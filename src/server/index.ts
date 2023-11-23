@@ -80,21 +80,26 @@ export class DocumentDriveServer implements IDocumentDriveServer {
         // retrieves the document's document model and
         // applies operation using its reducer
         const documentModel = this._getDocumentModel(document.documentType);
+        const signalResults: Promise<unknown>[] = [];
         const newDocument = documentModel.reducer(
             document,
             operation,
             signal => {
+                let result: Promise<unknown> | undefined = undefined;
                 switch (signal.type) {
                     case 'CREATE_CHILD_DOCUMENT':
-                        this.createDocument(drive, signal.input);
+                        result = this.createDocument(drive, signal.input);
                         break;
                     case 'DELETE_CHILD_DOCUMENT':
-                        this.deleteDocument(drive, signal.input.id);
+                        result = this.deleteDocument(drive, signal.input.id);
                         break;
+                }
+                if (result) {
+                    signalResults.push(result);
                 }
             }
         );
-
+        await Promise.all(signalResults);
         // saves the updated state of the document and returns it
         if (id) {
             await this.storage.saveDocument(drive, id, newDocument);

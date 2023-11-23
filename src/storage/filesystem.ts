@@ -1,6 +1,6 @@
 import { DocumentDriveDocument } from 'document-model-libs/document-drive';
 import { Document } from 'document-model/document';
-import fs from 'fs/promises';
+import fs from 'fs-extra';
 
 import path from 'path';
 import sanitize from 'sanitize-filename';
@@ -9,13 +9,20 @@ import { IDriveStorage } from './types';
 
 export class FilesystemStorage implements IDriveStorage {
     private basePath: string;
+    private drivesPath: string;
     private static DRIVES_DIR = 'drives';
 
     constructor(basePath: string) {
         this.basePath = basePath;
+        fs.ensureDirSync(this.basePath);
+        this.drivesPath = path.join(
+            this.basePath,
+            FilesystemStorage.DRIVES_DIR
+        );
+        fs.ensureDirSync(this.drivesPath);
     }
 
-    private _buildPath(...args: string[]) {
+    private _buildDocumentPath(...args: string[]) {
         return `${path.join(
             this.basePath,
             ...args.map(arg => sanitize(arg))
@@ -23,15 +30,17 @@ export class FilesystemStorage implements IDriveStorage {
     }
 
     async getDocuments(drive: string) {
-        const files = await fs.readdir(this._buildPath(drive), {
+        const files = await fs.readdir(path.join(this.basePath, drive), {
             withFileTypes: true
         });
         const documents: string[] = [];
         for (const file of files.filter(file => file.isFile())) {
             try {
+                const documentId = path.parse(file.name).name;
+
                 // checks if file is document
-                await this.getDocument(drive, file.name);
-                documents.push(file.name);
+                await this.getDocument(drive, documentId);
+                documents.push(documentId);
             } catch {
                 /* Ignore invalid document*/
             }
@@ -40,34 +49,35 @@ export class FilesystemStorage implements IDriveStorage {
     }
 
     async getDocument(drive: string, id: string) {
-        const content = await fs.readFile(this._buildPath(drive, id));
-        if (!content) {
+        try {
+            return await fs.readJSON(this._buildDocumentPath(drive, id));
+        } catch {
             throw new Error(`Document with id ${id} not found`);
         }
-        return JSON.parse(content.toString());
     }
 
     async saveDocument(drive: string, id: string, document: Document) {
-        return fs.writeFile(
-            this._buildPath(drive, id),
-            JSON.stringify(document)
-        );
+        const documentPath = this._buildDocumentPath(drive, id);
+        await fs.ensureDir(path.dirname(documentPath));
+        return fs.writeJSON(this._buildDocumentPath(drive, id), document);
     }
 
     async deleteDocument(drive: string, id: string) {
-        fs.rm(this._buildPath(drive, id));
+        return fs.rm(this._buildDocumentPath(drive, id));
     }
 
     async getDrives() {
-        const files = await fs.readdir(FilesystemStorage.DRIVES_DIR, {
+        const files = await fs.readdir(this.drivesPath, {
             withFileTypes: true
         });
         const drives: string[] = [];
         for (const file of files.filter(file => file.isFile())) {
             try {
+                const driveId = path.parse(file.name).name;
+
                 // checks if file is drive
-                await this.getDrive(file.name);
-                drives.push(file.name);
+                await this.getDrive(driveId);
+                drives.push(driveId);
             } catch {
                 /* Ignore invalid drive document found on drives dir */
             }
@@ -78,7 +88,7 @@ export class FilesystemStorage implements IDriveStorage {
     async getDrive(id: string) {
         let document: Document;
         try {
-            document = await this.getDocument(id, '');
+            document = await this.getDocument(FilesystemStorage.DRIVES_DIR, id);
         } catch {
             throw new Error(`Drive with id ${id} not found`);
         }
@@ -97,7 +107,11 @@ export class FilesystemStorage implements IDriveStorage {
         );
     }
 
-    deleteDrive(id: string) {
-        return this.deleteDocument(FilesystemStorage.DRIVES_DIR, id);
+    async deleteDrive(id: string) {
+        const documents = await this.getDocuments(id);
+        await this.deleteDocument(FilesystemStorage.DRIVES_DIR, id);
+        await Promise.all(
+            documents.map(document => this.deleteDocument(id, document))
+        );
     }
 }

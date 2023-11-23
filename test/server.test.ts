@@ -3,146 +3,231 @@ import {
     actions,
     reducer
 } from 'document-model-libs/document-drive';
-import * as Lib from 'document-model-libs/document-models';
+import * as DocumentModelsLibs from 'document-model-libs/document-models';
 import { DocumentModel } from 'document-model/document';
 import {
     module as DocumentModelLib,
     utils as DocumentModelUtils
 } from 'document-model/document-model';
-import { expect, test } from 'vitest';
+import fs from 'fs-extra';
+import path from 'path';
+import { afterEach, describe, it } from 'vitest';
 import { DocumentDriveServer } from '../src/server';
-import { MemoryStorage } from '../src/storage';
+import { FilesystemStorage, MemoryStorage } from '../src/storage';
 
 const documentModels = [
     DocumentModelLib,
-    ...Object.values(Lib)
+    ...Object.values(DocumentModelsLibs)
 ] as DocumentModel[];
 
-test('adds drive to server', async () => {
-    const server = new DocumentDriveServer(documentModels, new MemoryStorage());
-    await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+const FileStorageDir = path.join(__dirname, './file-storage');
 
-    const drive = await server.getDrive('1');
-    expect(drive.state).toStrictEqual(
-        DocumentDriveUtils.createState({
-            id: '1',
-            name: 'name',
-            icon: 'icon'
-        })
-    );
+const storageLayers = [
+    () => new MemoryStorage(),
+    () => new FilesystemStorage(FileStorageDir)
+] as const;
 
-    const drives = await server.getDrives();
-    expect(drives).toStrictEqual(['1']);
-});
+describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
+    'Document Drive Server with %s',
+    (storageName, buildStorage) => {
+        afterEach(() => {
+            if (storageName === FilesystemStorage.constructor.name) {
+                return fs.remove(FileStorageDir);
+            }
+        });
 
-test('adds file to server', async () => {
-    const server = new DocumentDriveServer(documentModels, new MemoryStorage());
-    await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
-    let drive = await server.getDrive('1');
+        it('adds drive to server', async ({ expect }) => {
+            const server = new DocumentDriveServer(
+                documentModels,
+                buildStorage()
+            );
+            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            const drive = await server.getDrive('1');
+            expect(drive.state).toStrictEqual(
+                DocumentDriveUtils.createState({
+                    id: '1',
+                    name: 'name',
+                    icon: 'icon'
+                })
+            );
 
-    // performs ADD_FILE operation locally
-    drive = reducer(
-        drive,
-        actions.addFile({
-            id: '1.1',
-            name: 'document 1',
-            documentType: 'powerhouse/document-model'
-        })
-    );
+            const drives = await server.getDrives();
+            expect(drives).toStrictEqual(['1']);
+        });
 
-    // dispatches operation to server
-    const operation = drive.operations[0]!;
-    const serverDrive = await server.addOperation('1', '', operation);
+        it('adds file to server', async ({ expect }) => {
+            const server = new DocumentDriveServer(
+                documentModels,
+                buildStorage()
+            );
+            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            let drive = await server.getDrive('1');
 
-    expect(drive.state).toStrictEqual(serverDrive.state);
-    expect(drive.state.nodes).toStrictEqual([
-        {
-            documentType: 'powerhouse/document-model',
-            id: '1.1',
-            kind: 'file',
-            name: 'document 1',
-            parentFolder: null
-        }
-    ]);
-});
+            // performs ADD_FILE operation locally
+            drive = reducer(
+                drive,
+                actions.addFile({
+                    id: '1.1',
+                    name: 'document 1',
+                    documentType: 'powerhouse/document-model'
+                })
+            );
 
-test('creates new document of the correct document type when file is added to server', async () => {
-    const server = new DocumentDriveServer(documentModels, new MemoryStorage());
-    await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
-    let drive = await server.getDrive('1');
-    drive = reducer(
-        drive,
-        actions.addFile({
-            id: '1.1',
-            name: 'document 1',
-            documentType: 'powerhouse/document-model'
-        })
-    );
-    const operation = drive.operations[0]!;
-    await server.addOperation('1', '', operation);
+            // dispatches operation to server
+            const operation = drive.operations[0]!;
+            const serverDrive = await server.addOperation('1', '', operation);
 
-    const document = await server.getDocument('1', '1.1');
-    expect(document.documentType).toBe('powerhouse/document-model');
-    expect(document.state).toStrictEqual(DocumentModelUtils.createState());
+            expect(drive.state).toStrictEqual(serverDrive.state);
+            expect(drive.state.nodes).toStrictEqual([
+                {
+                    documentType: 'powerhouse/document-model',
+                    id: '1.1',
+                    kind: 'file',
+                    name: 'document 1',
+                    parentFolder: null
+                }
+            ]);
+        });
 
-    const driveDocuments = await server.getDocuments('1');
-    expect(driveDocuments).toStrictEqual(['1.1']);
-});
+        it('creates new document of the correct document type when file is added to server', async ({
+            expect
+        }) => {
+            const server = new DocumentDriveServer(
+                documentModels,
+                buildStorage()
+            );
+            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            let drive = await server.getDrive('1');
+            drive = reducer(
+                drive,
+                actions.addFile({
+                    id: '1.1',
+                    name: 'document 1',
+                    documentType: 'powerhouse/document-model'
+                })
+            );
+            const operation = drive.operations[0]!;
 
-test('deletes file from server', async () => {
-    const server = new DocumentDriveServer(documentModels, new MemoryStorage());
-    await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
-    let drive = await server.getDrive('1');
+            await server.addOperation('1', '', operation);
 
-    // adds file
-    drive = reducer(
-        drive,
-        actions.addFile({
-            id: '1.1',
-            name: 'document 1',
-            documentType: 'powerhouse/document-model'
-        })
-    );
-    await server.addOperation('1', '', drive.operations[0]!);
+            const document = await server.getDocument('1', '1.1');
+            expect(document.documentType).toBe('powerhouse/document-model');
+            expect(document.state).toStrictEqual(
+                DocumentModelUtils.createState()
+            );
 
-    // removes file
-    drive = reducer(
-        drive,
-        actions.deleteNode({
-            id: '1.1'
-        })
-    );
-    await server.addOperation('1', '', drive.operations[1]!);
+            const driveDocuments = await server.getDocuments('1');
+            expect(driveDocuments).toStrictEqual(['1.1']);
+        });
 
-    const serverDrive = await server.getDrive('1');
-    expect(serverDrive.state.nodes).toStrictEqual([]);
-});
+        it('deletes file from server', async ({ expect }) => {
+            const server = new DocumentDriveServer(
+                documentModels,
+                buildStorage()
+            );
+            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            let drive = await server.getDrive('1');
 
-test('deletes document when file is removed from server', async () => {
-    const server = new DocumentDriveServer(documentModels, new MemoryStorage());
-    await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
-    let drive = await server.getDrive('1');
-    drive = reducer(
-        drive,
-        actions.addFile({
-            id: '1.1',
-            name: 'document 1',
-            documentType: 'powerhouse/document-model'
-        })
-    );
-    drive = reducer(
-        drive,
-        actions.deleteNode({
-            id: '1.1'
-        })
-    );
-    await server.addOperation('1', '', drive.operations[0]!);
-    await server.addOperation('1', '', drive.operations[1]!);
+            // adds file
+            drive = reducer(
+                drive,
+                actions.addFile({
+                    id: '1.1',
+                    name: 'document 1',
+                    documentType: 'powerhouse/document-model'
+                })
+            );
+            await server.addOperation('1', '', drive.operations[0]!);
 
-    const documents = await server.getDocuments('1');
-    expect(documents).toStrictEqual([]);
+            // removes file
+            drive = reducer(
+                drive,
+                actions.deleteNode({
+                    id: '1.1'
+                })
+            );
+            await server.addOperation('1', '', drive.operations[1]!);
 
-    expect(server.getDocument('1', '1.1')).rejects.toThrowError(
-        'Document with id 1.1 not found'
-    );
-});
+            const serverDrive = await server.getDrive('1');
+            expect(serverDrive.state.nodes).toStrictEqual([]);
+        });
+
+        it('deletes document when file is removed from server', async ({
+            expect
+        }) => {
+            const server = new DocumentDriveServer(
+                documentModels,
+                buildStorage()
+            );
+            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            let drive = await server.getDrive('1');
+            drive = reducer(
+                drive,
+                actions.addFile({
+                    id: '1.1',
+                    name: 'document 1',
+                    documentType: 'powerhouse/document-model'
+                })
+            );
+            drive = reducer(
+                drive,
+                actions.deleteNode({
+                    id: '1.1'
+                })
+            );
+            await server.addOperation('1', '', drive.operations[0]!);
+            await server.addOperation('1', '', drive.operations[1]!);
+
+            const documents = await server.getDocuments('1');
+            expect(documents).toStrictEqual([]);
+
+            expect(server.getDocument('1', '1.1')).rejects.toThrowError(
+                'Document with id 1.1 not found'
+            );
+        });
+
+        it('deletes documents inside a folder when it is removed from a drive', async ({
+            expect
+        }) => {
+            const server = new DocumentDriveServer(
+                documentModels,
+                buildStorage()
+            );
+            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            let drive = await server.getDrive('1');
+            drive = reducer(
+                drive,
+                actions.addFolder({
+                    id: '1.1',
+                    name: 'document 1'
+                })
+            );
+            drive = reducer(
+                drive,
+                actions.addFile({
+                    id: '1.1.1',
+                    name: 'document 1',
+                    documentType: 'powerhouse/document-model',
+                    parentFolder: '1.1'
+                })
+            );
+            drive = reducer(
+                drive,
+                actions.deleteNode({
+                    id: '1.1'
+                })
+            );
+
+            await server.addOperation('1', '', drive.operations[0]!);
+            await server.addOperation('1', '', drive.operations[1]!);
+            await server.addOperation('1', '', drive.operations[2]!);
+
+            const documents = await server.getDocuments('1');
+            expect(documents).toStrictEqual([]);
+
+            expect(server.getDocument('1', '1.1')).rejects.toThrowError(
+                'Document with id 1.1 not found'
+            );
+        });
+    }
+);
