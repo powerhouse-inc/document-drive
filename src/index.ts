@@ -1,15 +1,15 @@
-import { utils } from "document-model-libs/document-drive";
-import { Document, DocumentModel, Operation } from "document-model/document";
-import { MemoryStorage } from "./storage/memory";
+import { utils } from 'document-model-libs/document-drive';
+import { Document, DocumentModel, Operation } from 'document-model/document';
+import { MemoryStorage } from './storage/memory';
 import {
     CreateDocumentInput,
     DriveInput,
     IDocumentDriveServer,
-    IDriveStorage,
-} from "./types";
-import { isDocumentDrive } from "./utils";
+    IDriveStorage
+} from './types';
+import { isDocumentDrive } from './utils';
 
-export * from "./types";
+export * from './types';
 
 export class DocumentDriveServer implements IDocumentDriveServer {
     private documentModels: DocumentModel[];
@@ -25,7 +25,7 @@ export class DocumentDriveServer implements IDocumentDriveServer {
 
     private _getDocumentModel(documentType: string) {
         const documentModel = this.documentModels.find(
-            (model) => model.documentModel.id === documentType
+            model => model.documentModel.id === documentType
         );
         if (!documentModel) {
             throw new Error(`Document type ${documentType} not supported`);
@@ -83,9 +83,9 @@ export class DocumentDriveServer implements IDocumentDriveServer {
         const newDocument = documentModel.reducer(
             document,
             operation,
-            (signal) => {
+            signal => {
                 switch (signal.type) {
-                    case "CREATE_CHILD_DOCUMENT":
+                    case 'CREATE_CHILD_DOCUMENT':
                         this.createDocument(drive, signal.input);
                         break;
                 }
@@ -98,7 +98,7 @@ export class DocumentDriveServer implements IDocumentDriveServer {
         } else if (isDocumentDrive(newDocument)) {
             await this.storage.saveDrive(newDocument);
         } else {
-            throw new Error("Invalid document");
+            throw new Error('Invalid document');
         }
         return newDocument;
     }

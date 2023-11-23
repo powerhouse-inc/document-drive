@@ -24,7 +24,7 @@ export class FilesystemStorage implements IDriveStorage {
 
     async getDocuments(drive: string) {
         const files = await fs.readdir(this._buildPath(drive), {
-            withFileTypes: true,
+            withFileTypes: true
         });
         const documents: string[] = [];
         for (const file of files.filter(file => file.isFile())) {
@@ -60,7 +60,7 @@ export class FilesystemStorage implements IDriveStorage {
 
     async getDrives() {
         const files = await fs.readdir(FilesystemStorage.DRIVES_DIR, {
-            withFileTypes: true,
+            withFileTypes: true
         });
         const drives: string[] = [];
         for (const file of files.filter(file => file.isFile())) {

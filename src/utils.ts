@@ -1,7 +1,7 @@
 import {
     DocumentDriveDocument,
     documentModel as DocumentDriveModel,
-    z,
+    z
 } from 'document-model-libs/document-drive';
 import { Document } from 'document-model/document';
 

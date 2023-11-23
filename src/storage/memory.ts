@@ -1,6 +1,6 @@
-import { DocumentDriveDocument } from "document-model-libs/document-drive";
-import { Document } from "document-model/document";
-import { IDriveStorage } from "../types";
+import { DocumentDriveDocument } from 'document-model-libs/document-drive';
+import { Document } from 'document-model/document';
+import { IDriveStorage } from '../types';
 
 export class MemoryStorage implements IDriveStorage {
     private documents: Record<string, Record<string, Document>>;

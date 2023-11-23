@@ -1,12 +1,12 @@
 import {
     DocumentDriveDocument,
-    DocumentDriveState,
-} from "document-model-libs/document-drive";
-import { Document, Operation } from "document-model/document";
+    DocumentDriveState
+} from 'document-model-libs/document-drive';
+import { Document, Operation } from 'document-model/document';
 
 export type DriveInput = Omit<
     DocumentDriveState,
-    "__typename" | "remoteUrl" | "nodes"
+    '__typename' | 'remoteUrl' | 'nodes'
 >;
 
 export type CreateDocumentInput = {
