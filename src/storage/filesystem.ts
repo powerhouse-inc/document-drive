@@ -4,8 +4,8 @@ import fs from 'fs/promises';
 
 import path from 'path';
 import sanitize from 'sanitize-filename';
-import { IDriveStorage } from '../types';
 import { isDocumentDrive } from '../utils';
+import { IDriveStorage } from './types';
 
 export class FilesystemStorage implements IDriveStorage {
     private basePath: string;

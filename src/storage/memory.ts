@@ -1,6 +1,6 @@
 import { DocumentDriveDocument } from 'document-model-libs/document-drive';
 import { Document } from 'document-model/document';
-import { IDriveStorage } from '../types';
+import { IDriveStorage } from './types';
 
 export class MemoryStorage implements IDriveStorage {
     private documents: Record<string, Record<string, Document>>;
@@ -11,8 +11,8 @@ export class MemoryStorage implements IDriveStorage {
         this.drives = {};
     }
 
-    async getDocuments() {
-        return Object.keys(this.documents);
+    async getDocuments(drive: string) {
+        return Object.keys(this.documents[drive] ?? {});
     }
 
     async getDocument(driveId: string, id: string) {

@@ -1,15 +1,11 @@
 import { utils } from 'document-model-libs/document-drive';
 import { Document, DocumentModel, Operation } from 'document-model/document';
-import { MemoryStorage } from './storage/memory';
-import {
-    CreateDocumentInput,
-    DriveInput,
-    IDocumentDriveServer,
-    IDriveStorage
-} from './types';
-import { isDocumentDrive } from './utils';
+import { IDriveStorage } from '../storage';
+import { MemoryStorage } from '../storage/memory';
+import { isDocumentDrive } from '../utils';
+import { CreateDocumentInput, DriveInput, IDocumentDriveServer } from './types';
 
-export * from './types';
+export type * from './types';
 
 export class DocumentDriveServer implements IDocumentDriveServer {
     private documentModels: DocumentModel[];
@@ -40,6 +36,10 @@ export class DocumentDriveServer implements IDocumentDriveServer {
 
     deleteDrive(id: string) {
         return this.storage.deleteDrive(id);
+    }
+
+    getDrives() {
+        return this.storage.getDrives();
     }
 
     getDrive(drive: string) {
@@ -87,6 +87,9 @@ export class DocumentDriveServer implements IDocumentDriveServer {
                 switch (signal.type) {
                     case 'CREATE_CHILD_DOCUMENT':
                         this.createDocument(drive, signal.input);
+                        break;
+                    case 'DELETE_CHILD_DOCUMENT':
+                        this.deleteDocument(drive, signal.input.id);
                         break;
                 }
             }
