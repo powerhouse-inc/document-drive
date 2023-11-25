@@ -9,7 +9,7 @@ import {
     module as DocumentModelLib,
     utils as DocumentModelUtils
 } from 'document-model/document-model';
-import fs from 'fs-extra';
+import fs from 'fs/promises';
 import path from 'path';
 import { afterEach, describe, it } from 'vitest';
 import { DocumentDriveServer } from '../src/server';
@@ -32,7 +32,7 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
     (storageName, buildStorage) => {
         afterEach(() => {
             if (storageName === FilesystemStorage.constructor.name) {
-                return fs.remove(FileStorageDir);
+                return fs.rm(FileStorageDir, { recursive: true, force: true });
             }
         });
 

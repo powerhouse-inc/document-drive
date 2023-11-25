@@ -1,11 +1,18 @@
 import { DocumentDriveDocument } from 'document-model-libs/document-drive';
 import { Document } from 'document-model/document';
-import fs from 'fs-extra';
+import { existsSync, mkdirSync } from 'fs';
+import fs from 'fs/promises';
 
 import path from 'path';
 import sanitize from 'sanitize-filename';
 import { isDocumentDrive } from '../utils';
 import { IDriveStorage } from './types';
+
+function ensureDir(dir: string) {
+    if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+    }
+}
 
 export class FilesystemStorage implements IDriveStorage {
     private basePath: string;
@@ -14,12 +21,12 @@ export class FilesystemStorage implements IDriveStorage {
 
     constructor(basePath: string) {
         this.basePath = basePath;
-        fs.ensureDirSync(this.basePath);
+        ensureDir(this.basePath);
         this.drivesPath = path.join(
             this.basePath,
             FilesystemStorage.DRIVES_DIR
         );
-        fs.ensureDirSync(this.drivesPath);
+        ensureDir(this.drivesPath);
     }
 
     private _buildDocumentPath(...args: string[]) {
@@ -50,7 +57,11 @@ export class FilesystemStorage implements IDriveStorage {
 
     async getDocument(drive: string, id: string) {
         try {
-            return await fs.readJSON(this._buildDocumentPath(drive, id));
+            const content = await fs.readFile(
+                this._buildDocumentPath(drive, id),
+                { encoding: 'utf-8' }
+            );
+            return JSON.parse(content);
         } catch {
             throw new Error(`Document with id ${id} not found`);
         }
@@ -58,8 +69,12 @@ export class FilesystemStorage implements IDriveStorage {
 
     async saveDocument(drive: string, id: string, document: Document) {
         const documentPath = this._buildDocumentPath(drive, id);
-        await fs.ensureDir(path.dirname(documentPath));
-        return fs.writeJSON(this._buildDocumentPath(drive, id), document);
+        await ensureDir(path.dirname(documentPath));
+        return fs.writeFile(
+            this._buildDocumentPath(drive, id),
+            JSON.stringify(document),
+            { encoding: 'utf-8' }
+        );
     }
 
     async deleteDocument(drive: string, id: string) {
