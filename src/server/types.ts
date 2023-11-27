@@ -12,7 +12,7 @@ export type DriveInput = Omit<
 export type CreateDocumentInput = {
     id: string;
     documentType: string;
-    // initialState?: ExtendedState<S>; TODO add support for initial state
+    document?: Document;
 };
 
 export interface SortOptions {

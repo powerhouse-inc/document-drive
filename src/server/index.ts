@@ -56,9 +56,9 @@ export class DocumentDriveServer implements IDocumentDriveServer {
 
     async createDocument(driveId: string, input: CreateDocumentInput) {
         const documentModel = this._getDocumentModel(input.documentType);
-        const document = documentModel.utils.createDocument({
-            //  state: input.initialState, TODO add initial state
-        });
+
+        // TODO validate input.document is of documentType
+        const document = input.document ?? documentModel.utils.createDocument();
 
         return this.storage.saveDocument(driveId, input.id, document);
     }
