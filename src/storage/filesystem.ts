@@ -1,5 +1,6 @@
 import { DocumentDriveDocument } from 'document-model-libs/document-drive';
 import { Document } from 'document-model/document';
+import type { Dirent } from 'fs';
 import { existsSync, mkdirSync } from 'fs';
 import fs from 'fs/promises';
 
@@ -13,6 +14,13 @@ function ensureDir(dir: string) {
         mkdirSync(dir, { recursive: true });
     }
 }
+
+type FSError = {
+    errno: number;
+    code: string;
+    syscall: string;
+    path: string;
+};
 
 export class FilesystemStorage implements IDriveStorage {
     private basePath: string;
@@ -37,9 +45,17 @@ export class FilesystemStorage implements IDriveStorage {
     }
 
     async getDocuments(drive: string) {
-        const files = await fs.readdir(path.join(this.basePath, drive), {
-            withFileTypes: true
-        });
+        let files: Dirent[] = [];
+        try {
+            files = await fs.readdir(path.join(this.basePath, drive), {
+                withFileTypes: true
+            });
+        } catch (error) {
+            // if folder is not found then drive has no documents
+            if ((error as FSError).code !== 'ENOENT') {
+                throw error;
+            }
+        }
         const documents: string[] = [];
         for (const file of files.filter(file => file.isFile())) {
             try {

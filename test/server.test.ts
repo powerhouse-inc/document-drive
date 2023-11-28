@@ -229,5 +229,43 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
                 'Document with id 1.1 not found'
             );
         });
+
+        it('deletes drive from server', async ({ expect }) => {
+            const server = new DocumentDriveServer(
+                documentModels,
+                buildStorage()
+            );
+            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+
+            await server.deleteDrive('1');
+
+            const drives = await server.getDrives();
+            expect(drives).toStrictEqual([]);
+        });
+
+        it('deletes documents when drive is deleted from server', async ({
+            expect
+        }) => {
+            const server = new DocumentDriveServer(
+                documentModels,
+                buildStorage()
+            );
+            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+
+            const drive = await server.getDrive('1');
+            reducer(
+                drive,
+                actions.addFile({
+                    id: '1.1.1',
+                    name: 'document 1',
+                    documentType: 'powerhouse/document-model'
+                })
+            );
+
+            await server.deleteDrive('1');
+
+            const documents = await server.getDocuments('1');
+            expect(documents).toStrictEqual([]);
+        });
     }
 );
