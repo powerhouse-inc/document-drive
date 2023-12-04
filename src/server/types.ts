@@ -1,9 +1,14 @@
-import {
+import type {
     DocumentDriveAction,
     DocumentDriveDocument,
     DocumentDriveState
 } from 'document-model-libs/document-drive';
-import { BaseAction, Document, Operation } from 'document-model/document';
+import type {
+    BaseAction,
+    Document,
+    Operation,
+    Signal
+} from 'document-model/document';
 
 export type DriveInput = Omit<
     DocumentDriveState,
@@ -16,9 +21,18 @@ export type CreateDocumentInput = {
     document?: Document;
 };
 
-export interface SortOptions {
-    afterNodePath?: string;
-}
+export type SignalResult = {
+    signal: Signal;
+    result: unknown; // infer from return types on document-model
+};
+
+export type IOperationResult<T extends Document = Document> = {
+    success: boolean;
+    error?: Error;
+    operation: Operation;
+    document: T;
+    signals: SignalResult[];
+};
 
 export interface IDocumentDriveServer {
     getDrives(): Promise<string[]>;
@@ -35,19 +49,19 @@ export interface IDocumentDriveServer {
         drive: string,
         id: string,
         operation: Operation
-    ): Promise<Document>;
+    ): Promise<IOperationResult>;
     addOperations(
         drive: string,
         id: string,
         operations: Operation[]
-    ): Promise<Document>;
+    ): Promise<IOperationResult[]>;
 
     addDriveOperation(
         drive: string,
         operation: Operation<DocumentDriveAction | BaseAction>
-    ): Promise<DocumentDriveDocument>;
+    ): Promise<IOperationResult<DocumentDriveDocument>>;
     addDriveOperations(
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[]
-    ): Promise<DocumentDriveDocument>;
+    ): Promise<IOperationResult<DocumentDriveDocument>[]>;
 }
