@@ -56,6 +56,7 @@ export class MemoryStorage implements IDriveStorage {
     }
 
     async deleteDrive(id: string) {
+        delete this.documents[id];
         delete this.drives[id];
     }
 }

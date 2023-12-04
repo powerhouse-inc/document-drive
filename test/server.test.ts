@@ -252,8 +252,8 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
             );
             await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
 
-            const drive = await server.getDrive('1');
-            reducer(
+            let drive = await server.getDrive('1');
+            drive = reducer(
                 drive,
                 actions.addFile({
                     id: '1.1.1',
@@ -262,10 +262,31 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
                 })
             );
 
+            await server.addOperation('1', '', drive.operations[0]!);
             await server.deleteDrive('1');
 
             const documents = await server.getDocuments('1');
             expect(documents).toStrictEqual([]);
+        });
+
+        it('renames drive', async ({ expect }) => {
+            const server = new DocumentDriveServer(
+                documentModels,
+                buildStorage()
+            );
+            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            let drive = await server.getDrive('1');
+            drive = reducer(
+                drive,
+                actions.setDriveName({
+                    name: 'new name'
+                })
+            );
+
+            await server.addOperation('1', '', drive.operations[0]!);
+
+            drive = await server.getDrive('1');
+            expect(drive.state.name).toBe('new name');
         });
     }
 );
