@@ -1,8 +1,9 @@
 import {
+    DocumentDriveAction,
     DocumentDriveDocument,
     DocumentDriveState
 } from 'document-model-libs/document-drive';
-import { Document, Operation } from 'document-model/document';
+import { BaseAction, Document, Operation } from 'document-model/document';
 
 export type DriveInput = Omit<
     DocumentDriveState,
@@ -36,6 +37,17 @@ export interface IDocumentDriveServer {
         operation: Operation
     ): Promise<Document>;
     addOperations(
-        operations: { drive: string; id: string; operation: Operation }[]
-    ): Promise<Document[]>;
+        drive: string,
+        id: string,
+        operations: Operation[]
+    ): Promise<Document>;
+
+    addDriveOperation(
+        drive: string,
+        operation: Operation<DocumentDriveAction | BaseAction>
+    ): Promise<DocumentDriveDocument>;
+    addDriveOperations(
+        drive: string,
+        operations: Operation<DocumentDriveAction | BaseAction>[]
+    ): Promise<DocumentDriveDocument>;
 }

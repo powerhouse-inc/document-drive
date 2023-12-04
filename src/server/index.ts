@@ -1,5 +1,14 @@
-import { utils } from 'document-model-libs/document-drive';
-import { Document, DocumentModel, Operation } from 'document-model/document';
+import {
+    DocumentDriveAction,
+    DocumentDriveDocument,
+    utils
+} from 'document-model-libs/document-drive';
+import {
+    BaseAction,
+    Document,
+    DocumentModel,
+    Operation
+} from 'document-model/document';
 import { IDriveStorage } from '../storage';
 import { MemoryStorage } from '../storage/memory';
 import { isDocumentDrive } from '../utils';
@@ -111,13 +120,36 @@ export class DocumentDriveServer implements IDocumentDriveServer {
         return newDocument;
     }
 
-    async addOperations(
-        operations: { drive: string; id: string; operation: Operation }[]
-    ) {
-        return Promise.all(
-            operations.map(({ drive, id, operation }) =>
-                this.addOperation(drive, id, operation)
-            )
-        );
+    async addOperations(drive: string, id: string, operations: Operation[]) {
+        let document: Document | null = null;
+        for (const operation of operations) {
+            document = await this.addOperation(drive, id, operation);
+        }
+        if (!document) {
+            throw new Error('Document not found');
+        }
+        return document;
+    }
+
+    addDriveOperation(
+        drive: string,
+        operation: Operation<DocumentDriveAction | BaseAction>
+    ): Promise<DocumentDriveDocument> {
+        return this.addOperation(
+            drive,
+            '',
+            operation
+        ) as Promise<DocumentDriveDocument>;
+    }
+
+    addDriveOperations(
+        drive: string,
+        operations: Operation<DocumentDriveAction | BaseAction>[]
+    ): Promise<DocumentDriveDocument> {
+        return this.addOperations(
+            drive,
+            '',
+            operations
+        ) as Promise<DocumentDriveDocument>;
     }
 }

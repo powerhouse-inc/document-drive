@@ -175,8 +175,8 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
                     id: '1.1'
                 })
             );
-            await server.addOperation('1', '', drive.operations[0]!);
-            await server.addOperation('1', '', drive.operations[1]!);
+
+            await server.addDriveOperations('1', drive.operations);
 
             const documents = await server.getDocuments('1');
             expect(documents).toStrictEqual([]);
