@@ -35,4 +35,7 @@ export interface IDocumentDriveServer {
         id: string,
         operation: Operation
     ): Promise<Document>;
+    addOperations(
+        operations: { drive: string; id: string; operation: Operation }[]
+    ): Promise<Document[]>;
 }

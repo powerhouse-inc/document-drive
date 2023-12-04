@@ -110,4 +110,14 @@ export class DocumentDriveServer implements IDocumentDriveServer {
         }
         return newDocument;
     }
+
+    async addOperations(
+        operations: { drive: string; id: string; operation: Operation }[]
+    ) {
+        return Promise.all(
+            operations.map(({ drive, id, operation }) =>
+                this.addOperation(drive, id, operation)
+            )
+        );
+    }
 }
