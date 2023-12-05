@@ -103,7 +103,6 @@ export class DocumentDriveServer implements IDocumentDriveServer {
                             );
                             break;
                         case 'COPY_CHILD_DOCUMENT':
-                            console.log(signal.input);
                             handler = this.getDocument(
                                 drive,
                                 signal.input.id
