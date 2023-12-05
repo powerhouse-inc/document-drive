@@ -1,9 +1,19 @@
-import { utils } from 'document-model-libs/document-drive';
-import { Document, DocumentModel, Operation } from 'document-model/document';
+import {
+    DocumentDriveAction,
+    DocumentDriveDocument,
+    utils
+} from 'document-model-libs/document-drive';
+import { BaseAction, DocumentModel, Operation } from 'document-model/document';
 import { IDriveStorage } from '../storage';
 import { MemoryStorage } from '../storage/memory';
 import { isDocumentDrive } from '../utils';
-import { CreateDocumentInput, DriveInput, IDocumentDriveServer } from './types';
+import {
+    CreateDocumentInput,
+    DriveInput,
+    IDocumentDriveServer,
+    IOperationResult,
+    SignalResult
+} from './types';
 
 export type * from './types';
 
@@ -67,47 +77,89 @@ export class DocumentDriveServer implements IDocumentDriveServer {
         return this.storage.deleteDocument(driveId, id);
     }
 
-    async addOperation(
-        drive: string,
-        id: string,
-        operation: Operation
-    ): Promise<Document> {
+    async addOperation(drive: string, id: string, operation: Operation) {
         // retrieves document from storage
         const document = await (id
             ? this.storage.getDocument(drive, id)
             : this.storage.getDrive(drive));
+        try {
+            // retrieves the document's document model and
+            // applies operation using its reducer
+            const documentModel = this._getDocumentModel(document.documentType);
+            const signalHandlers: Promise<SignalResult>[] = [];
+            const newDocument = documentModel.reducer(
+                document,
+                operation,
+                signal => {
+                    let handler: Promise<unknown> | undefined = undefined;
+                    switch (signal.type) {
+                        case 'CREATE_CHILD_DOCUMENT':
+                            handler = this.createDocument(drive, signal.input);
+                            break;
+                        case 'DELETE_CHILD_DOCUMENT':
+                            handler = this.deleteDocument(
+                                drive,
+                                signal.input.id
+                            );
+                            break;
+                    }
+                    if (handler) {
+                        signalHandlers.push(
+                            handler.then(result => ({ signal, result }))
+                        );
+                    }
+                }
+            );
+            const signals = await Promise.all(signalHandlers);
 
-        // retrieves the document's document model and
-        // applies operation using its reducer
-        const documentModel = this._getDocumentModel(document.documentType);
-        const signalResults: Promise<unknown>[] = [];
-        const newDocument = documentModel.reducer(
-            document,
-            operation,
-            signal => {
-                let result: Promise<unknown> | undefined = undefined;
-                switch (signal.type) {
-                    case 'CREATE_CHILD_DOCUMENT':
-                        result = this.createDocument(drive, signal.input);
-                        break;
-                    case 'DELETE_CHILD_DOCUMENT':
-                        result = this.deleteDocument(drive, signal.input.id);
-                        break;
-                }
-                if (result) {
-                    signalResults.push(result);
-                }
+            // saves the updated state of the document and returns it
+            if (id) {
+                await this.storage.saveDocument(drive, id, newDocument);
+            } else if (isDocumentDrive(newDocument)) {
+                await this.storage.saveDrive(newDocument);
+            } else {
+                throw new Error('Invalid document');
             }
-        );
-        await Promise.all(signalResults);
-        // saves the updated state of the document and returns it
-        if (id) {
-            await this.storage.saveDocument(drive, id, newDocument);
-        } else if (isDocumentDrive(newDocument)) {
-            await this.storage.saveDrive(newDocument);
-        } else {
-            throw new Error('Invalid document');
+            return {
+                success: true,
+                document: newDocument,
+                operation,
+                signals
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error as Error,
+                document,
+                operation,
+                signals: []
+            };
         }
-        return newDocument;
+    }
+
+    async addOperations(drive: string, id: string, operations: Operation[]) {
+        const results: IOperationResult[] = [];
+        for (const operation of operations) {
+            results.push(await this.addOperation(drive, id, operation));
+        }
+        return results;
+    }
+
+    addDriveOperation(
+        drive: string,
+        operation: Operation<DocumentDriveAction | BaseAction>
+    ) {
+        return this.addOperation(drive, '', operation) as Promise<
+            IOperationResult<DocumentDriveDocument>
+        >;
+    }
+
+    addDriveOperations(
+        drive: string,
+        operations: Operation<DocumentDriveAction | BaseAction>[]
+    ) {
+        return this.addOperations(drive, '', operations) as Promise<
+            IOperationResult<DocumentDriveDocument>[]
+        >;
     }
 }

@@ -75,9 +75,12 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
 
             // dispatches operation to server
             const operation = drive.operations[0]!;
-            const serverDrive = await server.addOperation('1', '', operation);
+            const operationResult = await server.addDriveOperation(
+                '1',
+                operation
+            );
 
-            expect(drive.state).toStrictEqual(serverDrive.state);
+            expect(drive.state).toStrictEqual(operationResult.document.state);
             expect(drive.state.nodes).toStrictEqual([
                 {
                     documentType: 'powerhouse/document-model',
@@ -108,7 +111,7 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
             );
             const operation = drive.operations[0]!;
 
-            await server.addOperation('1', '', operation);
+            await server.addDriveOperation('1', operation);
 
             const document = await server.getDocument('1', '1.1');
             expect(document.documentType).toBe('powerhouse/document-model');
@@ -137,7 +140,7 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
                     documentType: 'powerhouse/document-model'
                 })
             );
-            await server.addOperation('1', '', drive.operations[0]!);
+            await server.addDriveOperation('1', drive.operations[0]!);
 
             // removes file
             drive = reducer(
@@ -146,7 +149,7 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
                     id: '1.1'
                 })
             );
-            await server.addOperation('1', '', drive.operations[1]!);
+            await server.addDriveOperation('1', drive.operations[1]!);
 
             const serverDrive = await server.getDrive('1');
             expect(serverDrive.state.nodes).toStrictEqual([]);
@@ -175,8 +178,8 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
                     id: '1.1'
                 })
             );
-            await server.addOperation('1', '', drive.operations[0]!);
-            await server.addOperation('1', '', drive.operations[1]!);
+
+            await server.addDriveOperations('1', drive.operations);
 
             const documents = await server.getDocuments('1');
             expect(documents).toStrictEqual([]);
@@ -218,9 +221,7 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
                 })
             );
 
-            await server.addOperation('1', '', drive.operations[0]!);
-            await server.addOperation('1', '', drive.operations[1]!);
-            await server.addOperation('1', '', drive.operations[2]!);
+            await server.addDriveOperations('1', drive.operations);
 
             const documents = await server.getDocuments('1');
             expect(documents).toStrictEqual([]);
@@ -252,8 +253,8 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
             );
             await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
 
-            const drive = await server.getDrive('1');
-            reducer(
+            let drive = await server.getDrive('1');
+            drive = reducer(
                 drive,
                 actions.addFile({
                     id: '1.1.1',
@@ -262,10 +263,31 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
                 })
             );
 
+            await server.addDriveOperation('1', drive.operations[0]!);
             await server.deleteDrive('1');
 
             const documents = await server.getDocuments('1');
             expect(documents).toStrictEqual([]);
+        });
+
+        it('renames drive', async ({ expect }) => {
+            const server = new DocumentDriveServer(
+                documentModels,
+                buildStorage()
+            );
+            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            let drive = await server.getDrive('1');
+            drive = reducer(
+                drive,
+                actions.setDriveName({
+                    name: 'new name'
+                })
+            );
+
+            await server.addDriveOperation('1', drive.operations[0]!);
+
+            drive = await server.getDrive('1');
+            expect(drive.state.name).toBe('new name');
         });
     }
 );
