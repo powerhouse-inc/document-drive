@@ -684,15 +684,15 @@ doctrine@^3.0.0:
   dependencies:
     esutils "^2.0.2"
 
-document-model-libs@^1.1.21:
-  version "1.1.21"
-  resolved "https://registry.yarnpkg.com/document-model-libs/-/document-model-libs-1.1.21.tgz#29b3b07951895c6c69d91fc90c7faffb7a8125fa"
-  integrity sha512-ACohY7cY43/UoA4s6VFvkVp+Gg7aDlZ55X4LKR4TjOLlbRWUtSZqchPrquZytXCkeOYlNXP8vdXOrGIFd9IAAw==
+document-model-libs@^1.1.23:
+  version "1.1.23"
+  resolved "https://registry.yarnpkg.com/document-model-libs/-/document-model-libs-1.1.23.tgz#f1599af11d7ba3d371ab29ce1db9b71df7a29ac8"
+  integrity sha512-jOhkxuvDwWQaM7vSHttqWWPukq3PpToB7iH+s2YFKRX1hkZbMIdywteBBzgXo8fcu3FhAFzGSB3/EYza43AWTA==
 
-document-model@^1.0.13:
-  version "1.0.13"
-  resolved "https://registry.yarnpkg.com/document-model/-/document-model-1.0.13.tgz#c76ae5c3966b42e1cc2cdce8e0e679d9c5dfc361"
-  integrity sha512-JlkcddHvDk6CwYOswbmHJcK1XvOufVziPxHog++DGF+KvpG4wglI/VNu/SwXJqFwVaF3tRxbZDetiP1hRcF22w==
+document-model@^1.0.15:
+  version "1.0.15"
+  resolved "https://registry.yarnpkg.com/document-model/-/document-model-1.0.15.tgz#f2f66b2e7ef5330335f6dcc5ecf0d21511696ad6"
+  integrity sha512-om5cr100jGh1TkaHIBQhCUrj+WmDgSo9LGlQx9Yy7qqn2IshO+yNxyN85vNBma7TALTbjynvhS1EfjkNL1KRHw==
   dependencies:
     immer "^10.0.2"
     json-stringify-deterministic "^1.0.10"

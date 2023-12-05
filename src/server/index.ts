@@ -102,6 +102,19 @@ export class DocumentDriveServer implements IDocumentDriveServer {
                                 signal.input.id
                             );
                             break;
+                        case 'COPY_CHILD_DOCUMENT':
+                            console.log(signal.input);
+                            handler = this.getDocument(
+                                drive,
+                                signal.input.id
+                            ).then(documentToCopy =>
+                                this.createDocument(drive, {
+                                    id: signal.input.newId,
+                                    documentType: documentToCopy.documentType,
+                                    document: documentToCopy
+                                })
+                            );
+                            break;
                     }
                     if (handler) {
                         signalHandlers.push(

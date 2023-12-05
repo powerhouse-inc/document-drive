@@ -289,5 +289,51 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
             drive = await server.getDrive('1');
             expect(drive.state.name).toBe('new name');
         });
+
+        it('copies document when file is copied drive', async ({ expect }) => {
+            const server = new DocumentDriveServer(
+                documentModels,
+                buildStorage()
+            );
+            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            let drive = await server.getDrive('1');
+            drive = reducer(
+                drive,
+                actions.addFolder({
+                    id: '1',
+                    name: '1'
+                })
+            );
+            drive = reducer(
+                drive,
+                actions.addFolder({
+                    id: '2',
+                    name: '2'
+                })
+            );
+            drive = reducer(
+                drive,
+                actions.addFile({
+                    id: '1.1',
+                    name: '1.1',
+                    documentType: 'powerhouse/document-model',
+                    parentFolder: '1'
+                })
+            );
+            drive = reducer(
+                drive,
+                actions.copyNode({
+                    srcId: '1.1',
+                    targetId: '2.1',
+                    targetName: '2.2',
+                    targetParentFolder: '2'
+                })
+            );
+            await server.addDriveOperations('1', drive.operations);
+            drive = await server.getDrive('1');
+            const document = await server.getDocument('1', '1.1');
+            const documentB = await server.getDocument('1', '2.1');
+            expect(document).toStrictEqual(documentB);
+        });
     }
 );
