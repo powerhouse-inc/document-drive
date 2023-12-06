@@ -11,7 +11,7 @@ export class BrowserStorage implements IDriveStorage {
 
     constructor() {
         this.db = import('localforage').then(localForage =>
-            localForage.createInstance({
+            localForage.default.createInstance({
                 name: BrowserStorage.DBName
             })
         );
