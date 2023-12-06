@@ -9,6 +9,8 @@
         ".": "./src/index.ts",
         "./server": "./src/server/index.ts",
         "./storage": "./src/storage/index.ts",
+        "./storage/filesystem": "./src/storage/filesystem.ts",
+        "./storage/browser": "./src/storage/browser.ts",
         "./utils": "./src/utils.ts"
     },
     "files": [
