@@ -6,6 +6,7 @@ export default defineConfig({
             deps: {
                 inline: ['document-model-libs']
             }
-        }
+        },
+        setupFiles: './test/vitest-setup.ts'
     }
 });

@@ -14,6 +14,7 @@ import path from 'path';
 import { afterEach, describe, it } from 'vitest';
 import { DocumentDriveServer } from '../src/server';
 import { FilesystemStorage, MemoryStorage } from '../src/storage';
+import { BrowserStorage } from '../src/storage/browser';
 
 const documentModels = [
     DocumentModelLib,
@@ -24,7 +25,8 @@ const FileStorageDir = path.join(__dirname, './file-storage');
 
 const storageLayers = [
     () => new MemoryStorage(),
-    () => new FilesystemStorage(FileStorageDir)
+    () => new FilesystemStorage(FileStorageDir),
+    () => new BrowserStorage()
 ] as const;
 
 describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
@@ -198,6 +200,7 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
             );
             await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
             let drive = await server.getDrive('1');
+
             drive = reducer(
                 drive,
                 actions.addFolder({
