@@ -10,10 +10,7 @@ import type {
     Signal
 } from 'document-model/document';
 
-export type DriveInput = Omit<
-    DocumentDriveState,
-    '__typename' | 'remoteUrl' | 'nodes'
->;
+export type DriveInput = Omit<DocumentDriveState, '__typename' | 'nodes'>;
 
 export type CreateDocumentInput = {
     id: string;
