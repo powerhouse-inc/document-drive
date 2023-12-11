@@ -133,7 +133,7 @@ export class FilesystemStorage implements IDriveStorage {
     saveDrive(drive: DocumentDriveDocument) {
         return this.saveDocument(
             FilesystemStorage.DRIVES_DIR,
-            drive.state.id,
+            drive.state.global.id,
             drive
         );
     }
