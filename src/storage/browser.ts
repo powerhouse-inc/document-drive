@@ -53,7 +53,7 @@ export class BrowserStorage implements IDriveStorage {
                 await this.db
             ).getItem<DocumentDriveDocument[]>(BrowserStorage.DRIVES_KEY)) ??
             [];
-        return drives.map(drive => drive.state.id);
+        return drives.map(drive => drive.state.global.id);
     }
 
     async getDrive(id: string) {
@@ -62,7 +62,7 @@ export class BrowserStorage implements IDriveStorage {
                 await this.db
             ).getItem<DocumentDriveDocument[]>(BrowserStorage.DRIVES_KEY)) ??
             [];
-        const drive = drives.find(drive => drive.state.id === id);
+        const drive = drives.find(drive => drive.state.global.id === id);
         if (!drive) {
             throw new Error(`Drive with id ${id} not found`);
         }
@@ -75,7 +75,9 @@ export class BrowserStorage implements IDriveStorage {
             (await db.getItem<DocumentDriveDocument[]>(
                 BrowserStorage.DRIVES_KEY
             )) ?? [];
-        const index = drives.findIndex(d => d.state.id === drive.state.id);
+        const index = drives.findIndex(
+            d => d.state.global.id === drive.state.global.id
+        );
         if (index > -1) {
             drives[index] = drive;
         } else {
@@ -94,7 +96,7 @@ export class BrowserStorage implements IDriveStorage {
             )) ?? [];
         await db.setItem(
             BrowserStorage.DRIVES_KEY,
-            drives.filter(drive => drive.state.id !== id)
+            drives.filter(drive => drive.state.global.id !== id)
         );
     }
 }
