@@ -16,6 +16,7 @@ export class MemoryStorage implements IDriveStorage {
     }
 
     async getDocument(driveId: string, id: string) {
+        
         const drive = this.documents[driveId];
         if (!drive) {
             throw new Error(`Drive with id ${driveId} not found`);
@@ -24,10 +25,12 @@ export class MemoryStorage implements IDriveStorage {
         if (!document) {
             throw new Error(`Document with id ${id} not found`);
         }
+        console.log(document);
         return document;
     }
 
     async saveDocument(drive: string, id: string, document: Document) {
+        console.log(drive, id, document);
         this.documents[drive] = this.documents[drive] ?? {};
         this.documents[drive]![id] = document;
     }
@@ -52,6 +55,7 @@ export class MemoryStorage implements IDriveStorage {
     }
 
     async saveDrive(drive: DocumentDriveDocument) {
+        console.log(drive);
         this.drives[drive.state.id] = drive;
     }
 

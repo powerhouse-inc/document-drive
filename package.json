@@ -27,7 +27,24 @@
         "document-model-libs": "^1.1.14"
     },
     "dependencies": {
-        "sanitize-filename": "^1.6.3"
+        "@ceramicnetwork/cli": "3.1.0",
+        "@ceramicnetwork/common": "3.1.0",
+        "@ceramicnetwork/http-client": "3.1.0",
+        "@composedb/cli": "0.6.1",
+        "@composedb/client": "0.6.1",
+        "@composedb/devtools": "0.6.1",
+        "@composedb/devtools-node": "0.6.1",
+        "@ceramicnetwork/blockchain-utils-linking": "3.1.0",
+        "@didtools/cacao": "2.0.0",
+        "@didtools/pkh-ethereum": "0.1.0",
+        "@prisma/client": "5.6.0",
+        "dids": "^4.0.4",
+        "key-did-provider-ed25519": "^3.0.2",
+        "key-did-resolver": "^3.0.0",
+        "knex": "^3.0.1",
+        "prisma": "^5.6.0",
+        "sanitize-filename": "^1.6.3",
+        "uint8arrays": "^5.0.0"
     },
     "devDependencies": {
         "@typescript-eslint/eslint-plugin": "^6.12.0",

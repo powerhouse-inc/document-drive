@@ -13,7 +13,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import { afterEach, describe, it } from 'vitest';
 import { DocumentDriveServer } from '../src/server';
-import { FilesystemStorage, MemoryStorage } from '../src/storage';
+import { FilesystemStorage } from '../src/storage';
+import { DatabaseStorage } from '../src/storage/database';
+// Import ComposeDB client
 
 const documentModels = [
     DocumentModelLib,
@@ -23,8 +25,9 @@ const documentModels = [
 const FileStorageDir = path.join(__dirname, './file-storage');
 
 const storageLayers = [
-    () => new MemoryStorage(),
-    () => new FilesystemStorage(FileStorageDir)
+    // () => new MemoryStorage()
+    // () => new FilesystemStorage(FileStorageDir),
+    () => new DatabaseStorage()
 ] as const;
 
 describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
@@ -41,8 +44,9 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
                 documentModels,
                 buildStorage()
             );
-            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
-            const drive = await server.getDrive('1');
+            await server.addDrive({ id: '', name: 'name', icon: 'icon' });
+            let drives = await server.getDrives();
+            const drive = await server.getDrive(drives[0]!);
             expect(drive.state).toStrictEqual(
                 DocumentDriveUtils.createState({
                     id: '1',
@@ -51,7 +55,7 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
                 })
             );
 
-            const drives = await server.getDrives();
+            drives = await server.getDrives();
             expect(drives).toStrictEqual(['1']);
         });
 
