@@ -6,6 +6,69 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
+}
+
+model Document {
+  id           String      @id @default(uuid())
+  created      DateTime    @default(now())
+  lastModified DateTime    @default(now())
+  revision     Int
+  name         String
+  operations   Operation[]
+  initialState String
+  state        String
+
+  attachements Attachment[]
+
+  documentType String
+
+  Drive         Drive?
+  DriveDocument DriveDocument[]
+}
+
+model Operation {
+  id           String       @id @default(uuid())
+  Document     Document?    @relation(fields: [documentId], references: [id])
+  documentId   String?
+  hash         String
+  index        Int
+  timestamp    DateTime
+  input        String
+  type         String
+  scope        String?      @map("scope")
+  attachements Attachment[]
+}
+
+model Attachment {
+  id          String     @id @default(uuid())
+  hash        String
+  data        String
+  mimeType    String
+  extension   String
+  fileName    String
+  Operation   Operation? @relation(fields: [operationId], references: [id])
+  operationId String?
+  Document    Document?  @relation(fields: [documentId], references: [id])
+  documentId  String?
+}
+
+model Drive {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  driveDocumentId   String   @unique
+  driveMetaDocument Document @relation(fields: [driveDocumentId], references: [id])
+
+  DriveDocument DriveDocument[]
+}
+
+model DriveDocument {
+  id         String   @id @default(uuid())
+  driveId    String
+  documentId String
+  identifier String
+  Drive      Drive    @relation(fields: [driveId], references: [id])
+  Document   Document @relation(fields: [documentId], references: [id])
 }
