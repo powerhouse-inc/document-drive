@@ -46,7 +46,9 @@ describe.each(storageLayers)(
                 documentModels,
                 buildStorage()
             );
-            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            await server.addDrive({
+                global: { id: '1', name: 'name', icon: 'icon' }
+            });
             const drive = await server.getDrive('1');
             expect(drive.state).toStrictEqual(
                 DocumentDriveUtils.createState({
@@ -67,7 +69,9 @@ describe.each(storageLayers)(
                 documentModels,
                 buildStorage()
             );
-            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            await server.addDrive({
+                global: { id: '1', name: 'name', icon: 'icon' }
+            });
             let drive = await server.getDrive('1');
 
             // performs ADD_FILE operation locally
@@ -108,7 +112,9 @@ describe.each(storageLayers)(
                 documentModels,
                 buildStorage()
             );
-            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            await server.addDrive({
+                global: { id: '1', name: 'name', icon: 'icon' }
+            });
             let drive = await server.getDrive('1');
             drive = reducer(
                 drive,
@@ -137,7 +143,9 @@ describe.each(storageLayers)(
                 documentModels,
                 buildStorage()
             );
-            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            await server.addDrive({
+                global: { id: '1', name: 'name', icon: 'icon' }
+            });
             let drive = await server.getDrive('1');
 
             // adds file
@@ -171,7 +179,9 @@ describe.each(storageLayers)(
                 documentModels,
                 buildStorage()
             );
-            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            await server.addDrive({
+                global: { id: '1', name: 'name', icon: 'icon' }
+            });
             let drive = await server.getDrive('1');
             drive = reducer(
                 drive,
@@ -205,7 +215,9 @@ describe.each(storageLayers)(
                 documentModels,
                 buildStorage()
             );
-            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            await server.addDrive({
+                global: { id: '1', name: 'name', icon: 'icon' }
+            });
             let drive = await server.getDrive('1');
 
             drive = reducer(
@@ -246,7 +258,9 @@ describe.each(storageLayers)(
                 documentModels,
                 buildStorage()
             );
-            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            await server.addDrive({
+                global: { id: '1', name: 'name', icon: 'icon' }
+            });
 
             await server.deleteDrive('1');
 
@@ -261,7 +275,9 @@ describe.each(storageLayers)(
                 documentModels,
                 buildStorage()
             );
-            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            await server.addDrive({
+                global: { id: '1', name: 'name', icon: 'icon' }
+            });
 
             let drive = await server.getDrive('1');
             drive = reducer(
@@ -285,7 +301,9 @@ describe.each(storageLayers)(
                 documentModels,
                 buildStorage()
             );
-            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            await server.addDrive({
+                global: { id: '1', name: 'name', icon: 'icon' }
+            });
             let drive = await server.getDrive('1');
             drive = reducer(
                 drive,
@@ -305,7 +323,9 @@ describe.each(storageLayers)(
                 documentModels,
                 buildStorage()
             );
-            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
+            await server.addDrive({
+                global: { id: '1', name: 'name', icon: 'icon' }
+            });
             let drive = await server.getDrive('1');
             drive = reducer(
                 drive,

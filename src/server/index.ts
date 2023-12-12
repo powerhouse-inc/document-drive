@@ -41,7 +41,7 @@ export class DocumentDriveServer implements IDocumentDriveServer {
 
     addDrive(drive: DriveInput) {
         const document = utils.createDocument({
-            state: { global: drive, local: {} }
+            state: drive
         });
         return this.storage.saveDrive(document);
     }
