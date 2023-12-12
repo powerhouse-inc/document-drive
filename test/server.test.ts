@@ -15,6 +15,7 @@ import { afterEach, describe, it } from 'vitest';
 import { DocumentDriveServer } from '../src/server';
 import { FilesystemStorage, MemoryStorage } from '../src/storage';
 import { BrowserStorage } from '../src/storage/browser';
+import { PrismaStorage } from '../src/storage/prisma';
 
 const documentModels = [
     DocumentModelLib,
@@ -24,6 +25,7 @@ const documentModels = [
 const FileStorageDir = path.join(__dirname, './file-storage');
 
 const storageLayers = [
+    () => new PrismaStorage(),
     () => new MemoryStorage(),
     () => new FilesystemStorage(FileStorageDir),
     () => new BrowserStorage()
