@@ -1,19 +1,18 @@
 import { DocumentDriveDocument } from 'document-model-libs/document-drive';
 import { Document } from 'document-model/document';
 import type { Dirent } from 'fs';
-import { existsSync, mkdirSync } from 'fs';
+import {
+    existsSync,
+    mkdirSync,
+    readFileSync,
+    readdirSync,
+    writeFileSync
+} from 'fs';
 import fs from 'fs/promises';
-
 import path from 'path';
 import sanitize from 'sanitize-filename';
 import { isDocumentDrive } from '../utils';
 import { IDriveStorage } from './types';
-
-function ensureDir(dir: string) {
-    if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
-    }
-}
 
 type FSError = {
     errno: number;
@@ -21,6 +20,12 @@ type FSError = {
     syscall: string;
     path: string;
 };
+
+function ensureDir(dir: string) {
+    if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+    }
+}
 
 export class FilesystemStorage implements IDriveStorage {
     private basePath: string;
@@ -47,7 +52,7 @@ export class FilesystemStorage implements IDriveStorage {
     async getDocuments(drive: string) {
         let files: Dirent[] = [];
         try {
-            files = await fs.readdir(path.join(this.basePath, drive), {
+            files = readdirSync(path.join(this.basePath, drive), {
                 withFileTypes: true
             });
         } catch (error) {
@@ -73,12 +78,12 @@ export class FilesystemStorage implements IDriveStorage {
 
     async getDocument(drive: string, id: string) {
         try {
-            const content = await fs.readFile(
-                this._buildDocumentPath(drive, id),
-                { encoding: 'utf-8' }
-            );
+            const content = readFileSync(this._buildDocumentPath(drive, id), {
+                encoding: 'utf-8'
+            });
             return JSON.parse(content);
-        } catch {
+        } catch (error) {
+            console.error(error);
             throw new Error(`Document with id ${id} not found`);
         }
     }
@@ -86,11 +91,9 @@ export class FilesystemStorage implements IDriveStorage {
     async saveDocument(drive: string, id: string, document: Document) {
         const documentPath = this._buildDocumentPath(drive, id);
         await ensureDir(path.dirname(documentPath));
-        return fs.writeFile(
-            this._buildDocumentPath(drive, id),
-            JSON.stringify(document),
-            { encoding: 'utf-8' }
-        );
+        await writeFileSync(documentPath, JSON.stringify(document), {
+            encoding: 'utf-8'
+        });
     }
 
     async deleteDocument(drive: string, id: string) {
@@ -98,7 +101,7 @@ export class FilesystemStorage implements IDriveStorage {
     }
 
     async getDrives() {
-        const files = await fs.readdir(this.drivesPath, {
+        const files = await readdirSync(this.drivesPath, {
             withFileTypes: true
         });
         const drives: string[] = [];
@@ -133,7 +136,7 @@ export class FilesystemStorage implements IDriveStorage {
     saveDrive(drive: DocumentDriveDocument) {
         return this.saveDocument(
             FilesystemStorage.DRIVES_DIR,
-            drive.state.id,
+            drive.state.global.id,
             drive
         );
     }

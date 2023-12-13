@@ -1,18 +1,20 @@
 import type {
     DocumentDriveAction,
     DocumentDriveDocument,
+    DocumentDriveLocalState,
     DocumentDriveState
 } from 'document-model-libs/document-drive';
 import type {
     BaseAction,
     Document,
     Operation,
-    Signal
+    Signal,
+    State
 } from 'document-model/document';
 
-export type DriveInput = Omit<
-    DocumentDriveState,
-    '__typename' | 'remoteUrl' | 'nodes'
+export type DriveInput = State<
+    Omit<DocumentDriveState, '__typename' | 'nodes'>,
+    DocumentDriveLocalState
 >;
 
 export type CreateDocumentInput = {
