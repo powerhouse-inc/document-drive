@@ -10,6 +10,6 @@ export function isDocumentDrive(
 ): document is DocumentDriveDocument {
     return (
         document.documentType === DocumentDriveModel.id &&
-        z.DocumentDriveStateSchema().safeParse(document.state.global).success
+        z.DocumentDriveStateSchema().safeParse(document.state).success
     );
 }

@@ -52,7 +52,7 @@ export class MemoryStorage implements IDriveStorage {
     }
 
     async saveDrive(drive: DocumentDriveDocument) {
-        this.drives[drive.state.global.id] = drive;
+        this.drives[drive.state.id] = drive;
     }
 
     async deleteDrive(id: string) {
