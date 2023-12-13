@@ -14,16 +14,8 @@ import { IDriveStorage } from './types';
 export class PrismaStorage implements IDriveStorage {
     private db: PrismaClient;
 
-    static DBName = 'DOCUMENT_DRIVES';
-    static SEP = ':';
-    static DRIVES_KEY = 'DRIVES';
-
     constructor() {
         this.db = new PrismaClient();
-    }
-
-    buildKey(...args: string[]) {
-        return args.join(PrismaStorage.SEP);
     }
 
     async getDocuments(drive: string) {
@@ -147,7 +139,7 @@ export class PrismaStorage implements IDriveStorage {
         } else {
             await this.db.document.update({
                 where: {
-                    id: doc.id
+                    id: doc.documentId
                 },
                 data: {
                     documentType: document.documentType,
@@ -219,7 +211,9 @@ export class PrismaStorage implements IDriveStorage {
                             include: {
                                 attachements: true
                             }
-                        }
+                        },
+
+                        attachements: true
                     }
                 },
                 DriveDocument: {
@@ -235,9 +229,13 @@ export class PrismaStorage implements IDriveStorage {
         }
 
         const metaDoc = drive.driveMetaDocument;
+        const attachements: FileRegistry = {};
+        metaDoc.attachements.forEach(a => {
+            attachements[a.hash] = a;
+        });
 
         const driveDoc: DocumentDriveDocument = {
-            attachments: {},
+            attachments: attachements,
             created: metaDoc.created.toISOString(),
             documentType: metaDoc.documentType,
             initialState: JSON.parse(metaDoc.initialState),
@@ -329,10 +327,18 @@ export class PrismaStorage implements IDriveStorage {
     }
 
     async deleteDrive(id: string) {
-        await this.db.drive.delete({
-            where: {
-                id: id
-            }
-        });
+        await Promise.all([
+            this.db.drive.deleteMany({
+                where: {
+                    id
+                }
+            }),
+
+            this.db.driveDocument.deleteMany({
+                where: {
+                    driveId: id
+                }
+            })
+        ]);
     }
 }

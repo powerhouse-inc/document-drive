@@ -59,7 +59,7 @@ model Drive {
   createdAt DateTime @default(now())
 
   driveDocumentId   String   @unique
-  driveMetaDocument Document @relation(fields: [driveDocumentId], references: [id])
+  driveMetaDocument Document @relation(fields: [driveDocumentId], references: [id], onDelete: Cascade)
 
   DriveDocument DriveDocument[]
 }
@@ -69,6 +69,6 @@ model DriveDocument {
   driveId    String
   documentId String
   identifier String
-  Drive      Drive    @relation(fields: [driveId], references: [id])
-  Document   Document @relation(fields: [documentId], references: [id])
+  Drive      Drive    @relation(fields: [driveId], references: [id], onDelete: Cascade)
+  Document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 }
