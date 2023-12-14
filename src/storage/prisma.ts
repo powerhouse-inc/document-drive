@@ -3,12 +3,7 @@ import {
     DocumentDriveAction,
     DocumentDriveDocument
 } from 'document-model-libs/document-drive';
-import {
-    Document,
-    FileRegistry,
-    Operation,
-    OperationScope
-} from 'document-model/document';
+import { Document, Operation, OperationScope } from 'document-model/document';
 import { IDriveStorage } from './types';
 
 export class PrismaStorage implements IDriveStorage {
@@ -19,52 +14,50 @@ export class PrismaStorage implements IDriveStorage {
     }
 
     async getDocuments(drive: string) {
-        const docs = await this.db.driveDocument.findMany({
+        const docs = await this.db.node.findMany({
             where: {
-                driveId: drive
+                AND: {
+                    driveId: drive,
+                    NOT: {
+                        id: {
+                            contains: 'drive-'
+                        }
+                    }
+                }
             },
             include: {
                 Document: true
             }
         });
 
-        return docs.map(doc => doc.identifier);
+        return docs.map(doc => doc.id);
     }
 
     async getDocument(driveId: string, id: string) {
-        const result = await this.db.driveDocument.findFirst({
+        const result = await this.db.document.findFirst({
             where: {
-                documentId: id,
+                id: id,
                 driveId: driveId
             },
             include: {
-                Document: {
-                    include: {
-                        operations: {
-                            include: {
-                                attachements: true
-                            }
-                        }
-                    }
-                },
                 Drive: {
                     include: {
                         driveMetaDocument: true
                     }
-                }
+                },
+                operations: true,
+                Node: true
             }
         });
 
-        const fileRegistry: FileRegistry = {};
-
-        if (result === null || result.Document === null) {
+        if (result === null) {
             throw new Error(`Document with id ${id} not found`);
         }
 
-        const dbDoc = result.Document;
+        const dbDoc = result;
 
         const doc: DocumentDriveDocument = {
-            attachments: fileRegistry,
+            attachments: JSON.parse(dbDoc.attachements),
             created: dbDoc.created.toISOString(),
             documentType: dbDoc.documentType,
             initialState: JSON.parse(dbDoc.initialState),
@@ -78,118 +71,99 @@ export class PrismaStorage implements IDriveStorage {
                     input: JSON.parse(op.input),
                     type: op.type,
                     scope: op.scope as OperationScope,
-                    attachments: op.attachements.map(a => {
-                        return {
-                            hash: a.hash,
-                            data: a.data,
-                            mimeType: a.mimeType,
-                            extension: a.extension,
-                            fileName: a.fileName
-                        };
-                    })
+                    attachments: op.attachements
+                        ? JSON.parse(op.attachements)
+                        : {}
                 };
             }) as Operation<DocumentDriveAction>[],
             revision: dbDoc.revision,
-            state: JSON.parse(dbDoc.state)
+            state: dbDoc.state ? JSON.parse(dbDoc.state) : {}
         };
 
         return doc;
     }
 
     async saveDocument(drive: string, id: string, document: Document) {
-        const doc = await this.db.driveDocument.findFirst({
-            where: {
-                driveId: drive,
-                identifier: id
-            }
-        });
-
-        if (!doc) {
-            const dbDoc = await this.db.document.create({
-                data: {
-                    id,
-                    documentType: document.documentType,
-                    initialState: JSON.stringify(document.initialState),
-                    lastModified: new Date(document.lastModified),
-                    name: document.name,
-                    revision: document.revision,
-                    state: JSON.stringify(document.state),
-                    attachements: document.attachments,
-                    operations: {
-                        create: document.operations.map(op => {
-                            return {
-                                hash: op.hash,
-                                index: op.index,
-                                timestamp: new Date(op.timestamp),
-                                input: JSON.stringify(op.input),
-                                type: op.type
-                            };
-                        })
-                    }
-                }
-            });
-
-            await this.db.driveDocument.create({
-                data: {
-                    documentId: dbDoc.id,
-                    identifier: id,
-                    driveId: drive
-                }
-            });
-        } else {
-            await this.db.document.update({
+        try {
+            await this.db.document.upsert({
                 where: {
-                    id: doc.documentId
+                    id_driveId: {
+                        driveId: drive,
+                        id: id
+                    }
                 },
-                data: {
+                create: {
                     documentType: document.documentType,
                     initialState: JSON.stringify(document.initialState),
-                    lastModified: new Date(document.lastModified),
+                    lastModified: document.lastModified,
                     name: document.name,
                     revision: document.revision,
                     state: JSON.stringify(document.state),
-                    attachements: document.attachments,
-                    operations: {
-                        create: document.operations.map(op => {
-                            return {
-                                hash: op.hash,
-                                index: op.index,
-                                timestamp: new Date(op.timestamp),
-                                input: JSON.stringify(op.input),
-                                type: op.type
-                            };
-                        })
-                    }
+                    id: id,
+                    driveId: drive,
+                    attachements: JSON.stringify(document.attachments),
+                    created: document.created
+                },
+                update: {
+                    documentType: document.documentType,
+                    initialState: JSON.stringify(document.initialState),
+                    lastModified: document.lastModified,
+                    name: document.name,
+                    revision: document.revision,
+                    state: JSON.stringify(document.state),
+                    attachements: JSON.stringify(document.attachments),
+                    created: document.created
                 }
             });
+
+            // add operations
+            await Promise.all(
+                document.operations.map(op => {
+                    return this.db.operation.upsert({
+                        where: {
+                            hash_timestamp: {
+                                hash: op.hash,
+                                timestamp: op.timestamp
+                            }
+                        },
+                        create: {
+                            hash: op.hash,
+                            index: op.index,
+                            input: JSON.stringify(op.input),
+                            timestamp: op.timestamp,
+                            type: op.type
+                        },
+                        update: {
+                            index: op.index,
+                            hash: op.hash,
+                            input: JSON.stringify(op.input),
+                            timestamp: op.timestamp,
+                            type: op.type
+                        }
+                    });
+                })
+            );
+        } catch (e) {
+            console.log(e);
         }
     }
 
     async deleteDocument(drive: string, id: string) {
-        console.log('delete document', drive, id);
-        const driveDoc = await this.db.driveDocument.findFirst({
+        await this.db.document.deleteMany({
             where: {
-                driveId: drive,
-                identifier: id
+                AND: {
+                    driveId: drive,
+                    id: id
+                }
             }
         });
 
-        if (!driveDoc) {
-            return;
-        }
-
-        await this.db.driveDocument.delete({
+        await this.db.node.deleteMany({
             where: {
-                id: driveDoc?.id
-            },
-            include: {
-                Document: true
-            }
-        });
-
-        await this.db.document.delete({
-            where: {
-                id: driveDoc?.documentId
+                AND: {
+                    driveId: drive,
+                    id: id
+                }
             }
         });
     }
@@ -207,16 +181,10 @@ export class PrismaStorage implements IDriveStorage {
             include: {
                 driveMetaDocument: {
                     include: {
-                        operations: {
-                            include: {
-                                attachements: true
-                            }
-                        },
-
-                        attachements: true
+                        operations: true
                     }
                 },
-                DriveDocument: {
+                nodes: {
                     include: {
                         Document: true
                     }
@@ -229,39 +197,42 @@ export class PrismaStorage implements IDriveStorage {
         }
 
         const metaDoc = drive.driveMetaDocument;
-        const attachements: FileRegistry = {};
-        metaDoc.attachements.forEach(a => {
-            attachements[a.hash] = a;
-        });
 
         const driveDoc: DocumentDriveDocument = {
-            attachments: attachements,
+            attachments: JSON.parse(metaDoc.attachements),
             created: metaDoc.created.toISOString(),
             documentType: metaDoc.documentType,
             initialState: JSON.parse(metaDoc.initialState),
             lastModified: metaDoc.lastModified.toISOString(),
             name: metaDoc.name,
             revision: metaDoc.revision,
+            state: {
+                icon: drive.icon,
+                id: drive.id,
+                name: drive.name ?? '',
+                remoteUrl: drive.remoteUrl ?? null,
+                nodes:
+                    drive.nodes.map(node => {
+                        return {
+                            documentType: node.Document[0]
+                                ? node.Document[0].documentType
+                                : '',
+                            id: node.id,
+                            kind: node.kind ?? '',
+                            name: node.name ?? '',
+                            parentFolder: node.parentFolder ?? ''
+                        };
+                    }) ?? []
+            },
             operations: metaDoc.operations.map(op => {
                 return {
                     hash: op.hash,
                     index: op.index,
                     timestamp: op.timestamp.toISOString(),
                     input: JSON.parse(op.input),
-                    type: op.type,
-                    scope: op.scope as OperationScope,
-                    attachments: op.attachements.map(a => {
-                        return {
-                            hash: a.hash,
-                            data: a.data,
-                            mimeType: a.mimeType,
-                            extension: a.extension,
-                            fileName: a.fileName
-                        };
-                    })
+                    type: op.type
                 };
-            }) as Operation<DocumentDriveAction>[],
-            state: JSON.parse(metaDoc.state)
+            }) as Operation<DocumentDriveAction>[]
         };
 
         return driveDoc;
@@ -273,55 +244,74 @@ export class PrismaStorage implements IDriveStorage {
                 id: drive.state.id
             },
             create: {
-                createdAt: new Date(),
-                id: drive.state.id,
-                driveMetaDocument: {
-                    create: {
-                        documentType: drive.documentType,
-                        initialState: JSON.stringify(drive.initialState),
-                        lastModified: new Date(),
-                        name: drive.name,
-                        revision: drive.revision,
-                        state: JSON.stringify(drive.state),
-                        attachements: drive.attachments,
-                        operations: {
-                            create: drive.operations.map(op => {
-                                return {
-                                    hash: op.hash,
-                                    index: op.index,
-                                    timestamp: new Date(op.timestamp),
-                                    input: JSON.stringify(op.input),
-                                    type: op.type
-                                };
-                            })
-                        }
-                    }
-                }
+                icon: drive.state.icon,
+                name: drive.state.name,
+                remoteUrl: drive.state.remoteUrl,
+                id: drive.state.id
             },
             update: {
-                id: drive.state.id,
-                driveMetaDocument: {
-                    create: {
-                        documentType: drive.documentType,
-                        initialState: JSON.stringify(drive.initialState),
-                        lastModified: new Date(),
-                        name: drive.name,
-                        revision: drive.revision,
-                        state: JSON.stringify(drive.state),
-                        attachements: drive.attachments,
-                        operations: {
-                            create: drive.operations.map(op => {
-                                return {
-                                    hash: op.hash,
-                                    index: op.index,
-                                    timestamp: new Date(op.timestamp),
-                                    input: JSON.stringify(op.input),
-                                    type: op.type
-                                };
-                            })
+                icon: drive.state.icon,
+                name: drive.state.name,
+                remoteUrl: drive.state.remoteUrl
+            }
+        });
+
+        await this.saveDocument(
+            drive.state.id,
+            'drive-' + drive.state.id,
+            drive
+        );
+
+        try {
+            await Promise.all(
+                drive.state.nodes.map(e => {
+                    return this.db.node.upsert({
+                        where: {
+                            driveId_id: {
+                                id: e.id,
+                                driveId: drive.state.id
+                            }
+                        },
+                        create: {
+                            id: e.id,
+                            driveId: drive.state.id,
+                            kind: e.kind,
+                            name: e.name,
+                            parentFolder: e.parentFolder
+                        },
+                        update: {
+                            kind: e.kind,
+                            name: e.name,
+                            parentFolder: e.parentFolder
+                        }
+                    });
+                })
+            );
+        } catch (error) {
+            console.log(error);
+        }
+
+        // delete old nodes
+        await this.db.node.deleteMany({
+            where: {
+                AND: {
+                    driveId: drive.state.id,
+                    NOT: {
+                        id: {
+                            in: drive.state.nodes.map(node => node.id)
                         }
                     }
                 }
+            }
+        });
+
+        // connect drive and document
+        await this.db.drive.update({
+            where: {
+                id: drive.state.id
+            },
+            data: {
+                driveDocumentId: 'drive-' + drive.state.id
             }
         });
     }
@@ -334,7 +324,7 @@ export class PrismaStorage implements IDriveStorage {
                 }
             }),
 
-            this.db.driveDocument.deleteMany({
+            this.db.node.deleteMany({
                 where: {
                     driveId: id
                 }

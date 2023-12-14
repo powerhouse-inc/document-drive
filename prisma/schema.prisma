@@ -11,64 +11,72 @@ datasource db {
 }
 
 model Document {
-  id           String      @id @default(uuid())
+  id           String
+  driveId      String
   created      DateTime    @default(now())
   lastModified DateTime    @default(now())
   revision     Int
   name         String
   operations   Operation[]
   initialState String
-  state        String
+  state        String?
 
-  attachements Attachment[]
+  attachements String
 
   documentType String
 
-  Drive         Drive?
-  DriveDocument DriveDocument[]
+  Drive       Drive?
+  Node        Node?   @relation(fields: [nodeDriveId, nodeId], references: [driveId, id])
+  nodeDriveId String?
+  nodeId      String?
+
+  @@id([id, driveId])
 }
 
 model Operation {
-  id           String       @id @default(uuid())
-  Document     Document?    @relation(fields: [documentId], references: [id])
+  driveId      String?
+  Document     Document? @relation(fields: [driveId, documentId], references: [driveId, id])
   documentId   String?
   hash         String
   index        Int
   timestamp    DateTime
   input        String
   type         String
-  scope        String?      @map("scope")
-  attachements Attachment[]
-}
+  scope        String?   @map("scope")
+  attachements String?
 
-model Attachment {
-  id          String     @id @default(uuid())
-  hash        String
-  data        String
-  mimeType    String
-  extension   String
-  fileName    String
-  Operation   Operation? @relation(fields: [operationId], references: [id])
-  operationId String?
-  Document    Document?  @relation(fields: [documentId], references: [id])
-  documentId  String?
+  @@id([hash, timestamp])
 }
 
 model Drive {
-  id        String   @id @default(uuid())
+  id        String   @id
   createdAt DateTime @default(now())
 
-  driveDocumentId   String   @unique
-  driveMetaDocument Document @relation(fields: [driveDocumentId], references: [id], onDelete: Cascade)
+  driveDocumentId   String?
+  driveMetaDocument Document? @relation(fields: [id, driveDocumentId], references: [driveId, id], onDelete: Cascade)
 
-  DriveDocument DriveDocument[]
+  nodes     Node[]
+  icon      String?
+  name      String?
+  remoteUrl String?
+
+  @@unique([id, driveDocumentId])
 }
 
-model DriveDocument {
-  id         String   @id @default(uuid())
-  driveId    String
-  documentId String
-  identifier String
-  Drive      Drive    @relation(fields: [driveId], references: [id], onDelete: Cascade)
-  Document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+model Node {
+  driveId String
+  id      String
+
+  Drive Drive? @relation(fields: [driveId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  kind         String?
+  name         String?
+  parentFolder String?
+
+  // parentNode Node?  @relation("ParentNode", fields: [driveId, parentFolder], references: [driveId, id], onDelete: Cascade, onUpdate: Cascade)
+  // nodes      Node[] @relation("ParentNode")
+
+  Document Document[]
+
+  @@id([driveId, id])
 }
