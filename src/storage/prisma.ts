@@ -85,7 +85,7 @@ export class PrismaStorage implements IDriveStorage {
                 };
             }) as Operation<DocumentDriveAction>[],
             revision: dbDoc.revision,
-            state: dbDoc.state as ExtendedState<DocumentDriveState>
+            state: dbDoc.state as DocumentDriveState
         };
 
         return doc;
