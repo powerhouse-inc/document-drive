@@ -1,9 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 import {
     DocumentDriveAction,
-    DocumentDriveDocument
+    DocumentDriveDocument,
+    DocumentDriveState
 } from 'document-model-libs/document-drive';
-import { Document, Operation, OperationScope } from 'document-model/document';
+import {
+    Document,
+    ExtendedState,
+    FileRegistry,
+    Operation,
+    OperationScope
+} from 'document-model/document';
 import { IDriveStorage } from './types';
 
 export class PrismaStorage implements IDriveStorage {
@@ -57,10 +64,11 @@ export class PrismaStorage implements IDriveStorage {
         const dbDoc = result;
 
         const doc: DocumentDriveDocument = {
-            attachments: JSON.parse(dbDoc.attachements),
+            attachments: dbDoc.attachements as FileRegistry,
             created: dbDoc.created.toISOString(),
             documentType: dbDoc.documentType,
-            initialState: JSON.parse(dbDoc.initialState),
+            initialState:
+                dbDoc.initialState as ExtendedState<DocumentDriveState>,
             lastModified: dbDoc.lastModified.toISOString(),
             name: dbDoc.name,
             operations: dbDoc.operations.map(op => {
@@ -77,7 +85,7 @@ export class PrismaStorage implements IDriveStorage {
                 };
             }) as Operation<DocumentDriveAction>[],
             revision: dbDoc.revision,
-            state: dbDoc.state ? JSON.parse(dbDoc.state) : {}
+            state: dbDoc.state as ExtendedState<DocumentDriveState>
         };
 
         return doc;
@@ -94,24 +102,26 @@ export class PrismaStorage implements IDriveStorage {
                 },
                 create: {
                     documentType: document.documentType,
-                    initialState: JSON.stringify(document.initialState),
+                    initialState:
+                        document.initialState as ExtendedState<DocumentDriveState>,
                     lastModified: document.lastModified,
                     name: document.name,
                     revision: document.revision,
-                    state: JSON.stringify(document.state),
+                    state: document.state as ExtendedState<DocumentDriveState>,
                     id: id,
                     driveId: drive,
-                    attachements: JSON.stringify(document.attachments),
+                    attachements: document.attachments,
                     created: document.created
                 },
                 update: {
                     documentType: document.documentType,
-                    initialState: JSON.stringify(document.initialState),
+                    initialState:
+                        document.initialState as ExtendedState<DocumentDriveState>,
                     lastModified: document.lastModified,
                     name: document.name,
                     revision: document.revision,
-                    state: JSON.stringify(document.state),
-                    attachements: JSON.stringify(document.attachments),
+                    state: document.state as ExtendedState<DocumentDriveState>,
+                    attachements: document.attachments,
                     created: document.created
                 }
             });
@@ -193,10 +203,11 @@ export class PrismaStorage implements IDriveStorage {
         const metaDoc = drive.driveMetaDocument;
 
         const driveDoc: DocumentDriveDocument = {
-            attachments: JSON.parse(metaDoc.attachements),
+            attachments: metaDoc.attachements as FileRegistry,
             created: metaDoc.created.toISOString(),
             documentType: metaDoc.documentType,
-            initialState: JSON.parse(metaDoc.initialState),
+            initialState:
+                metaDoc.initialState as ExtendedState<DocumentDriveState>,
             lastModified: metaDoc.lastModified.toISOString(),
             name: metaDoc.name,
             revision: metaDoc.revision,

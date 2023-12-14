@@ -6,8 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("PG_CONNECTION_STRING")
 }
 
 model Document {
@@ -18,10 +18,10 @@ model Document {
   revision     Int
   name         String
   operations   Operation[]
-  initialState String
-  state        String?
+  initialState Json
+  state        Json
 
-  attachements String
+  attachements Json
 
   documentType String
 
