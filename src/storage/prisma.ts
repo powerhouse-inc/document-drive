@@ -121,12 +121,15 @@ export class PrismaStorage implements IDriveStorage {
                 document.operations.map(op => {
                     return this.db.operation.upsert({
                         where: {
-                            hash_timestamp: {
+                            documentId_timestamp_hash: {
                                 hash: op.hash,
-                                timestamp: op.timestamp
+                                timestamp: op.timestamp,
+                                documentId: id
                             }
                         },
                         create: {
+                            driveId: drive,
+                            documentId: id,
                             hash: op.hash,
                             index: op.index,
                             input: JSON.stringify(op.input),

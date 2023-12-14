@@ -36,7 +36,7 @@ model Document {
 model Operation {
   driveId      String?
   Document     Document? @relation(fields: [driveId, documentId], references: [driveId, id])
-  documentId   String?
+  documentId   String
   hash         String
   index        Int
   timestamp    DateTime
@@ -45,7 +45,7 @@ model Operation {
   scope        String?   @map("scope")
   attachements String?
 
-  @@id([hash, timestamp])
+  @@id([documentId, timestamp, hash])
 }
 
 model Drive {
