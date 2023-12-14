@@ -152,18 +152,9 @@ export class PrismaStorage implements IDriveStorage {
     }
 
     async deleteDocument(drive: string, id: string) {
-        await this.db.document.deleteMany({
+        await this.db.document.delete({
             where: {
-                AND: {
-                    driveId: drive,
-                    id: id
-                }
-            }
-        });
-
-        await this.db.node.deleteMany({
-            where: {
-                AND: {
+                id_driveId: {
                     driveId: drive,
                     id: id
                 }
@@ -242,11 +233,18 @@ export class PrismaStorage implements IDriveStorage {
     }
 
     async saveDrive(drive: DocumentDriveDocument) {
+        await this.saveDocument(
+            drive.state.id,
+            'drive-' + drive.state.id,
+            drive
+        );
+
         await this.db.drive.upsert({
             where: {
                 id: drive.state.id
             },
             create: {
+                driveDocumentId: 'drive-' + drive.state.id,
                 icon: drive.state.icon,
                 name: drive.state.name,
                 remoteUrl: drive.state.remoteUrl,
@@ -259,42 +257,33 @@ export class PrismaStorage implements IDriveStorage {
             }
         });
 
-        await this.saveDocument(
-            drive.state.id,
-            'drive-' + drive.state.id,
-            drive
+        // persist nodes
+        await Promise.all(
+            drive.state.nodes.map(e => {
+                return this.db.node.upsert({
+                    where: {
+                        driveId_id: {
+                            id: e.id,
+                            driveId: drive.state.id
+                        }
+                    },
+                    create: {
+                        id: e.id,
+                        driveId: drive.state.id,
+                        kind: e.kind,
+                        name: e.name,
+                        parentFolder: e.parentFolder
+                    },
+                    update: {
+                        kind: e.kind,
+                        name: e.name,
+                        parentFolder: e.parentFolder
+                    }
+                });
+            })
         );
 
-        try {
-            await Promise.all(
-                drive.state.nodes.map(e => {
-                    return this.db.node.upsert({
-                        where: {
-                            driveId_id: {
-                                id: e.id,
-                                driveId: drive.state.id
-                            }
-                        },
-                        create: {
-                            id: e.id,
-                            driveId: drive.state.id,
-                            kind: e.kind,
-                            name: e.name,
-                            parentFolder: e.parentFolder
-                        },
-                        update: {
-                            kind: e.kind,
-                            name: e.name,
-                            parentFolder: e.parentFolder
-                        }
-                    });
-                })
-            );
-        } catch (error) {
-            console.log(error);
-        }
-
-        // delete old nodes
+        // delete nodes, which arent in the drive anymore
         await this.db.node.deleteMany({
             where: {
                 AND: {
@@ -307,16 +296,6 @@ export class PrismaStorage implements IDriveStorage {
                 }
             }
         });
-
-        // connect drive and document
-        await this.db.drive.update({
-            where: {
-                id: drive.state.id
-            },
-            data: {
-                driveDocumentId: 'drive-' + drive.state.id
-            }
-        });
     }
 
     async deleteDrive(id: string) {
@@ -324,12 +303,6 @@ export class PrismaStorage implements IDriveStorage {
             this.db.drive.deleteMany({
                 where: {
                     id
-                }
-            }),
-
-            this.db.node.deleteMany({
-                where: {
-                    driveId: id
                 }
             })
         ]);
