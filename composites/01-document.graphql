@@ -4,7 +4,10 @@ type Drive @loadModel(id: "$DRIVE_ID") {
 
 type Document
     @createModel(accountRelation: LIST, description: "A Powerhouse document")
-    @createIndex(fields: [{ path: "name" }]) {
+    @createIndex(fields: [{ path: "identifier" }])
+    @createIndex(fields: [{ path: "driveIdentifier" }])
+    @createIndex(fields: [{ path: "isDeleted" }]) {
+    identifier: String! @string(maxLength: 255)
     author: DID! @documentAccount
     name: String @string(maxLength: 100)
     lastModified: String! @string(minLength: 5, maxLength: 255)
@@ -12,24 +15,27 @@ type Document
     initialState: String @string(minLength: 5, maxLength: 2147483647)
     operations: [Operation!]! @list(maxLength: 2147483647)
     attachments: [Attachement!]! @list(maxLength: 2147483647)
-    driveID: StreamID @documentReference(model: "Drive")
-    drive: Drive @relationDocument(property: "driveID")
-    nodes: [String!]! @list(maxLength: 2147483647) @string(maxLength: 255)
+    # driveID: StreamID @documentReference(model: "Drive")
+    # drive: Drive @relationDocument(property: "driveID")
+    driveIdentifier: String! @string(maxLength: 255)
+    created: String! @string(maxLength: 255)
+    documentType: String! @string(maxLength: 255)
+    revision: Int! @int(min: 0, max: 2147483647)
+    isDeleted: Boolean! @boolean
 }
 
 type Operation {
     type: String! @string(maxLength: 100)
     input: String! @string(maxLength: 2147483647)
-    scope: String! @string(maxLength: 100)
     index: Int! @int(min: 0, max: 2147483647)
     timestamp: String! @string(maxLength: 100)
     hash: String! @string(maxLength: 100)
 }
 
 type Attachement {
-    name: String! @string(maxLength: 255)
-    hash: String! @string(maxLength: 255)
-    size: Int! @int(min: 0, max: 2147483647)
-    type: String! @string(maxLength: 255)
-    lastModified: String! @string(maxLength: 255)
+    data: String! @string(maxLength: 2147483647)
+    mimeType: String! @string(maxLength: 255)
+    extension: String! @string(maxLength: 255)
+    fileName: String! @string(maxLength: 255)
+    identifier: String! @string(maxLength: 255)
 }

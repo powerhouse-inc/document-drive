@@ -1,13 +1,23 @@
 type DocumentDrive
     @createModel(accountRelation: LIST, description: "A Powerhouse drive")
     @createIndex(fields: [{ path: "name" }])
-    @createIndex(fields: [{ path: "hash" }])
-    @createIndex(fields: [{ path: "icon" }])
-    @createIndex(fields: [{ path: "remoteUrl" }]) {
+    @createIndex(fields: [{ path: "identifier" }])
+    @createIndex(fields: [{ path: "isDeleted" }]) {
     author: DID! @documentAccount
+    identifier: String @string(maxLength: 255)
     name: String @string(maxLength: 100)
     hash: String @string(maxLength: 255)
     icon: String @string(maxLength: 255)
     remoteUrl: String @string(maxLength: 255)
-    # nodes: [String!]! @list(maxLength: 2147483647) @string(maxLength: 255)
+    isDeleted: Boolean!
+    nodes: [DocumentDriveNode!]!
+        @list(maxLength: 2147483647)
+        @string(maxLength: 255)
+}
+
+type DocumentDriveNode {
+    identifier: String! @string(maxLength: 255)
+    kind: String! @string(maxLength: 255)
+    name: String! @string(maxLength: 255)
+    parentFolder: String @string(maxLength: 255)
 }

@@ -14,7 +14,7 @@ import path from 'path';
 import { afterEach, describe, it } from 'vitest';
 import { DocumentDriveServer } from '../src/server';
 import { FilesystemStorage } from '../src/storage';
-import { DatabaseStorage } from '../src/storage/database';
+import { CeramicDB } from '../src/storage/ceramicdb';
 // Import ComposeDB client
 
 const documentModels = [
@@ -27,7 +27,7 @@ const FileStorageDir = path.join(__dirname, './file-storage');
 const storageLayers = [
     // () => new MemoryStorage()
     // () => new FilesystemStorage(FileStorageDir),
-    () => new DatabaseStorage()
+    () => new CeramicDB()
 ] as const;
 
 describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
@@ -44,9 +44,9 @@ describe.each(storageLayers.map(layer => [layer.constructor.name, layer]))(
                 documentModels,
                 buildStorage()
             );
-            await server.addDrive({ id: '', name: 'name', icon: 'icon' });
+            await server.addDrive({ id: '1', name: 'name', icon: 'icon' });
             let drives = await server.getDrives();
-            const drive = await server.getDrive(drives[0]!);
+            const drive = await server.getDrive('1');
             expect(drive.state).toStrictEqual(
                 DocumentDriveUtils.createState({
                     id: '1',
