@@ -47,7 +47,16 @@ describe.each(storageLayers)(
                 buildStorage()
             );
             await server.addDrive({
-                global: { id: '1', name: 'name', icon: 'icon' }
+                global: {
+                    id: '1',
+                    name: 'name',
+                    icon: 'icon',
+                    remoteUrl: null
+                },
+                local: {
+                    availableOffline: false,
+                    sharingType: 'public'
+                }
             });
             const drive = await server.getDrive('1');
             expect(drive.state).toStrictEqual(
@@ -56,6 +65,10 @@ describe.each(storageLayers)(
                         id: '1',
                         name: 'name',
                         icon: 'icon'
+                    },
+                    local: {
+                        availableOffline: false,
+                        sharingType: 'public'
                     }
                 })
             );
@@ -70,7 +83,16 @@ describe.each(storageLayers)(
                 buildStorage()
             );
             await server.addDrive({
-                global: { id: '1', name: 'name', icon: 'icon' }
+                global: {
+                    id: '1',
+                    name: 'name',
+                    icon: 'icon',
+                    remoteUrl: null
+                },
+                local: {
+                    availableOffline: false,
+                    sharingType: 'public'
+                }
             });
             let drive = await server.getDrive('1');
 
@@ -113,7 +135,16 @@ describe.each(storageLayers)(
                 buildStorage()
             );
             await server.addDrive({
-                global: { id: '1', name: 'name', icon: 'icon' }
+                global: {
+                    id: '1',
+                    name: 'name',
+                    icon: 'icon',
+                    remoteUrl: null
+                },
+                local: {
+                    availableOffline: false,
+                    sharingType: 'public'
+                }
             });
             let drive = await server.getDrive('1');
             drive = reducer(
@@ -144,7 +175,16 @@ describe.each(storageLayers)(
                 buildStorage()
             );
             await server.addDrive({
-                global: { id: '1', name: 'name', icon: 'icon' }
+                global: {
+                    id: '1',
+                    name: 'name',
+                    icon: 'icon',
+                    remoteUrl: null
+                },
+                local: {
+                    availableOffline: false,
+                    sharingType: 'public'
+                }
             });
             let drive = await server.getDrive('1');
 
@@ -180,7 +220,16 @@ describe.each(storageLayers)(
                 buildStorage()
             );
             await server.addDrive({
-                global: { id: '1', name: 'name', icon: 'icon' }
+                global: {
+                    id: '1',
+                    name: 'name',
+                    icon: 'icon',
+                    remoteUrl: null
+                },
+                local: {
+                    availableOffline: false,
+                    sharingType: 'public'
+                }
             });
             let drive = await server.getDrive('1');
             drive = reducer(
@@ -216,7 +265,16 @@ describe.each(storageLayers)(
                 buildStorage()
             );
             await server.addDrive({
-                global: { id: '1', name: 'name', icon: 'icon' }
+                global: {
+                    id: '1',
+                    name: 'name',
+                    icon: 'icon',
+                    remoteUrl: null
+                },
+                local: {
+                    availableOffline: false,
+                    sharingType: 'public'
+                }
             });
             let drive = await server.getDrive('1');
 
@@ -259,7 +317,16 @@ describe.each(storageLayers)(
                 buildStorage()
             );
             await server.addDrive({
-                global: { id: '1', name: 'name', icon: 'icon' }
+                global: {
+                    id: '1',
+                    name: 'name',
+                    icon: 'icon',
+                    remoteUrl: null
+                },
+                local: {
+                    availableOffline: false,
+                    sharingType: 'public'
+                }
             });
 
             await server.deleteDrive('1');
@@ -276,7 +343,16 @@ describe.each(storageLayers)(
                 buildStorage()
             );
             await server.addDrive({
-                global: { id: '1', name: 'name', icon: 'icon' }
+                global: {
+                    id: '1',
+                    name: 'name',
+                    icon: 'icon',
+                    remoteUrl: null
+                },
+                local: {
+                    availableOffline: false,
+                    sharingType: 'public'
+                }
             });
 
             let drive = await server.getDrive('1');
@@ -302,7 +378,16 @@ describe.each(storageLayers)(
                 buildStorage()
             );
             await server.addDrive({
-                global: { id: '1', name: 'name', icon: 'icon' }
+                global: {
+                    id: '1',
+                    name: 'name',
+                    icon: 'icon',
+                    remoteUrl: null
+                },
+                local: {
+                    availableOffline: false,
+                    sharingType: 'public'
+                }
             });
             let drive = await server.getDrive('1');
             drive = reducer(
@@ -324,7 +409,16 @@ describe.each(storageLayers)(
                 buildStorage()
             );
             await server.addDrive({
-                global: { id: '1', name: 'name', icon: 'icon' }
+                global: {
+                    id: '1',
+                    name: 'name',
+                    icon: 'icon',
+                    remoteUrl: null
+                },
+                local: {
+                    availableOffline: false,
+                    sharingType: 'public'
+                }
             });
             let drive = await server.getDrive('1');
             drive = reducer(
