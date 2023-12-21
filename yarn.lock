@@ -689,10 +689,10 @@ document-model-libs@^1.1.26:
   resolved "https://registry.yarnpkg.com/document-model-libs/-/document-model-libs-1.1.26.tgz#eeb498c7c955baf0a3e01189f0701528e2e53e45"
   integrity sha512-QMjUhiQVcRfLQjjfcHEmL6rFnhJCfuzdsLrfZo9y4J6zQH705OooN454+a8XK3ZhZoV8KJ8gAMux8RAL0tWrag==
 
-document-model@^1.0.18:
-  version "1.0.18"
-  resolved "https://registry.yarnpkg.com/document-model/-/document-model-1.0.18.tgz#9b0fe34cd2d7bf9ecb9a93fbe1d8bebea79a80d9"
-  integrity sha512-JP8XMn9FYflFR85tBQ0hWsSRD2S6vnUw5MMGlshaIbBN+RYhwPWaGOWgM/LHkKdIco0nYKAhXJwJ6aTDzp6b9g==
+document-model@^1.0.19:
+  version "1.0.19"
+  resolved "https://registry.yarnpkg.com/document-model/-/document-model-1.0.19.tgz#064ffbbc3635cfd2257ff0d8cdea810df2285ce2"
+  integrity sha512-LchmMlJLtds2/E5BRHWZVxd5inFCcrYMmZpFFU1K51pS6FbTVqJpA/7EjmpIDQnFAyph2iVd2dSAXGv2ZepmvQ==
   dependencies:
     immer "^10.0.2"
     json-stringify-deterministic "^1.0.10"

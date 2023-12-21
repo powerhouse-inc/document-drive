@@ -1,9 +1,12 @@
-import { DocumentDriveDocument } from 'document-model-libs/document-drive';
-import { Document } from 'document-model/document';
-import { IDriveStorage } from './types';
+import {
+    DocumentDriveAction,
+    DocumentDriveDocument
+} from 'document-model-libs/document-drive';
+import { Document, DocumentHeader, Operation } from 'document-model/document';
+import { DocumentStorage, IDriveStorage } from './types';
 
 export class MemoryStorage implements IDriveStorage {
-    private documents: Record<string, Record<string, Document>>;
+    private documents: Record<string, Record<string, DocumentStorage>>;
     private drives: Record<string, DocumentDriveDocument>;
 
     constructor() {
@@ -32,6 +35,55 @@ export class MemoryStorage implements IDriveStorage {
         this.documents[drive]![id] = document;
     }
 
+    async createDocument(drive: string, id: string, document: DocumentStorage) {
+        this.documents[drive] = this.documents[drive] ?? {};
+        const {
+            operations,
+            initialState,
+            name,
+            revision,
+            documentType,
+            created,
+            lastModified
+        } = document;
+        this.documents[drive]![id] = {
+            operations,
+            initialState,
+            name,
+            revision,
+            documentType,
+            created,
+            lastModified
+        };
+    }
+
+    async addDocumentOperations(
+        drive: string,
+        id: string,
+        operations: Operation[],
+        header: DocumentHeader
+    ): Promise<void> {
+        if (!this.documents[drive]) {
+            throw new Error(`Drive with id ${drive} not found`);
+        }
+        const document = this.documents[drive]![id];
+        if (!document) {
+            throw new Error(`Document with id ${id} not found`);
+        }
+
+        const mergedOperations = operations.reduce((acc, curr) => {
+            const operations = acc[curr.scope] ?? [];
+            acc[curr.scope] = [...operations, curr];
+            return acc;
+        }, document.operations);
+
+        this.documents[drive]![id] = {
+            ...document,
+            ...header,
+            operations: mergedOperations
+        };
+    }
+
     async deleteDocument(drive: string, id: string) {
         if (!this.documents[drive]) {
             throw new Error(`Drive with id ${drive} not found`);
@@ -51,8 +103,30 @@ export class MemoryStorage implements IDriveStorage {
         return drive;
     }
 
-    async saveDrive(drive: DocumentDriveDocument) {
+    async createDrive(drive: DocumentDriveDocument) {
         this.drives[drive.state.global.id] = drive;
+    }
+
+    async addDriveOperations(
+        id: string,
+        operations: Operation[],
+        header: DocumentHeader
+    ): Promise<void> {
+        const drive = await this.getDrive(id);
+        const mergedOperations = operations.reduce((acc, curr) => {
+            const operations = acc[curr.scope] ?? [];
+            acc[curr.scope] = [
+                ...operations,
+                curr
+            ] as Operation<DocumentDriveAction>[];
+            return acc;
+        }, drive.operations);
+
+        this.drives[id] = {
+            ...drive,
+            ...header,
+            operations: mergedOperations
+        };
     }
 
     async deleteDrive(id: string) {
