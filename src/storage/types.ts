@@ -1,5 +1,13 @@
-import { DocumentDriveDocument } from 'document-model-libs/document-drive';
-import { Document, DocumentHeader, Operation } from 'document-model/document';
+import type {
+    DocumentDriveAction,
+    DocumentDriveDocument
+} from 'document-model-libs/document-drive';
+import type {
+    BaseAction,
+    Document,
+    DocumentHeader,
+    Operation
+} from 'document-model/document';
 
 export type DocumentStorage<D extends Document = Document> = Omit<
     D,
@@ -31,7 +39,7 @@ export interface IDriveStorage extends IStorage {
     deleteDrive(id: string): Promise<void>;
     addDriveOperations(
         id: string,
-        operations: Operation[],
+        operations: Operation<DocumentDriveAction | BaseAction>[],
         header: DocumentHeader
     ): Promise<void>;
 }

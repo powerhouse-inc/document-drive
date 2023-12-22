@@ -1,5 +1,5 @@
-import { DocumentDriveDocument } from 'document-model-libs/document-drive';
-import { Document } from 'document-model/document';
+import { DocumentDriveAction } from 'document-model-libs/document-drive';
+import { BaseAction, DocumentHeader, Operation } from 'document-model/document';
 import type { Dirent } from 'fs';
 import {
     existsSync,
@@ -11,8 +11,8 @@ import {
 import fs from 'fs/promises';
 import path from 'path';
 import sanitize from 'sanitize-filename';
-import { isDocumentDrive } from '../utils';
-import { IDriveStorage } from './types';
+import { mergeOperations } from '..';
+import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 
 type FSError = {
     errno: number;
@@ -88,7 +88,7 @@ export class FilesystemStorage implements IDriveStorage {
         }
     }
 
-    async saveDocument(drive: string, id: string, document: Document) {
+    async createDocument(drive: string, id: string, document: DocumentStorage) {
         const documentPath = this._buildDocumentPath(drive, id);
         await ensureDir(path.dirname(documentPath));
         await writeFileSync(documentPath, JSON.stringify(document), {
@@ -98,6 +98,29 @@ export class FilesystemStorage implements IDriveStorage {
 
     async deleteDocument(drive: string, id: string) {
         return fs.rm(this._buildDocumentPath(drive, id));
+    }
+
+    async addDocumentOperations(
+        drive: string,
+        id: string,
+        operations: Operation[],
+        header: DocumentHeader
+    ) {
+        const document = await this.getDocument(drive, id);
+        if (!document) {
+            throw new Error(`Document with id ${id} not found`);
+        }
+
+        const mergedOperations = mergeOperations(
+            document.operations,
+            operations
+        );
+
+        this.createDocument(drive, id, {
+            ...document,
+            ...header,
+            operations: mergedOperations
+        });
     }
 
     async getDrives() {
@@ -120,25 +143,18 @@ export class FilesystemStorage implements IDriveStorage {
     }
 
     async getDrive(id: string) {
-        let document: Document;
         try {
-            document = await this.getDocument(FilesystemStorage.DRIVES_DIR, id);
+            return (await this.getDocument(
+                FilesystemStorage.DRIVES_DIR,
+                id
+            )) as DocumentDriveStorage;
         } catch {
             throw new Error(`Drive with id ${id} not found`);
         }
-        if (isDocumentDrive(document)) {
-            return document;
-        } else {
-            throw new Error('Invalid drive document');
-        }
     }
 
-    saveDrive(drive: DocumentDriveDocument) {
-        return this.saveDocument(
-            FilesystemStorage.DRIVES_DIR,
-            drive.state.global.id,
-            drive
-        );
+    createDrive(id: string, drive: DocumentDriveStorage) {
+        return this.createDocument(FilesystemStorage.DRIVES_DIR, id, drive);
     }
 
     async deleteDrive(id: string) {
@@ -147,5 +163,20 @@ export class FilesystemStorage implements IDriveStorage {
         await Promise.all(
             documents.map(document => this.deleteDocument(id, document))
         );
+    }
+
+    async addDriveOperations(
+        id: string,
+        operations: Operation<DocumentDriveAction | BaseAction>[],
+        header: DocumentHeader
+    ): Promise<void> {
+        const drive = await this.getDrive(id);
+        const mergedOperations = mergeOperations(drive.operations, operations);
+
+        this.createDrive(id, {
+            ...drive,
+            ...header,
+            operations: mergedOperations
+        });
     }
 }

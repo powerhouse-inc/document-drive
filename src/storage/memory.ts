@@ -1,5 +1,11 @@
 import { DocumentDriveAction } from 'document-model-libs/document-drive';
-import { Document, DocumentHeader, Operation } from 'document-model/document';
+import {
+    BaseAction,
+    Document,
+    DocumentHeader,
+    Operation
+} from 'document-model/document';
+import { mergeOperations } from '..';
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 
 export class MemoryStorage implements IDriveStorage {
@@ -65,11 +71,10 @@ export class MemoryStorage implements IDriveStorage {
             throw new Error(`Document with id ${id} not found`);
         }
 
-        const mergedOperations = operations.reduce((acc, curr) => {
-            const operations = acc[curr.scope] ?? [];
-            acc[curr.scope] = [...operations, curr];
-            return acc;
-        }, document.operations);
+        const mergedOperations = mergeOperations(
+            document.operations,
+            operations
+        );
 
         this.documents[drive]![id] = {
             ...document,
@@ -103,18 +108,11 @@ export class MemoryStorage implements IDriveStorage {
 
     async addDriveOperations(
         id: string,
-        operations: Operation[],
+        operations: Operation<DocumentDriveAction | BaseAction>[],
         header: DocumentHeader
     ): Promise<void> {
         const drive = await this.getDrive(id);
-        const mergedOperations = operations.reduce((acc, curr) => {
-            const operations = acc[curr.scope] ?? [];
-            acc[curr.scope] = [
-                ...operations,
-                curr
-            ] as Operation<DocumentDriveAction>[];
-            return acc;
-        }, drive.operations);
+        const mergedOperations = mergeOperations(drive.operations, operations);
 
         this.drives[id] = {
             ...drive,
