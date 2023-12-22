@@ -44,11 +44,23 @@ export class DocumentDriveServer implements IDocumentDriveServer {
         return documentModel;
     }
 
-    addDrive(drive: DriveInput) {
+    async addDrive(drive: DriveInput) {
+        const id = drive.global.id;
+        if (!id) {
+            throw new Error('Invalid Drive Id');
+        }
+        try {
+            const driveStorage = await this.storage.getDrive(id);
+            if (driveStorage) {
+                throw new Error('Drive already exists');
+            }
+        } catch {
+            // ignore error has it means drive does not exist already
+        }
         const document = utils.createDocument({
             state: drive
         });
-        return this.storage.createDrive(document);
+        return this.storage.createDrive(id, document);
     }
 
     deleteDrive(id: string) {

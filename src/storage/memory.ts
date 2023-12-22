@@ -1,13 +1,10 @@
-import {
-    DocumentDriveAction,
-    DocumentDriveDocument
-} from 'document-model-libs/document-drive';
+import { DocumentDriveAction } from 'document-model-libs/document-drive';
 import { Document, DocumentHeader, Operation } from 'document-model/document';
-import { DocumentStorage, IDriveStorage } from './types';
+import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 
 export class MemoryStorage implements IDriveStorage {
     private documents: Record<string, Record<string, DocumentStorage>>;
-    private drives: Record<string, DocumentDriveDocument>;
+    private drives: Record<string, DocumentDriveStorage>;
 
     constructor() {
         this.documents = {};
@@ -63,10 +60,7 @@ export class MemoryStorage implements IDriveStorage {
         operations: Operation[],
         header: DocumentHeader
     ): Promise<void> {
-        if (!this.documents[drive]) {
-            throw new Error(`Drive with id ${drive} not found`);
-        }
-        const document = this.documents[drive]![id];
+        const document = await this.getDocument(drive, id);
         if (!document) {
             throw new Error(`Document with id ${id} not found`);
         }
@@ -103,8 +97,8 @@ export class MemoryStorage implements IDriveStorage {
         return drive;
     }
 
-    async createDrive(drive: DocumentDriveDocument) {
-        this.drives[drive.state.global.id] = drive;
+    async createDrive(id: string, drive: DocumentDriveStorage) {
+        this.drives[id] = drive;
     }
 
     async addDriveOperations(
