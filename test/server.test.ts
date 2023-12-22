@@ -13,7 +13,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { afterEach, describe, it } from 'vitest';
 import { DocumentDriveServer } from '../src/server';
-import { MemoryStorage } from '../src/storage';
+import { BrowserStorage, MemoryStorage } from '../src/storage';
 
 const documentModels = [
     DocumentModelLib,
@@ -23,9 +23,9 @@ const documentModels = [
 const FileStorageDir = path.join(__dirname, './file-storage');
 
 const storageLayers = [
-    ['MemoryStorage', () => new MemoryStorage()]
+    ['MemoryStorage', () => new MemoryStorage()],
     // ['FilesystemStorage', () => new FilesystemStorage(FileStorageDir)],
-    // ['BrowserStorage', () => new BrowserStorage()]
+    ['BrowserStorage', () => new BrowserStorage()]
 ] as const;
 
 describe.each(storageLayers)(

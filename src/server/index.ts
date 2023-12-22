@@ -145,10 +145,14 @@ export class DocumentDriveServer implements IDocumentDriveServer {
                 documentStorage
             );
 
-            const signalHandlers: Promise<SignalResult>[] = [];
-            const newDocument = operations.reduce(
-                (document, operation) =>
-                    documentModel.reducer(document, operation, signal => {
+            const signalResults: SignalResult[] = [];
+            let newDocument = document;
+            for (const operation of operations) {
+                const operationSignals: Promise<SignalResult>[] = [];
+                newDocument = documentModel.reducer(
+                    newDocument,
+                    operation,
+                    signal => {
                         let handler: Promise<unknown> | undefined = undefined;
                         switch (signal.type) {
                             case 'CREATE_CHILD_DOCUMENT':
@@ -178,14 +182,15 @@ export class DocumentDriveServer implements IDocumentDriveServer {
                                 break;
                         }
                         if (handler) {
-                            signalHandlers.push(
+                            operationSignals.push(
                                 handler.then(result => ({ signal, result }))
                             );
                         }
-                    }),
-                document
-            );
-            const signals = await Promise.all(signalHandlers);
+                    }
+                );
+                const results = await Promise.all(operationSignals);
+                signalResults.push(...results);
+            }
 
             // saves the updated state of the document and returns it
             if (id) {
@@ -209,7 +214,7 @@ export class DocumentDriveServer implements IDocumentDriveServer {
                 success: true,
                 document: newDocument,
                 operations,
-                signals
+                signals: signalResults
             };
         } catch (error) {
             return {
