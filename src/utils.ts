@@ -3,7 +3,13 @@ import {
     documentModel as DocumentDriveModel,
     z
 } from 'document-model-libs/document-drive';
-import { Document } from 'document-model/document';
+import {
+    Action,
+    BaseAction,
+    Document,
+    DocumentOperations,
+    Operation
+} from 'document-model/document';
 
 export function isDocumentDrive(
     document: Document
@@ -12,4 +18,15 @@ export function isDocumentDrive(
         document.documentType === DocumentDriveModel.id &&
         z.DocumentDriveStateSchema().safeParse(document.state.global).success
     );
+}
+
+export function mergeOperations<A extends Action = Action>(
+    currentOperations: DocumentOperations<A>,
+    newOperations: Operation<A | BaseAction>[]
+): DocumentOperations<A> {
+    return newOperations.reduce((acc, curr) => {
+        const operations = acc[curr.scope] ?? [];
+        acc[curr.scope] = [...operations, curr] as Operation<A>[];
+        return acc;
+    }, currentOperations);
 }

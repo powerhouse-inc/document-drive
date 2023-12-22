@@ -31,8 +31,8 @@ export type SignalResult = {
 export type IOperationResult<T extends Document = Document> = {
     success: boolean;
     error?: Error;
-    operation: Operation;
-    document: T;
+    operations: Operation[];
+    document: T | undefined;
     signals: SignalResult[];
 };
 
@@ -56,7 +56,7 @@ export interface IDocumentDriveServer {
         drive: string,
         id: string,
         operations: Operation[]
-    ): Promise<IOperationResult[]>;
+    ): Promise<IOperationResult>;
 
     addDriveOperation(
         drive: string,
@@ -65,5 +65,5 @@ export interface IDocumentDriveServer {
     addDriveOperations(
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[]
-    ): Promise<IOperationResult<DocumentDriveDocument>[]>;
+    ): Promise<IOperationResult<DocumentDriveDocument>>;
 }

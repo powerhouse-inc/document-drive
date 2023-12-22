@@ -1,17 +1,17 @@
+import { DocumentDriveAction, utils } from 'document-model-libs/document-drive';
 import {
-    DocumentDriveAction,
-    DocumentDriveDocument,
-    utils
-} from 'document-model-libs/document-drive';
-import { BaseAction, DocumentModel, Operation } from 'document-model/document';
-import { IDriveStorage } from '../storage';
+    BaseAction,
+    DocumentModel,
+    Operation,
+    utils as baseUtils
+} from 'document-model/document';
+import { DocumentStorage, IDriveStorage } from '../storage';
 import { MemoryStorage } from '../storage/memory';
 import { isDocumentDrive } from '../utils';
 import {
     CreateDocumentInput,
     DriveInput,
     IDocumentDriveServer,
-    IOperationResult,
     SignalResult
 } from './types';
 
@@ -39,11 +39,23 @@ export class DocumentDriveServer implements IDocumentDriveServer {
         return documentModel;
     }
 
-    addDrive(drive: DriveInput) {
+    async addDrive(drive: DriveInput) {
+        const id = drive.global.id;
+        if (!id) {
+            throw new Error('Invalid Drive Id');
+        }
+        try {
+            const driveStorage = await this.storage.getDrive(id);
+            if (driveStorage) {
+                throw new Error('Drive already exists');
+            }
+        } catch {
+            // ignore error has it means drive does not exist already
+        }
         const document = utils.createDocument({
             state: drive
         });
-        return this.storage.saveDrive(document);
+        return this.storage.createDrive(id, document);
     }
 
     deleteDrive(id: string) {
@@ -54,12 +66,38 @@ export class DocumentDriveServer implements IDocumentDriveServer {
         return this.storage.getDrives();
     }
 
-    getDrive(drive: string) {
-        return this.storage.getDrive(drive);
+    async getDrive(drive: string) {
+        const driveStorage = await this.storage.getDrive(drive);
+        const documentModel = this._getDocumentModel(driveStorage.documentType);
+        const document = baseUtils.replayDocument(
+            driveStorage.initialState,
+            driveStorage.operations,
+            documentModel.reducer,
+            undefined,
+            driveStorage
+        );
+        if (!isDocumentDrive(document)) {
+            throw new Error(
+                `Document with id ${drive} is not a Document Drive`
+            );
+        } else {
+            return document;
+        }
     }
 
-    getDocument(drive: string, id: string) {
-        return this.storage.getDocument(drive, id);
+    async getDocument(drive: string, id: string) {
+        const { initialState, operations, ...header } =
+            await this.storage.getDocument(drive, id);
+
+        const documentModel = this._getDocumentModel(header.documentType);
+
+        return baseUtils.replayDocument(
+            initialState,
+            operations,
+            documentModel.reducer,
+            undefined,
+            header
+        );
     }
 
     getDocuments(drive: string) {
@@ -72,25 +110,35 @@ export class DocumentDriveServer implements IDocumentDriveServer {
         // TODO validate input.document is of documentType
         const document = input.document ?? documentModel.utils.createDocument();
 
-        return this.storage.saveDocument(driveId, input.id, document);
+        return this.storage.createDocument(driveId, input.id, document);
     }
 
-    async deleteDocument(driveId: string, id: string): Promise<void> {
+    async deleteDocument(driveId: string, id: string) {
         return this.storage.deleteDocument(driveId, id);
     }
 
-    async addOperation(drive: string, id: string, operation: Operation) {
-        // retrieves document from storage
-        const document = await (id
-            ? this.storage.getDocument(drive, id)
-            : this.storage.getDrive(drive));
-        try {
-            // retrieves the document's document model and
-            // applies operation using its reducer
-            const documentModel = this._getDocumentModel(document.documentType);
-            const signalHandlers: Promise<SignalResult>[] = [];
-            const newDocument = documentModel.reducer(
-                document,
+    private async _performOperations(
+        drive: string,
+        documentStorage: DocumentStorage,
+        operations: Operation[]
+    ) {
+        const documentModel = this._getDocumentModel(
+            documentStorage.documentType
+        );
+        const document = baseUtils.replayDocument(
+            documentStorage.initialState,
+            documentStorage.operations,
+            documentModel.reducer,
+            undefined,
+            documentStorage
+        );
+
+        const signalResults: SignalResult[] = [];
+        let newDocument = document;
+        for (const operation of operations) {
+            const operationSignals: Promise<SignalResult>[] = [];
+            newDocument = documentModel.reducer(
+                newDocument,
                 operation,
                 signal => {
                     let handler: Promise<unknown> | undefined = undefined;
@@ -118,62 +166,105 @@ export class DocumentDriveServer implements IDocumentDriveServer {
                             break;
                     }
                     if (handler) {
-                        signalHandlers.push(
+                        operationSignals.push(
                             handler.then(result => ({ signal, result }))
                         );
                     }
                 }
             );
-            const signals = await Promise.all(signalHandlers);
+            const results = await Promise.all(operationSignals);
+            signalResults.push(...results);
+        }
+        return { document: newDocument, signals: signalResults };
+    }
+
+    addOperation(drive: string, id: string, operation: Operation) {
+        return this.addOperations(drive, id, [operation]);
+    }
+
+    async addOperations(drive: string, id: string, operations: Operation[]) {
+        // retrieves document from storage
+        const documentStorage = await this.storage.getDocument(drive, id);
+        try {
+            // retrieves the document's document model and
+            // applies the operations using its reducer
+            const { document, signals } = await this._performOperations(
+                drive,
+                documentStorage,
+                operations
+            );
 
             // saves the updated state of the document and returns it
-            if (id) {
-                await this.storage.saveDocument(drive, id, newDocument);
-            } else if (isDocumentDrive(newDocument)) {
-                await this.storage.saveDrive(newDocument);
-            } else {
-                throw new Error('Invalid document');
-            }
+            await this.storage.addDocumentOperations(
+                drive,
+                id,
+                operations,
+                document
+            );
+
             return {
                 success: true,
-                document: newDocument,
-                operation,
+                document,
+                operations,
                 signals
             };
         } catch (error) {
             return {
                 success: false,
                 error: error as Error,
-                document,
-                operation,
+                document: undefined,
+                operations,
                 signals: []
             };
         }
-    }
-
-    async addOperations(drive: string, id: string, operations: Operation[]) {
-        const results: IOperationResult[] = [];
-        for (const operation of operations) {
-            results.push(await this.addOperation(drive, id, operation));
-        }
-        return results;
     }
 
     addDriveOperation(
         drive: string,
         operation: Operation<DocumentDriveAction | BaseAction>
     ) {
-        return this.addOperation(drive, '', operation) as Promise<
-            IOperationResult<DocumentDriveDocument>
-        >;
+        return this.addDriveOperations(drive, [operation]);
     }
 
-    addDriveOperations(
+    async addDriveOperations(
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[]
     ) {
-        return this.addOperations(drive, '', operations) as Promise<
-            IOperationResult<DocumentDriveDocument>[]
-        >;
+        // retrieves document from storage
+        const documentStorage = await this.storage.getDrive(drive);
+        try {
+            // retrieves the document's document model and
+            // applies the operations using its reducer
+            const { document, signals } = await this._performOperations(
+                drive,
+                documentStorage,
+                operations
+            );
+
+            if (isDocumentDrive(document)) {
+                await this.storage.addDriveOperations(
+                    drive,
+                    operations as Operation<DocumentDriveAction | BaseAction>[], // TODO check?
+                    document
+                );
+            } else {
+                throw new Error('Invalid Document Drive document');
+            }
+
+            return {
+                success: true,
+                document,
+                operations,
+                signals
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error as Error,
+                document: undefined,
+                operations,
+                signals: []
+            };
+        }
     }
 }

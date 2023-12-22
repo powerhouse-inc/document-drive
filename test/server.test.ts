@@ -112,9 +112,8 @@ describe.each(storageLayers)(
                 '1',
                 operation
             );
-
             expect(drive.state.global).toStrictEqual(
-                operationResult.document.state.global
+                operationResult.document?.state.global
             );
             expect(drive.state.global.nodes).toStrictEqual([
                 {

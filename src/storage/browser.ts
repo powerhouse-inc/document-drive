@@ -1,6 +1,12 @@
-import { DocumentDriveDocument } from 'document-model-libs/document-drive';
-import { Document } from 'document-model/document';
-import { IDriveStorage } from './types';
+import { DocumentDriveAction } from 'document-model-libs/document-drive';
+import {
+    BaseAction,
+    Document,
+    DocumentHeader,
+    Operation
+} from 'document-model/document';
+import { mergeOperations } from '..';
+import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 
 export class BrowserStorage implements IDriveStorage {
     private db: Promise<LocalForage>;
@@ -39,7 +45,7 @@ export class BrowserStorage implements IDriveStorage {
         return document;
     }
 
-    async saveDocument(drive: string, id: string, document: Document) {
+    async createDocument(drive: string, id: string, document: DocumentStorage) {
         await (await this.db).setItem(this.buildKey(drive, id), document);
     }
 
@@ -47,56 +53,80 @@ export class BrowserStorage implements IDriveStorage {
         await (await this.db).removeItem(this.buildKey(drive, id));
     }
 
+    async addDocumentOperations(
+        drive: string,
+        id: string,
+        operations: Operation[],
+        header: DocumentHeader
+    ): Promise<void> {
+        const document = await this.getDocument(drive, id);
+        if (!document) {
+            throw new Error(`Document with id ${id} not found`);
+        }
+
+        const mergedOperations = mergeOperations(
+            document.operations,
+            operations
+        );
+
+        await (
+            await this.db
+        ).setItem(this.buildKey(drive, id), {
+            ...document,
+            ...header,
+            operations: mergedOperations
+        });
+    }
+
     async getDrives() {
-        const drives =
-            (await (
-                await this.db
-            ).getItem<DocumentDriveDocument[]>(BrowserStorage.DRIVES_KEY)) ??
-            [];
-        return drives.map(drive => drive.state.global.id);
+        const keys = (await (await this.db).keys()) ?? [];
+        return keys
+            .filter(key => key.startsWith(BrowserStorage.DRIVES_KEY))
+            .map(key =>
+                key.slice(
+                    BrowserStorage.DRIVES_KEY.length + BrowserStorage.SEP.length
+                )
+            );
     }
 
     async getDrive(id: string) {
-        const drives =
-            (await (
-                await this.db
-            ).getItem<DocumentDriveDocument[]>(BrowserStorage.DRIVES_KEY)) ??
-            [];
-        const drive = drives.find(drive => drive.state.global.id === id);
+        const drive = await (
+            await this.db
+        ).getItem<DocumentDriveStorage>(
+            this.buildKey(BrowserStorage.DRIVES_KEY, id)
+        );
         if (!drive) {
             throw new Error(`Drive with id ${id} not found`);
         }
         return drive;
     }
 
-    async saveDrive(drive: DocumentDriveDocument) {
+    async createDrive(id: string, drive: DocumentDriveStorage) {
         const db = await this.db;
-        const drives =
-            (await db.getItem<DocumentDriveDocument[]>(
-                BrowserStorage.DRIVES_KEY
-            )) ?? [];
-        const index = drives.findIndex(
-            d => d.state.global.id === drive.state.global.id
-        );
-        if (index > -1) {
-            drives[index] = drive;
-        } else {
-            drives.push(drive);
-        }
-        await db.setItem(BrowserStorage.DRIVES_KEY, drives);
+        await db.setItem(this.buildKey(BrowserStorage.DRIVES_KEY, id), drive);
     }
 
     async deleteDrive(id: string) {
         const documents = await this.getDocuments(id);
         await Promise.all(documents.map(doc => this.deleteDocument(id, doc)));
-        const db = await this.db;
-        const drives =
-            (await db.getItem<DocumentDriveDocument[]>(
-                BrowserStorage.DRIVES_KEY
-            )) ?? [];
-        await db.setItem(
-            BrowserStorage.DRIVES_KEY,
-            drives.filter(drive => drive.state.global.id !== id)
+        return (await this.db).removeItem(
+            this.buildKey(BrowserStorage.DRIVES_KEY, id)
         );
+    }
+
+    async addDriveOperations(
+        id: string,
+        operations: Operation<DocumentDriveAction | BaseAction>[],
+        header: DocumentHeader
+    ): Promise<void> {
+        const drive = await this.getDrive(id);
+        const mergedOperations = mergeOperations(drive.operations, operations);
+
+        (await this.db).setItem(this.buildKey(BrowserStorage.DRIVES_KEY, id), {
+            ...drive,
+            ...header,
+            operations: mergedOperations
+        });
+        return;
     }
 }
