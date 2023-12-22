@@ -13,9 +13,13 @@ import {
 import fs from 'fs/promises';
 import path from 'path';
 import { afterEach, describe, it } from 'vitest';
-import { BrowserStorage, FilesystemStorage, MemoryStorage } from '../src';
+import {
+    BrowserStorage,
+    FilesystemStorage,
+    MemoryStorage,
+    PrismaStorage
+} from '../src';
 import { DocumentDriveServer } from '../src/server';
-import { PrismaStorage } from '../src/storage/prisma';
 
 const documentModels = [
     DocumentModelLib,
@@ -404,10 +408,7 @@ describe.each(storageLayers)(
                 })
             );
 
-            const result2 = await server.addDriveOperation(
-                '1',
-                drive.operations.global[0]!
-            );
+            await server.addDriveOperation('1', drive.operations.global[0]!);
 
             drive = await server.getDrive('1');
             expect(drive.state.global.name).toBe('new name');
