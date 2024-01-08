@@ -30,6 +30,7 @@
         "localforage": "^1.10.0"
     },
     "dependencies": {
+        "@prisma/client": "5.7.1",
         "sanitize-filename": "^1.6.3"
     },
     "devDependencies": {
