@@ -12,7 +12,10 @@ import {
     CreateDocumentInput,
     DriveInput,
     IDocumentDriveServer,
-    SignalResult
+    ListenerRevision,
+    SignalResult,
+    StrandUpdate,
+    UpdateStatus
 } from './types';
 
 export type * from './types';
@@ -266,5 +269,62 @@ export class DocumentDriveServer implements IDocumentDriveServer {
                 signals: []
             };
         }
+    }
+
+    registerListener(input: CreateListenerInput): Promise<Listener> {
+        throw new Error('Method not implemented.');
+    }
+
+    removeListener(listenerId: string): Promise<boolean> {
+        throw new Error('Method not implemented.');
+    }
+    
+    cleanAllListener(): Promise<boolean> {
+        throw new Error('Method not implemented.');
+    }
+
+    async pushStrands(strands: StrandUpdate[]): Promise<ListenerRevision[]> {
+        const results = await Promise.all(
+            strands.map(strand => {
+                const drive = strand.driveId;
+                const documentId = strand.documentId;
+                const scope = strand.scope;
+                const branch = strand.branch;
+                const operations: Operation[] = strand.operations.map(
+                    operation => {
+                        return {
+                            ...operation,
+                            scope,
+                            branch,
+                            index: operation.revision,
+                            timestamp: new Date().toTimeString()
+                        };
+                    }
+                );
+
+                return this.addOperations(drive, documentId, operations);
+            })
+        );
+
+        return results.map((result, i) => {
+            const status: UpdateStatus = result.success
+                ? UpdateStatus.SUCCESS
+                : UpdateStatus.ERROR;
+
+            return {
+                driveId: strands[i]!.driveId,
+                documentId: strands[i]!.documentId,
+                scope: strands[i]!.scope,
+                branch: strands[i]!.branch,
+                status: status,
+                revision: 0
+            };
+        });
+    }
+    getStrands(listenerId: string): Promise<StrandUpdate[]> {
+        throw new Error('Method not implemented.');
+    }
+    getStrandsSince(listenerId: string, since: Date): Promise<StrandUpdate[]> {
+        throw new Error('Method not implemented.');
     }
 }

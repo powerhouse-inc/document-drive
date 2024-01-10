@@ -8,6 +8,7 @@ import type {
     BaseAction,
     Document,
     Operation,
+    OperationScope,
     Signal,
     State
 } from 'document-model/document';
@@ -91,20 +92,22 @@ export enum UpdateStatus {
     ERROR
 }
 
-type StrandUpdate = {
+export type StrandUpdate = {
     driveId: string;
     documentId: string;
-    scope: string;
+    scope: OperationScope;
     branch: string;
     operations: OperationUpdate[];
 };
 
-type OperationUpdate = {
+// maybe change to Operation?
+export type OperationUpdate = {
     revision: number;
     skip: number;
     name: string;
-    inputJson: string;
-    stateHash: string;
+    input: string;
+    hash: string;
+    type: string;
 };
 
 export interface IDocumentDriveServer {
