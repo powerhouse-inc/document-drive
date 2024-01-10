@@ -36,6 +36,77 @@ export type IOperationResult<T extends Document = Document> = {
     signals: SignalResult[];
 };
 
+export type Listener = {
+    listenerId: string;
+    label?: string;
+    block: boolean;
+    system: boolean;
+    filter: ListenerFilter;
+    callInfo?: ListenerCallInfo;
+};
+
+export type CreateListenerInput = {
+    label?: string;
+    block: boolean;
+    system: boolean;
+    filter: ListenerFilter;
+    callInfo?: ListenerCallInfo;
+};
+
+export type ListenerCallInfo = {
+    transmitterType: TransmitterType;
+    name: string;
+    data: string;
+};
+
+export enum TransmitterType {
+    Internal,
+    SwitchboardPush,
+    PullResponder,
+    SecureConnect,
+    MatrixConnect,
+    RESTWebhook
+}
+
+export type ListenerFilter = {
+    documentType: string[];
+    documentId: string[];
+    scope: string[];
+    branch: string[];
+};
+
+export type ListenerRevision = {
+    driveId: string;
+    documentId: string;
+    scope: string;
+    branch: string;
+    status: UpdateStatus;
+    revision: number;
+};
+
+export enum UpdateStatus {
+    SUCCESS,
+    MISSING,
+    CONFLICT,
+    ERROR
+}
+
+type StrandUpdate = {
+    driveId: string;
+    documentId: string;
+    scope: string;
+    branch: string;
+    operations: OperationUpdate[];
+};
+
+type OperationUpdate = {
+    revision: number;
+    skip: number;
+    name: string;
+    inputJson: string;
+    stateHash: string;
+};
+
 export interface IDocumentDriveServer {
     getDrives(): Promise<string[]>;
     addDrive(drive: DriveInput): Promise<void>;
@@ -66,4 +137,12 @@ export interface IDocumentDriveServer {
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[]
     ): Promise<IOperationResult<DocumentDriveDocument>>;
+
+    registerListener(input: CreateListenerInput): Promise<Listener>;
+    removeListener(listenerId: string): Promise<boolean>;
+    cleanAllListener(): Promise<boolean>;
+
+    pushStrands(strands: StrandUpdate[]): Promise<ListenerRevision[]>;
+    getStrands(listenerId: string): Promise<StrandUpdate[]>;
+    getStrandsSince(listenerId: string, since: Date): Promise<StrandUpdate[]>;
 }
