@@ -69,6 +69,7 @@ export class PrismaStorage implements IDriveStorage {
             },
             update: {},
             create: {
+                name: document.name,
                 documentType: document.documentType,
                 driveId: drive,
                 initialState: document.initialState,

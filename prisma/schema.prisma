@@ -26,7 +26,7 @@ model Document {
   created      DateTime    @default(now())
   lastModified DateTime    @default(now())
   revision     Int
-  // name         String
+  name         String?
   operations   Operation[]
   initialState Json // json object with the scope as keys of the root object
   documentType String
