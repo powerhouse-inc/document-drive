@@ -73,7 +73,6 @@ export class PrismaStorage implements IDriveStorage {
                 driveId: drive,
                 initialState: document.initialState,
                 lastModified: document.lastModified,
-                name: document.name,
                 revision: document.revision,
                 id
             }
@@ -128,6 +127,19 @@ export class PrismaStorage implements IDriveStorage {
                     });
                 })
             );
+
+            await this.db.document.update({
+                where: {
+                    id_driveId: {
+                        id,
+                        driveId: 'drives'
+                    }
+                },
+                data: {
+                    lastModified: header.lastModified,
+                    revision: header.revision
+                }
+            });
         } catch (e) {
             console.log(e);
         }
@@ -145,13 +157,11 @@ export class PrismaStorage implements IDriveStorage {
                 documentType: header.documentType,
                 initialState: document.initialState,
                 lastModified: header.lastModified,
-                name: header.name,
                 revision: header.revision,
                 created: header.created
             },
             update: {
                 lastModified: header.lastModified,
-                name: header.name,
                 revision: header.revision
             }
         });
@@ -206,7 +216,6 @@ export class PrismaStorage implements IDriveStorage {
                 DocumentDriveLocalState
             >,
             lastModified: dbDoc.lastModified.toISOString(),
-            name: dbDoc.name,
             operations: {
                 global: dbDoc.operations
                     .filter(op => op.scope === 'global')
