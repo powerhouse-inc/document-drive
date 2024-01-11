@@ -211,6 +211,7 @@ export class PrismaStorage implements IDriveStorage {
 
         const doc = {
             created: dbDoc.created.toISOString(),
+            name: dbDoc.name ? dbDoc.name : '',
             documentType: dbDoc.documentType,
             initialState: dbDoc.initialState as ExtendedState<
                 DocumentDriveState,
