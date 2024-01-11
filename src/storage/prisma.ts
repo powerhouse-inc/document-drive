@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import {
     DocumentDriveLocalState,
     DocumentDriveState
@@ -72,7 +72,7 @@ export class PrismaStorage implements IDriveStorage {
                 name: document.name,
                 documentType: document.documentType,
                 driveId: drive,
-                initialState: document.initialState,
+                initialState: document.initialState as Prisma.InputJsonObject,
                 lastModified: document.lastModified,
                 revision: document.revision,
                 id
@@ -108,7 +108,7 @@ export class PrismaStorage implements IDriveStorage {
                             documentId: id,
                             hash: op.hash,
                             index: op.index,
-                            input: op.input,
+                            input: op.input as Prisma.InputJsonObject,
                             timestamp: op.timestamp,
                             type: op.type,
                             scope: op.scope,
@@ -119,7 +119,7 @@ export class PrismaStorage implements IDriveStorage {
                             documentId: id,
                             hash: op.hash,
                             index: op.index,
-                            input: op.input,
+                            input: op.input as Prisma.InputJsonObject,
                             timestamp: op.timestamp,
                             type: op.type,
                             scope: op.scope,
