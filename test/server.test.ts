@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 import {
     utils as DocumentDriveUtils,
     actions,
@@ -12,12 +13,13 @@ import {
 import fs from 'fs/promises';
 import path from 'path';
 import { afterEach, describe, it } from 'vitest';
-import { DocumentDriveServer } from '../src/server';
 import {
     BrowserStorage,
     FilesystemStorage,
-    MemoryStorage
-} from '../src/storage';
+    MemoryStorage,
+    PrismaStorage
+} from '../src';
+import { DocumentDriveServer } from '../src/server';
 
 const documentModels = [
     DocumentModelLib,
@@ -25,19 +27,29 @@ const documentModels = [
 ] as DocumentModel[];
 
 const FileStorageDir = path.join(__dirname, './file-storage');
-
+const prismaClient = new PrismaClient();
 const storageLayers = [
     ['MemoryStorage', () => new MemoryStorage()],
     ['FilesystemStorage', () => new FilesystemStorage(FileStorageDir)],
-    ['BrowserStorage', () => new BrowserStorage()]
+    ['BrowserStorage', () => new BrowserStorage()],
+    ['PrismaStorage', () => new PrismaStorage(prismaClient)]
 ] as const;
 
 describe.each(storageLayers)(
     'Document Drive Server with %s',
     (storageName, buildStorage) => {
-        afterEach(() => {
+        afterEach(async () => {
             if (storageName === 'FilesystemStorage') {
                 return fs.rm(FileStorageDir, { recursive: true, force: true });
+            } else if (storageName === 'PrismaStorage') {
+                await prismaClient.$executeRawUnsafe(
+                    'DELETE FROM "Attachment";'
+                );
+                await prismaClient.$executeRawUnsafe(
+                    'DELETE FROM "Operation";'
+                );
+                await prismaClient.$executeRawUnsafe('DELETE FROM "Document";');
+                await prismaClient.$executeRawUnsafe('DELETE FROM "Drive";');
             }
         });
 
