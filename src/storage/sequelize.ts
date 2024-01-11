@@ -101,7 +101,6 @@ export class SequelizeStorage implements IDriveStorage {
     }
 
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
-        // drive for all drive documents
         await this.createDocument(
             'drives',
             id,
@@ -126,7 +125,7 @@ export class SequelizeStorage implements IDriveStorage {
             throw new Error('Document model not found');
         }
 
-        const result = await Document.create({
+        await Document.create({
             id: id,
             driveId: drive,
             name: document.name,
@@ -135,8 +134,6 @@ export class SequelizeStorage implements IDriveStorage {
             lastModified: document.lastModified,
             revision: document.revision
         });
-
-        console.log('create doc', result.dataValues);
     }
     async addDocumentOperations(
         drive: string,
@@ -154,7 +151,7 @@ export class SequelizeStorage implements IDriveStorage {
             throw new Error('Operation model not found');
         }
 
-        const result = await Promise.all(
+        await Promise.all(
             operations.map(async op => {
                 return Operation.create({
                     driveId: drive,
@@ -169,8 +166,6 @@ export class SequelizeStorage implements IDriveStorage {
                 });
             })
         );
-
-        console.log(result);
 
         const Document = this.db.models['document'];
         if (!Document) {
