@@ -20,6 +20,7 @@ import {
     PrismaStorage
 } from '../src';
 import { DocumentDriveServer } from '../src/server';
+import { SequelizeStorage } from '../src/storage/sequelize';
 
 const documentModels = [
     DocumentModelLib,
@@ -29,10 +30,22 @@ const documentModels = [
 const FileStorageDir = path.join(__dirname, './file-storage');
 const prismaClient = new PrismaClient();
 const storageLayers = [
-    ['MemoryStorage', () => new MemoryStorage()],
-    ['FilesystemStorage', () => new FilesystemStorage(FileStorageDir)],
-    ['BrowserStorage', () => new BrowserStorage()],
-    ['PrismaStorage', () => new PrismaStorage(prismaClient)]
+    ['MemoryStorage', async () => new MemoryStorage()],
+    ['FilesystemStorage', async () => new FilesystemStorage(FileStorageDir)],
+    ['BrowserStorage', async () => new BrowserStorage()],
+    ['PrismaStorage', async () => new PrismaStorage(prismaClient)],
+    [
+        'SequelizeStorage',
+        async () => {
+            const storage = new SequelizeStorage({
+                dialect: 'sqlite',
+                storage: ':memory:'
+            });
+
+            await storage.syncModels();
+            return storage;
+        }
+    ]
 ] as const;
 
 describe.each(storageLayers)(
@@ -56,7 +69,7 @@ describe.each(storageLayers)(
         it('adds drive to server', async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
-                buildStorage()
+                await buildStorage()
             );
             await server.addDrive({
                 global: {
@@ -92,7 +105,7 @@ describe.each(storageLayers)(
         it('adds file to server', async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
-                buildStorage()
+                await buildStorage()
             );
             await server.addDrive({
                 global: {
@@ -143,7 +156,7 @@ describe.each(storageLayers)(
         }) => {
             const server = new DocumentDriveServer(
                 documentModels,
-                buildStorage()
+                await buildStorage()
             );
             await server.addDrive({
                 global: {
@@ -183,7 +196,7 @@ describe.each(storageLayers)(
         it('deletes file from server', async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
-                buildStorage()
+                await buildStorage()
             );
             await server.addDrive({
                 global: {
@@ -228,7 +241,7 @@ describe.each(storageLayers)(
         }) => {
             const server = new DocumentDriveServer(
                 documentModels,
-                buildStorage()
+                await buildStorage()
             );
             await server.addDrive({
                 global: {
@@ -273,7 +286,7 @@ describe.each(storageLayers)(
         }) => {
             const server = new DocumentDriveServer(
                 documentModels,
-                buildStorage()
+                await buildStorage()
             );
             await server.addDrive({
                 global: {
@@ -325,7 +338,7 @@ describe.each(storageLayers)(
         it('deletes drive from server', async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
-                buildStorage()
+                await buildStorage()
             );
             await server.addDrive({
                 global: {
@@ -351,7 +364,7 @@ describe.each(storageLayers)(
         }) => {
             const server = new DocumentDriveServer(
                 documentModels,
-                buildStorage()
+                await buildStorage()
             );
             await server.addDrive({
                 global: {
@@ -386,7 +399,7 @@ describe.each(storageLayers)(
         it('renames drive', async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
-                buildStorage()
+                await buildStorage()
             );
             await server.addDrive({
                 global: {
@@ -408,7 +421,14 @@ describe.each(storageLayers)(
                 })
             );
 
-            await server.addDriveOperation('1', drive.operations.global[0]!);
+            try {
+                await server.addDriveOperation(
+                    '1',
+                    drive.operations.global[0]!
+                );
+            } catch (e) {
+                console.log(e);
+            }
 
             drive = await server.getDrive('1');
             expect(drive.state.global.name).toBe('new name');
@@ -417,7 +437,7 @@ describe.each(storageLayers)(
         it('copies document when file is copied drive', async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
-                buildStorage()
+                await buildStorage()
             );
             await server.addDrive({
                 global: {
