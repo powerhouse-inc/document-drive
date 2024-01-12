@@ -33,7 +33,7 @@ export class PrismaStorage implements IDriveStorage {
         await this.createDocument(
             'drives',
             id,
-            drive as DocumentStorage<Document>
+            drive as DocumentStorage
         );
 
         await this.db.drive.upsert({
@@ -58,7 +58,7 @@ export class PrismaStorage implements IDriveStorage {
     async createDocument(
         drive: string,
         id: string,
-        document: DocumentStorage<Document>
+        document: DocumentStorage
     ): Promise<void> {
         await this.db.document.upsert({
             where: {
