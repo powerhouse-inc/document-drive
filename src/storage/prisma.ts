@@ -19,34 +19,11 @@ export class PrismaStorage implements IDriveStorage {
         this.db = db;
     }
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
-        // drive for all drive documents
-        await this.db.drive.upsert({
-            where: {
-                id: 'drives'
-            },
-            create: {
-                id: 'drives'
-            },
-            update: {}
-        });
-
         await this.createDocument(
             'drives',
             id,
             drive as DocumentStorage<Document>
         );
-
-        await this.db.drive.upsert({
-            where: {
-                id: id
-            },
-            create: {
-                id: id
-            },
-            update: {}
-        });
-
-        await this.db.drive;
     }
     async addDriveOperations(
         id: string,
@@ -190,11 +167,6 @@ export class PrismaStorage implements IDriveStorage {
                 driveId: driveId
             },
             include: {
-                Drive: {
-                    include: {
-                        driveMetaDocument: true
-                    }
-                },
                 operations: {
                     include: {
                         attachments: true
@@ -249,45 +221,27 @@ export class PrismaStorage implements IDriveStorage {
     }
 
     async deleteDocument(drive: string, id: string) {
-        await this.db.document.delete({
+        await this.db.document.deleteMany({
             where: {
-                id_driveId: {
-                    driveId: drive,
-                    id: id
-                }
+                driveId: drive,
+                id: id
             }
         });
     }
 
     async getDrives() {
-        const results = await this.db.drive.findMany({
-            where: {
-                NOT: {
-                    id: 'drives'
-                }
-            }
-        });
-        return results.map(drive => drive.id);
+        return this.getDocuments('drives');
     }
 
     async getDrive(id: string) {
-        try {
-            const doc = await this.getDocument('drives', id);
-            return doc as DocumentDriveStorage;
-        } catch (e) {
-            throw new Error(`Drive with id ${id} not found`);
-        }
+        return this.getDocument('drives', id) as Promise<DocumentDriveStorage>;
     }
 
     async deleteDrive(id: string) {
+        await this.deleteDocument('drives', id);
         await this.db.document.deleteMany({
             where: {
                 driveId: id
-            }
-        });
-        await this.db.drive.deleteMany({
-            where: {
-                id
             }
         });
     }
