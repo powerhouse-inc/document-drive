@@ -10,16 +10,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Drive {
-  id        String   @id
-  createdAt DateTime @default(now())
-
-  driveDocumentId   String?
-  driveMetaDocument Document? @relation(fields: [id, driveDocumentId], references: [driveId, id], onDelete: Cascade)
-
-  @@unique([id, driveDocumentId])
-}
-
 model Document {
   id           String
   driveId      String
@@ -31,14 +21,12 @@ model Document {
   initialState Json // json object with the scope as keys of the root object
   documentType String
 
-  Drive Drive?
-
   @@id([id, driveId])
 }
 
 model Operation {
   driveId    String
-  Document   Document? @relation(fields: [driveId, documentId], references: [driveId, id])
+  Document   Document? @relation(fields: [driveId, documentId], references: [driveId, id], onDelete: Cascade)
   documentId String
   scope      String
   branch     String
@@ -59,7 +47,7 @@ model Attachment {
   scope      String
   branch     String
   index      Int
-  Operation  Operation @relation(fields: [driveId, documentId, scope, branch, index], references: [driveId, documentId, scope, branch, index])
+  Operation  Operation @relation(fields: [driveId, documentId, scope, branch, index], references: [driveId, documentId, scope, branch, index], onDelete: Cascade)
 
   mimeType  String
   data      String
