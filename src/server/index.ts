@@ -244,7 +244,7 @@ export class DocumentDriveServer implements IDocumentDriveServer {
             if (isDocumentDrive(document)) {
                 await this.storage.addDriveOperations(
                     drive,
-                    operations as Operation<DocumentDriveAction | BaseAction>[], // TODO check?
+                    operations, // TODO check?
                     document
                 );
             } else {

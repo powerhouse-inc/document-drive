@@ -62,7 +62,6 @@ describe.each(storageLayers)(
                     'DELETE FROM "Operation";'
                 );
                 await prismaClient.$executeRawUnsafe('DELETE FROM "Document";');
-                await prismaClient.$executeRawUnsafe('DELETE FROM "Drive";');
             }
         });
 
