@@ -3,6 +3,7 @@ import {
     DocumentDriveState
 } from 'document-model-libs/document-drive';
 import {
+    AttachmentInput,
     Document,
     DocumentHeader,
     ExtendedState,
@@ -63,7 +64,7 @@ export class SequelizeStorage implements IDriveStorage {
             }
         });
 
-        this.db.define('attachment', {
+        const Attachment = this.db.define('attachment', {
             driveId: {
                 type: DataTypes.STRING,
                 primaryKey: true
@@ -88,10 +89,16 @@ export class SequelizeStorage implements IDriveStorage {
                 type: DataTypes.STRING,
                 primaryKey: true
             },
+            mimeType: DataTypes.STRING,
+            fileName: DataTypes.STRING,
+            extension: DataTypes.STRING,
             data: DataTypes.BLOB
         });
 
-        // operation.hasMany(attachment);
+        Operation.hasMany(Attachment, {
+            onDelete: 'CASCADE'
+        });
+        Attachment.belongsTo(Operation);
         Document.hasMany(Operation, {
             onDelete: 'CASCADE'
         });
@@ -163,6 +170,15 @@ export class SequelizeStorage implements IDriveStorage {
                     type: op.type,
                     scope: op.scope,
                     branch: 'main'
+                }).then(async () => {
+                    if (op.attachments) {
+                        await this._addDocumentOperationAttachments(
+                            drive,
+                            id,
+                            op,
+                            op.attachments
+                        );
+                    }
                 });
             })
         );
@@ -183,6 +199,35 @@ export class SequelizeStorage implements IDriveStorage {
                     driveId: drive
                 }
             }
+        );
+    }
+
+    async _addDocumentOperationAttachments(
+        driveId: string,
+        documentId: string,
+        operation: Operation,
+        attachments: AttachmentInput[]
+    ) {
+        const Attachment = this.db.models['attachment'];
+        if (!Attachment) {
+            throw new Error('Attachment model not found');
+        }
+
+        await Promise.all(
+            attachments.map(async attachment => {
+                return Attachment.create({
+                    driveId: driveId,
+                    documentId: documentId,
+                    scope: operation.scope,
+                    branch: 'main',
+                    index: operation.index,
+                    mimeType: attachment.mimeType,
+                    fileName: attachment.fileName,
+                    extension: attachment.extension,
+                    data: attachment.data,
+                    hash: attachment.hash
+                });
+            })
         );
     }
 
