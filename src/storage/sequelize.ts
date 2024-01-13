@@ -4,7 +4,6 @@ import {
 } from 'document-model-libs/document-drive';
 import {
     AttachmentInput,
-    Document,
     DocumentHeader,
     ExtendedState,
     Operation,
@@ -34,7 +33,7 @@ export class SequelizeStorage implements IDriveStorage {
             documentType: DataTypes.STRING,
             initialState: DataTypes.JSON,
             lastModified: DataTypes.DATE,
-            revision: DataTypes.INTEGER
+            revision: DataTypes.JSON
         });
 
         const Operation = this.db.define('operation', {
@@ -108,11 +107,7 @@ export class SequelizeStorage implements IDriveStorage {
     }
 
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
-        await this.createDocument(
-            'drives',
-            id,
-            drive as DocumentStorage<Document>
-        );
+        await this.createDocument('drives', id, drive as DocumentStorage);
     }
     async addDriveOperations(
         id: string,
@@ -124,9 +119,9 @@ export class SequelizeStorage implements IDriveStorage {
     async createDocument(
         drive: string,
         id: string,
-        document: DocumentStorage<Document>
+        document: DocumentStorage
     ): Promise<void> {
-        const Document = this.db.models['document'];
+        const Document = this.db.models.document;
 
         if (!Document) {
             throw new Error('Document model not found');
@@ -153,7 +148,7 @@ export class SequelizeStorage implements IDriveStorage {
             throw new Error(`Document with id ${id} not found`);
         }
 
-        const Operation = this.db.models['operation'];
+        const Operation = this.db.models.operation;
         if (!Operation) {
             throw new Error('Operation model not found');
         }
@@ -183,7 +178,7 @@ export class SequelizeStorage implements IDriveStorage {
             })
         );
 
-        const Document = this.db.models['document'];
+        const Document = this.db.models.document;
         if (!Document) {
             throw new Error('Document model not found');
         }
@@ -208,7 +203,7 @@ export class SequelizeStorage implements IDriveStorage {
         operation: Operation,
         attachments: AttachmentInput[]
     ) {
-        const Attachment = this.db.models['attachment'];
+        const Attachment = this.db.models.attachment;
         if (!Attachment) {
             throw new Error('Attachment model not found');
         }
@@ -232,7 +227,7 @@ export class SequelizeStorage implements IDriveStorage {
     }
 
     async getDocuments(drive: string) {
-        const Document = this.db.models['document'];
+        const Document = this.db.models.document;
         if (!Document) {
             throw new Error('Document model not found');
         }
@@ -244,11 +239,15 @@ export class SequelizeStorage implements IDriveStorage {
             }
         });
 
-        return result.map(e => e.dataValues.id);
+        const ids = result.map((e: { dataValues: { id: string } }) => {
+            const { id } = e.dataValues;
+            return id;
+        });
+        return ids;
     }
 
     async getDocument(driveId: string, id: string) {
-        const Document = this.db.models['document'];
+        const Document = this.db.models.document;
         if (!Document) {
             throw new Error('Document model not found');
         }
@@ -260,7 +259,7 @@ export class SequelizeStorage implements IDriveStorage {
             },
             include: [
                 {
-                    model: this.db.models['operation'],
+                    model: this.db.models.operation,
                     as: 'operations'
                 }
             ]
@@ -270,8 +269,29 @@ export class SequelizeStorage implements IDriveStorage {
             throw new Error(`Document with id ${id} not found`);
         }
 
-        const document = entry.dataValues;
-        const Operation = this.db.models['operation'];
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const document: {
+            operations: [
+                {
+                    hash: string;
+                    index: number;
+                    timestamp: Date;
+                    input: JSON;
+                    type: string;
+                    scope: string;
+                }
+            ];
+            revision: Required<Record<OperationScope, number>>;
+            createdAt: Date;
+            name: string;
+            updatedAt: Date;
+            documentType: string;
+            initialState: ExtendedState<
+                DocumentDriveState,
+                DocumentDriveLocalState
+            >;
+        } = entry.dataValues;
+        const Operation = this.db.models.operation;
         if (!Operation) {
             throw new Error('Operation model not found');
         }
@@ -296,14 +316,11 @@ export class SequelizeStorage implements IDriveStorage {
         );
 
         const doc = {
-            created: document.createdAt,
+            created: document.createdAt.toISOString(),
             name: document.name ? document.name : '',
             documentType: document.documentType,
-            initialState: document.initialState as ExtendedState<
-                DocumentDriveState,
-                DocumentDriveLocalState
-            >,
-            lastModified: document.updatedAt,
+            initialState: document.initialState,
+            lastModified: document.updatedAt.toISOString(),
             operations: {
                 global: operations.filter(
                     (op: Operation) => op.scope === 'global'
@@ -319,7 +336,7 @@ export class SequelizeStorage implements IDriveStorage {
     }
 
     async deleteDocument(drive: string, id: string) {
-        const Document = this.db.models['document'];
+        const Document = this.db.models.document;
         if (!Document) {
             throw new Error('Document model not found');
         }
@@ -344,7 +361,7 @@ export class SequelizeStorage implements IDriveStorage {
     async deleteDrive(id: string) {
         await this.deleteDocument('drives', id);
 
-        const Document = this.db.models['document'];
+        const Document = this.db.models.document;
         if (!Document) {
             throw new Error('Document model not found');
         }

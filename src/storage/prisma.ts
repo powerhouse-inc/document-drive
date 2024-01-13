@@ -4,7 +4,6 @@ import {
     DocumentDriveState
 } from 'document-model-libs/document-drive';
 import {
-    Document,
     DocumentHeader,
     ExtendedState,
     Operation,
@@ -19,11 +18,7 @@ export class PrismaStorage implements IDriveStorage {
         this.db = db;
     }
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
-        await this.createDocument(
-            'drives',
-            id,
-            drive as DocumentStorage
-        );
+        await this.createDocument('drives', id, drive as DocumentStorage);
     }
     async addDriveOperations(
         id: string,
@@ -214,7 +209,7 @@ export class PrismaStorage implements IDriveStorage {
                         // attachments: fileRegistry
                     }))
             },
-            revision: dbDoc.revision
+            revision: dbDoc.revision as Required<Record<OperationScope, number>>
         };
 
         return doc;
