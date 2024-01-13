@@ -420,14 +420,7 @@ describe.each(storageLayers)(
                 })
             );
 
-            try {
-                await server.addDriveOperation(
-                    '1',
-                    drive.operations.global[0]!
-                );
-            } catch (e) {
-                console.log(e);
-            }
+            await server.addDriveOperation('1', drive.operations.global[0]!);
 
             drive = await server.getDrive('1');
             expect(drive.state.global.name).toBe('new name');
