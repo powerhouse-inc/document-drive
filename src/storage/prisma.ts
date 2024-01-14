@@ -1,4 +1,4 @@
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { type Prisma } from '@prisma/client';
 import {
     DocumentDriveLocalState,
     DocumentDriveState
@@ -12,9 +12,9 @@ import {
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 
 export class PrismaStorage implements IDriveStorage {
-    private db: PrismaClient;
+    private db: Prisma.TransactionClient;
 
-    constructor(db: PrismaClient) {
+    constructor(db: Prisma.TransactionClient) {
         this.db = db;
     }
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
