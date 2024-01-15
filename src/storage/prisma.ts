@@ -1,10 +1,9 @@
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { type Prisma } from '@prisma/client';
 import {
     DocumentDriveLocalState,
     DocumentDriveState
 } from 'document-model-libs/document-drive';
 import {
-    Document,
     DocumentHeader,
     ExtendedState,
     Operation,
@@ -13,17 +12,13 @@ import {
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 
 export class PrismaStorage implements IDriveStorage {
-    private db: PrismaClient;
+    private db: Prisma.TransactionClient;
 
-    constructor(db: PrismaClient) {
+    constructor(db: Prisma.TransactionClient) {
         this.db = db;
     }
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
-        await this.createDocument(
-            'drives',
-            id,
-            drive as DocumentStorage
-        );
+        await this.createDocument('drives', id, drive as DocumentStorage);
     }
     async addDriveOperations(
         id: string,
@@ -214,7 +209,7 @@ export class PrismaStorage implements IDriveStorage {
                         // attachments: fileRegistry
                     }))
             },
-            revision: dbDoc.revision
+            revision: dbDoc.revision as Required<Record<OperationScope, number>>
         };
 
         return doc;
