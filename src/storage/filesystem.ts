@@ -83,7 +83,6 @@ export class FilesystemStorage implements IDriveStorage {
             });
             return JSON.parse(content);
         } catch (error) {
-            console.error(error);
             throw new Error(`Document with id ${id} not found`);
         }
     }
