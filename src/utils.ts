@@ -30,3 +30,10 @@ export function mergeOperations<A extends Action = Action>(
         return acc;
     }, currentOperations);
 }
+
+export function generateUUID() {
+    const crypto =
+        // @ts-expect-error - window.crypto is not defined in node enviroment
+        typeof window !== 'undefined' ? window.crypto : require('crypto');
+    return crypto.randomUUID();
+}
