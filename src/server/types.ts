@@ -37,6 +37,27 @@ export type IOperationResult<T extends Document = Document> = {
     signals: SignalResult[];
 };
 
+export type SynchronizationUnit = {
+    syncId: string;
+    driveId: string;
+    documentId: string;
+    documentType: string;
+    scope: string;
+    branch: string;
+    lastUpdated: string;
+    revision: number;
+};
+
+export type DocumentOperations = {
+    syncId: string;
+    revision: number;
+    committed: string;
+    operation: string;
+    params: object;
+    stateHash: string;
+    skip: number;
+};
+
 export type Listener = {
     listenerId: string;
     label?: string;
@@ -110,42 +131,74 @@ export type OperationUpdate = {
     type: string;
 };
 
-export interface IDocumentDriveServer {
-    getDrives(): Promise<string[]>;
-    addDrive(drive: DriveInput): Promise<void>;
-    deleteDrive(id: string): Promise<void>;
-    getDrive(id: string): Promise<DocumentDriveDocument>;
+export abstract class BaseDocumentDriveServer {
+    abstract getDrives(): Promise<string[]>;
+    abstract addDrive(drive: DriveInput): Promise<void>;
+    abstract deleteDrive(id: string): Promise<void>;
+    abstract getDrive(id: string): Promise<DocumentDriveDocument>;
 
-    getDocuments: (drive: string) => Promise<string[]>;
-    getDocument: (drive: string, id: string) => Promise<Document>;
-    createDocument(drive: string, document: CreateDocumentInput): Promise<void>;
-    deleteDocument(drive: string, id: string): Promise<void>;
+    abstract getDocuments(drive: string): Promise<string[]>;
+    abstract getDocument(drive: string, id: string): Promise<Document>;
 
-    addOperation(
+    protected abstract createDocument(
+        drive: string,
+        document: CreateDocumentInput
+    ): Promise<void>;
+    protected abstract deleteDocument(drive: string, id: string): Promise<void>;
+
+    protected abstract addOperation(
         drive: string,
         id: string,
         operation: Operation
-    ): Promise<IOperationResult>;
-    addOperations(
+    ): Promise<IOperationResult<Document>>;
+    protected abstract addOperations(
         drive: string,
         id: string,
         operations: Operation[]
-    ): Promise<IOperationResult>;
-
-    addDriveOperation(
+    ): Promise<IOperationResult<Document>>;
+    protected abstract addDriveOperation(
         drive: string,
         operation: Operation<DocumentDriveAction | BaseAction>
     ): Promise<IOperationResult<DocumentDriveDocument>>;
-    addDriveOperations(
+    protected abstract addDriveOperations(
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[]
     ): Promise<IOperationResult<DocumentDriveDocument>>;
 
-    registerListener(input: CreateListenerInput): Promise<Listener>;
-    removeListener(listenerId: string): Promise<boolean>;
-    cleanAllListener(): Promise<boolean>;
+    abstract registerListener(input: CreateListenerInput): Promise<Listener>;
+    abstract removeListener(listenerId: string): Promise<boolean>;
+    abstract cleanAllListener(): Promise<boolean>;
 
-    pushStrands(strands: StrandUpdate[]): Promise<ListenerRevision[]>;
-    getStrands(listenerId: string): Promise<StrandUpdate[]>;
-    getStrandsSince(listenerId: string, since: Date): Promise<StrandUpdate[]>;
+    abstract pushStrands(strands: StrandUpdate[]): Promise<ListenerRevision[]>;
+    abstract getStrands(listenerId: string): Promise<StrandUpdate[]>;
+    abstract getStrandsSince(
+        listenerId: string,
+        since: string
+    ): Promise<StrandUpdate[]>;
+
+    protected abstract getSynchronizationUnits: (
+        driveId: string,
+        documentId: string,
+        scope?: string,
+        branch?: string
+    ) => Promise<SynchronizationUnit[]>;
+
+    protected abstract getSynchronizationUnit(
+        driveId: string,
+        syncId: string
+    ): Promise<SynchronizationUnit>;
+
+    protected abstract getOperationData(
+        driveId: string,
+        syncId: string,
+        filter: {
+            since?: string;
+            fromRevision?: number;
+        }
+    ): Promise<DocumentOperations[]>;
 }
+
+export type IDocumentDriveServer = Pick<
+    BaseDocumentDriveServer,
+    keyof BaseDocumentDriveServer
+>;

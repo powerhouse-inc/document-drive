@@ -10,24 +10,27 @@ import {
     Document,
     DocumentModel,
     Operation,
+    OperationScope,
     utils as baseUtils
 } from 'document-model/document';
 import { DocumentStorage, IDriveStorage } from '../storage';
 import { MemoryStorage } from '../storage/memory';
 import { generateUUID, isDocumentDrive } from '../utils';
 import {
+    BaseDocumentDriveServer,
     CreateDocumentInput,
+    DocumentOperations,
     DriveInput,
-    IDocumentDriveServer,
     ListenerRevision,
     SignalResult,
     StrandUpdate,
+    SynchronizationUnit,
     UpdateStatus
 } from './types';
 
 export type * from './types';
 
-export class DocumentDriveServer implements IDocumentDriveServer {
+export class DocumentDriveServer implements BaseDocumentDriveServer {
     private documentModels: DocumentModel[];
     private storage: IDriveStorage;
 
@@ -37,6 +40,121 @@ export class DocumentDriveServer implements IDocumentDriveServer {
     ) {
         this.documentModels = documentModels;
         this.storage = storage;
+    }
+
+    protected async getSynchronizationUnits(
+        driveId: string,
+        documentId: string,
+        scope?: string,
+        branch?: string
+    ) {
+        const drive = await this.getDrive(driveId);
+        const node = drive.state.global.nodes.find(
+            node => isFileNode(node) && node.id === documentId
+        );
+
+        if (!node || !isFileNode(node)) {
+            throw new Error('File node not found');
+        }
+
+        const document = await this.getDocument(driveId, documentId);
+
+        const synchronizationUnits = node.synchronizationUnits
+            .filter(
+                unit =>
+                    (scope === undefined || unit.scope === scope) &&
+                    (branch === undefined || unit.branch === branch)
+            )
+            .map(({ syncId, scope, branch }) => {
+                const operations =
+                    document.operations[scope as OperationScope] ?? [];
+                const lastOperation = operations.pop();
+
+                return {
+                    syncId,
+                    scope,
+                    branch,
+                    driveId,
+                    documentId,
+                    documentType: node.documentType,
+                    lastUpdated:
+                        lastOperation?.timestamp ?? document.lastModified,
+                    revision: lastOperation?.index ?? 0
+                };
+            });
+
+        if (!synchronizationUnits.length) {
+            throw new Error('Synchronization unit not found');
+        }
+        return synchronizationUnits;
+    }
+
+    protected async getSynchronizationUnit(
+        driveId: string,
+        syncId: string
+    ): Promise<SynchronizationUnit> {
+        const drive = await this.getDrive(driveId);
+        const node = drive.state.global.nodes.find(
+            node =>
+                isFileNode(node) &&
+                node.synchronizationUnits.find(unit => unit.syncId === syncId)
+        );
+
+        if (!node || !isFileNode(node)) {
+            throw new Error('Synchronization unit not found');
+        }
+
+        const { scope, branch } = node.synchronizationUnits.find(
+            unit => unit.syncId === syncId
+        )!;
+
+        const documentId = node.id;
+        const document = await this.getDocument(driveId, documentId);
+        const operations = document.operations[scope as OperationScope] ?? [];
+        const lastOperation = operations.pop();
+
+        return {
+            syncId,
+            scope,
+            branch,
+            driveId,
+            documentId,
+            documentType: node.documentType,
+            lastUpdated: lastOperation?.timestamp ?? document.lastModified,
+            revision: lastOperation?.index ?? 0
+        };
+    }
+    protected async getOperationData(
+        driveId: string,
+        syncId: string,
+        filter: {
+            since?: string | undefined;
+            fromRevision?: number | undefined;
+        }
+    ): Promise<DocumentOperations[]> {
+        const { documentId, scope } = await this.getSynchronizationUnit(
+            driveId,
+            syncId
+        );
+
+        const document = await this.getDocument(driveId, documentId); // TODO replace with getDocumentOperations
+        const operations = document.operations[scope as OperationScope] ?? []; // TODO filter by branch also
+        const filteredOperations = operations.filter(
+            operation =>
+                Object.keys(filter).length === 0 ||
+                (filter.since && filter.since <= operation.timestamp) ||
+                (filter.fromRevision && operation.index >= filter.fromRevision)
+        );
+
+        return filteredOperations.map(operation => ({
+            syncId,
+            revision: operation.index,
+            committed: operation.timestamp,
+            operation: operation.type,
+            params: operation.input as object,
+            stateHash: operation.hash,
+            skip: 0 // TODO operation.skip
+        }));
     }
 
     private _getDocumentModel(documentType: string) {
@@ -51,15 +169,15 @@ export class DocumentDriveServer implements IDocumentDriveServer {
 
     private async _createSynchronizationUnits(
         driveId: string,
-        file: string,
+        nodeId: string,
         document: Document
     ) {
         const branch = 'main';
         const scopes = Object.keys(document.operations);
         let drive = await this.getDrive(driveId);
-        const node = drive.state.global.nodes.find(node => node.id === file);
+        const node = drive.state.global.nodes.find(node => node.id === nodeId);
         if (!node || !isFileNode(node)) {
-            throw new Error(`Node with id: ${file} is not a file`);
+            throw new Error(`Node with id: ${nodeId} is not a file`);
         }
 
         const operations = [] as Operation<DocumentDriveAction>[];
@@ -77,7 +195,7 @@ export class DocumentDriveServer implements IDocumentDriveServer {
                 drive,
                 actions.addSynchronizationUnit({
                     syncId: generateUUID(),
-                    file,
+                    file: nodeId,
                     scope,
                     branch
                 })
@@ -317,7 +435,8 @@ export class DocumentDriveServer implements IDocumentDriveServer {
                 throw new Error('Invalid Document Drive document');
             }
 
-            // filter out signals that created a document that was deleted by a subsequent signal
+            // filter out signals that created a document that was deleted by a subsequent
+            // signal as there is no need to create synchronization units for it
             const signalResults = signals
                 .map(signal => signal.signal)
                 .filter(
