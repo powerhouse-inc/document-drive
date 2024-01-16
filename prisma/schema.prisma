@@ -69,3 +69,15 @@ model Attachment {
 
   @@id([driveId, documentId, scope, branch, index, hash])
 }
+
+model Listener {
+  listenerId String @id @default(uuid())
+  driveId    String
+
+  label  String?
+  block  Boolean
+  system Boolean
+
+  filter   Json
+  callInfo Json
+}

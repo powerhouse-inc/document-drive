@@ -19,8 +19,10 @@ import { generateUUID, isDocumentDrive } from '../utils';
 import {
     BaseDocumentDriveServer,
     CreateDocumentInput,
+    CreateListenerInput,
     DocumentOperations,
     DriveInput,
+    Listener,
     ListenerRevision,
     SignalResult,
     StrandUpdate,
@@ -486,16 +488,19 @@ export class DocumentDriveServer implements BaseDocumentDriveServer {
         }
     }
 
-    registerListener(input: CreateListenerInput): Promise<Listener> {
-        throw new Error('Method not implemented.');
+    registerListener(
+        driveId: string,
+        input: CreateListenerInput
+    ): Promise<Listener> {
+        return this.storage.registerListener(driveId, input);
     }
 
     removeListener(listenerId: string): Promise<boolean> {
-        throw new Error('Method not implemented.');
+        return this.storage.removeListener(listenerId);
     }
 
     cleanAllListener(): Promise<boolean> {
-        throw new Error('Method not implemented.');
+        return this.storage.cleanAllListener();
     }
 
     async pushStrands(strands: StrandUpdate[]): Promise<ListenerRevision[]> {

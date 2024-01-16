@@ -10,6 +10,12 @@ import {
     Operation,
     OperationScope
 } from 'document-model/document';
+import {
+    CreateListenerInput,
+    Listener,
+    ListenerCallInfo,
+    ListenerFilter
+} from '..';
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 
 export class PrismaStorage implements IDriveStorage {
@@ -18,6 +24,45 @@ export class PrismaStorage implements IDriveStorage {
     constructor(db: PrismaClient) {
         this.db = db;
     }
+    registerListener(
+        driveId: string,
+        input: CreateListenerInput
+    ): Promise<Listener> {
+        this.db.listener.create({
+            data: {
+                ...input,
+                driveId,
+                callInfo: input.callInfo ? input.callInfo : {}
+            }
+        });
+        throw new Error('Method not implemented.');
+    }
+
+    async removeListener(listenerId: string): Promise<boolean> {
+        const result = await this.db.listener.delete({
+            where: {
+                listenerId
+            }
+        });
+
+        return result !== null;
+    }
+
+    async cleanAllListener(): Promise<boolean> {
+        const result = await this.db.listener.deleteMany({});
+        return result !== null;
+    }
+
+    async getListeners(): Promise<Listener[]> {
+        const result = await this.db.listener.findMany({});
+        return result.map(e => ({
+            ...e,
+            label: e.label ? e.label : '',
+            filter: e.filter as ListenerFilter,
+            callInfo: e.callInfo ? (e.callInfo as ListenerCallInfo) : undefined
+        }));
+    }
+
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
         // drive for all drive documents
         await this.db.drive.upsert({

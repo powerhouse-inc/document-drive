@@ -565,5 +565,55 @@ describe.each(storageLayers)(
                 document.operations
             );
         });
+
+        it('adds a listener to the drive', async ({ expect }) => {
+            const server = new DocumentDriveServer(
+                documentModels,
+                buildStorage()
+            );
+            await server.addDrive({
+                global: {
+                    id: '1',
+                    name: 'name',
+                    icon: 'icon',
+                    remoteUrl: null
+                },
+                local: {
+                    availableOffline: false,
+                    sharingType: 'public'
+                }
+            });
+            let drive = await server.getDrive('1');
+
+            // adds file
+            drive = reducer(
+                drive,
+                actions.addFile({
+                    id: '1.1',
+                    name: 'document 1',
+                    documentType: 'powerhouse/document-model'
+                })
+            );
+            await server.addDriveOperation('1', drive.operations.global[0]!);
+
+            let document = (await server.getDocument(
+                '1',
+                '1.1'
+            )) as DocumentModelDocument;
+            document = DocumentModelLib.reducer(
+                document,
+                DocumentModelActions.setName('Test')
+            );
+            const operation = document.operations.global[0]!;
+            const result = await server.addOperation('1', '1.1', operation);
+            expect(result.success).toBe(true);
+            expect(result.operations[0]).toStrictEqual(operation);
+
+            const storedDocument = await server.getDocument('1', '1.1');
+            expect(storedDocument.state).toStrictEqual(document.state);
+            expect(storedDocument.operations).toStrictEqual(
+                document.operations
+            );
+        });
     }
 );

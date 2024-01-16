@@ -165,7 +165,10 @@ export abstract class BaseDocumentDriveServer {
         operations: Operation<DocumentDriveAction | BaseAction>[]
     ): Promise<IOperationResult<DocumentDriveDocument>>;
 
-    abstract registerListener(input: CreateListenerInput): Promise<Listener>;
+    abstract registerListener(
+        driveId: string,
+        input: CreateListenerInput
+    ): Promise<Listener>;
     abstract removeListener(listenerId: string): Promise<boolean>;
     abstract cleanAllListener(): Promise<boolean>;
 
