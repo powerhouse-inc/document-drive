@@ -1,5 +1,11 @@
 import { IDriveStorage } from '..';
-import { CacheEntry, Listener, ListenerStatus } from './types';
+import {
+    CacheEntry,
+    Listener,
+    ListenerFilter,
+    ListenerStatus,
+    SynchronizationUnit
+} from './types';
 
 export class ListenerManager {
     private cache: CacheEntry[] = [];
@@ -11,14 +17,8 @@ export class ListenerManager {
 
     async addListener(listener: Listener) {
         const syncUnits = await this.storage.getSyncUnits();
-        syncUnits.forEach(syncUnit => {
-            const { branch, documentId, scope, documentType } = syncUnit;
-            if (
-                listener.filter.branch.includes(branch) &&
-                listener.filter.documentId.includes(documentId) &&
-                listener.filter.scope.includes(scope) &&
-                listener.filter.documentType.includes(documentType)
-            ) {
+        for (const syncUnit of syncUnits) {
+            if (this.checkFilter(listener.filter, syncUnit)) {
                 this.cache.push({
                     block: listener.block,
                     listenerId: listener.listenerId,
@@ -29,7 +29,23 @@ export class ListenerManager {
                     pendingTimeout: '0'
                 });
             }
-        });
+        }
+
+        //TODO: persist Listener in Storage?
+    }
+
+    checkFilter(filter: ListenerFilter, syncUnit: SynchronizationUnit) {
+        const { branch, documentId, scope, documentType } = syncUnit;
+        // TODO: Needs to be optimized
+        if (
+            filter.branch.includes(branch) &&
+            filter.documentId.includes(documentId) &&
+            filter.scope.includes(scope) &&
+            filter.documentType.includes(documentType)
+        ) {
+            return true;
+        }
+        return false;
     }
 
     async setup() {
@@ -40,7 +56,7 @@ export class ListenerManager {
 
         const syncUnits = await this.storage.getSyncUnits();
         const listeners = await this.storage.getListener();
-        listeners.forEach(listener => {
+        for (const listener of listeners) {
             const {
                 driveId,
                 listenerId,
@@ -51,14 +67,8 @@ export class ListenerManager {
                 label
             } = listener;
 
-            syncUnits.forEach(syncUnit => {
-                const { branch, documentId, scope, documentType } = syncUnit;
-                if (
-                    filter.branch.includes(branch) &&
-                    filter.documentId.includes(documentId) &&
-                    filter.scope.includes(scope) &&
-                    filter.documentType.includes(documentType)
-                ) {
+            for (const syncUnit of syncUnits) {
+                if (this.checkFilter(filter, syncUnit)) {
                     this.cache.push({
                         block,
                         listenerId,
@@ -69,28 +79,28 @@ export class ListenerManager {
                         pendingTimeout: '0'
                     });
                 }
-            });
-        });
+            }
+        }
     }
 
-    process() {
-      this.cache.forEach(entry => {
-        if(entry.listenerRev === entry.syncRev) {
-          return;
+    async process() {
+        for (let i = 0; i < this.cache.length; i++) {
+            const entry = this.cache[i];
+            const result = await this.processCacheEntry(entry!);
+            //TODO: update cache with result
         }
-
-        if(entry.listenerRev > entry.syncRev) { // listener is ahead of sync
-          // pull strands and update cache
-        }
-
-        if(entry.listenerRev < entry.syncRev) { // sync is ahead of listener
-          // push strands and update cache
-        }
-      });
-
     }
 
-    pushStrands(listenerId: string, ) {}
+    async processCacheEntry(cacheEntry: CacheEntry) {
+        if (cacheEntry.listenerRev === cacheEntry.syncRev) {
+            return;
+        } else if (cacheEntry.listenerRev < cacheEntry.syncRev) {
+            // sync is ahead of listener
+            // push strands and update cache
+        }
+    }
+
+    pushStrands(listenerId: string) {}
 
     pullStrands() {}
 }
