@@ -1,13 +1,10 @@
 import {
     DocumentDriveAction,
-    actions,
     isFileNode,
-    reducer,
     utils
 } from 'document-model-libs/document-drive';
 import {
     BaseAction,
-    Document,
     DocumentModel,
     Operation,
     OperationScope,
@@ -15,7 +12,7 @@ import {
 } from 'document-model/document';
 import { DocumentStorage, IDriveStorage } from '../storage';
 import { MemoryStorage } from '../storage/memory';
-import { generateUUID, isDocumentDrive } from '../utils';
+import { isDocumentDrive } from '../utils';
 import {
     BaseDocumentDriveServer,
     CreateDocumentInput,
@@ -165,59 +162,6 @@ export class DocumentDriveServer implements BaseDocumentDriveServer {
             throw new Error(`Document type ${documentType} not supported`);
         }
         return documentModel;
-    }
-
-    private async _createSynchronizationUnits(
-        driveId: string,
-        nodeId: string,
-        document: Document
-    ) {
-        const branch = 'main';
-        const scopes = Object.keys(document.operations);
-        let drive = await this.getDrive(driveId);
-        const node = drive.state.global.nodes.find(node => node.id === nodeId);
-        if (!node || !isFileNode(node)) {
-            throw new Error(`Node with id: ${nodeId} is not a file`);
-        }
-
-        const operations = [] as Operation<DocumentDriveAction>[];
-        for (const scope of scopes) {
-            // checks if there already exists a synchronization unit for the scope and branch
-            if (
-                node.synchronizationUnits.find(
-                    unit => unit.scope === scope && unit.branch == branch
-                )
-            ) {
-                continue;
-            }
-
-            drive = reducer(
-                drive,
-                actions.addSynchronizationUnit({
-                    syncId: generateUUID(),
-                    file: nodeId,
-                    scope,
-                    branch
-                })
-            );
-            const operation = drive.operations.global[
-                drive.operations.global.length - 1
-            ] as Operation<DocumentDriveAction>;
-            operations.push(operation);
-        }
-
-        if (operations.length) {
-            await this.addDriveOperations(driveId, operations);
-        }
-    }
-
-    private async _documentCreated(driveId: string, documentId: string) {
-        const document = await this.getDocument(driveId, documentId);
-        return this._createSynchronizationUnits(driveId, documentId, document);
-    }
-
-    private async _documentDeleted(driveId: string, documentId: string) {
-        // TODO update synchronization units index?
     }
 
     async addDrive(drive: DriveInput) {
@@ -383,9 +327,6 @@ export class DocumentDriveServer implements BaseDocumentDriveServer {
                 document
             );
 
-            // creates new synchronization units in case new scopes were created
-            await this._createSynchronizationUnits(drive, id, document);
-
             return {
                 success: true,
                 document,
@@ -435,43 +376,9 @@ export class DocumentDriveServer implements BaseDocumentDriveServer {
                 throw new Error('Invalid Document Drive document');
             }
 
-            // filter out signals that created a document that was deleted by a subsequent
-            // signal as there is no need to create synchronization units for it
-            const signalResults = signals
-                .map(signal => signal.signal)
-                .filter(
-                    (signal, index, array) =>
-                        !(
-                            (signal.type === 'CREATE_CHILD_DOCUMENT' ||
-                                signal.type === 'COPY_CHILD_DOCUMENT') &&
-                            array
-                                .slice(index)
-                                .find(
-                                    nextSignal =>
-                                        nextSignal.type ===
-                                            'DELETE_CHILD_DOCUMENT' &&
-                                        nextSignal.input.id === signal.input.id
-                                )
-                        )
-                );
-            // updates the synchronization units of the drive
-            for (const signal of signalResults) {
-                if (
-                    signal.type === 'CREATE_CHILD_DOCUMENT' ||
-                    signal.type === 'COPY_CHILD_DOCUMENT'
-                ) {
-                    await this._documentCreated(drive, signal.input.id);
-                } else if (signal.type === 'DELETE_CHILD_DOCUMENT') {
-                    await this._documentDeleted(drive, signal.input.id);
-                }
-            }
-
-            // fetches the final state of the drive
-            const driveDocument = await this.getDrive(drive);
-
             return {
                 success: true,
-                document: driveDocument,
+                document,
                 operations,
                 signals
             };

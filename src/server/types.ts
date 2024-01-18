@@ -132,6 +132,7 @@ export type OperationUpdate = {
 };
 
 export abstract class BaseDocumentDriveServer {
+    /** Public methods **/
     abstract getDrives(): Promise<string[]>;
     abstract addDrive(drive: DriveInput): Promise<void>;
     abstract deleteDrive(id: string): Promise<void>;
@@ -140,6 +141,19 @@ export abstract class BaseDocumentDriveServer {
     abstract getDocuments(drive: string): Promise<string[]>;
     abstract getDocument(drive: string, id: string): Promise<Document>;
 
+    /** Sync protocol methods **/
+    abstract registerListener(input: CreateListenerInput): Promise<Listener>;
+    abstract removeListener(listenerId: string): Promise<boolean>;
+    abstract cleanAllListener(): Promise<boolean>;
+
+    abstract pushStrands(strands: StrandUpdate[]): Promise<ListenerRevision[]>;
+    abstract getStrands(listenerId: string): Promise<StrandUpdate[]>;
+    abstract getStrandsSince(
+        listenerId: string,
+        since: string
+    ): Promise<StrandUpdate[]>;
+
+    /** Internal methods **/
     protected abstract createDocument(
         drive: string,
         document: CreateDocumentInput
@@ -164,17 +178,6 @@ export abstract class BaseDocumentDriveServer {
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[]
     ): Promise<IOperationResult<DocumentDriveDocument>>;
-
-    abstract registerListener(input: CreateListenerInput): Promise<Listener>;
-    abstract removeListener(listenerId: string): Promise<boolean>;
-    abstract cleanAllListener(): Promise<boolean>;
-
-    abstract pushStrands(strands: StrandUpdate[]): Promise<ListenerRevision[]>;
-    abstract getStrands(listenerId: string): Promise<StrandUpdate[]>;
-    abstract getStrandsSince(
-        listenerId: string,
-        since: string
-    ): Promise<StrandUpdate[]>;
 
     protected abstract getSynchronizationUnits: (
         driveId: string,

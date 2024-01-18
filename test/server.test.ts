@@ -116,7 +116,8 @@ describe.each(storageLayers)(
                 actions.addFile({
                     id: '1.1',
                     name: 'document 1',
-                    documentType: 'powerhouse/document-model'
+                    documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local']
                 })
             );
 
@@ -132,21 +133,22 @@ describe.each(storageLayers)(
             expect(drive.state).toStrictEqual(operationResult.document?.state);
 
             expect(drive.state.global.nodes[0]).toStrictEqual({
-                documentType: 'powerhouse/document-model',
                 id: '1.1',
                 kind: 'file',
                 name: 'document 1',
+                documentType: 'powerhouse/document-model',
+                scopes: ['global', 'local'],
                 parentFolder: null,
                 synchronizationUnits: [
                     {
                         branch: 'main',
                         scope: 'global',
-                        syncId: expect.any(String)
+                        syncId: '1'
                     },
                     {
                         branch: 'main',
                         scope: 'local',
-                        syncId: expect.any(String)
+                        syncId: '2'
                     }
                 ]
             });
@@ -177,7 +179,8 @@ describe.each(storageLayers)(
                 actions.addFile({
                     id: '1.1',
                     name: 'document 1',
-                    documentType: 'powerhouse/document-model'
+                    documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local']
                 })
             );
             const operation = drive.operations.global[0]!;
@@ -220,7 +223,8 @@ describe.each(storageLayers)(
                 actions.addFile({
                     id: '1.1',
                     name: 'document 1',
-                    documentType: 'powerhouse/document-model'
+                    documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local']
                 })
             );
             let result = await server.addDriveOperation(
@@ -271,7 +275,8 @@ describe.each(storageLayers)(
                 actions.addFile({
                     id: '1.1',
                     name: 'document 1',
-                    documentType: 'powerhouse/document-model'
+                    documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local']
                 })
             );
             drive = reducer(
@@ -329,6 +334,7 @@ describe.each(storageLayers)(
                     id: '1.1.1',
                     name: 'document 1',
                     documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local'],
                     parentFolder: '1.1'
                 })
             );
@@ -403,7 +409,8 @@ describe.each(storageLayers)(
                 actions.addFile({
                     id: '1.1.1',
                     name: 'document 1',
-                    documentType: 'powerhouse/document-model'
+                    documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local']
                 })
             );
 
@@ -492,6 +499,7 @@ describe.each(storageLayers)(
                     id: '1.1',
                     name: '1.1',
                     documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local'],
                     parentFolder: '1'
                 })
             );
@@ -541,7 +549,8 @@ describe.each(storageLayers)(
                 actions.addFile({
                     id: '1.1',
                     name: 'document 1',
-                    documentType: 'powerhouse/document-model'
+                    documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local']
                 })
             );
             await server.addDriveOperation('1', drive.operations.global[0]!);
