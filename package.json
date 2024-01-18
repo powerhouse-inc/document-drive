@@ -44,6 +44,7 @@
         "document-model-libs": "^1.1.33",
         "eslint": "^8.56.0",
         "eslint-config-prettier": "^9.1.0",
+        "eslint-plugin-prettier": "^5.1.3",
         "fake-indexeddb": "^5.0.2",
         "localforage": "^1.10.0",
         "prettier": "^3.2.4",
