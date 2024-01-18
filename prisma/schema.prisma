@@ -10,16 +10,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Drive {
-  id        String   @id
-  createdAt DateTime @default(now())
-
-  driveDocumentId   String?
-  driveMetaDocument Document? @relation(fields: [id, driveDocumentId], references: [driveId, id], onDelete: Cascade)
-
-  @@unique([id, driveDocumentId])
-}
-
 model Document {
   id           String
   driveId      String
@@ -31,12 +21,13 @@ model Document {
   initialState Json // json object with the scope as keys of the root object
   documentType String
 
-  Drive Drive?
+  syncronizationUnits SyncronizationUnit[]
 
   @@id([id, driveId])
 }
 
 model Operation {
+  id         String    @id @default(uuid())
   driveId    String
   Document   Document? @relation(fields: [driveId, documentId], references: [driveId, id])
   documentId String
@@ -50,24 +41,34 @@ model Operation {
   type        String
   attachments Attachment[]
 
-  @@id([driveId, documentId, scope, branch, index])
+  syncId String
+
+  SyncronizationUnit SyncronizationUnit @relation(fields: [syncId, driveId], references: [id, driveId])
+}
+
+model SyncronizationUnit {
+  id         String
+  driveId    String
+  documentId String
+
+  Document   Document    @relation(fields: [documentId, driveId], references: [id, driveId])
+  scope      String
+  branch     String
+  operations Operation[]
+
+  @@id([id, driveId])
 }
 
 model Attachment {
-  driveId    String
-  documentId String
-  scope      String
-  branch     String
-  index      Int
-  Operation  Operation @relation(fields: [driveId, documentId, scope, branch, index], references: [driveId, documentId, scope, branch, index])
+  id          String    @id @default(uuid())
+  operationId String
+  Operation   Operation @relation(fields: [operationId], references: [id])
 
   mimeType  String
   data      String
   filename  String
   extension String
   hash      String
-
-  @@id([driveId, documentId, scope, branch, index, hash])
 }
 
 model Listener {
