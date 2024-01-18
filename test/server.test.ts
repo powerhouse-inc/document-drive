@@ -599,7 +599,8 @@ describe.each(storageLayers)(
                 actions.addFile({
                     id: '1.1',
                     name: 'document 1',
-                    documentType: 'powerhouse/document-model'
+                    documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local']
                 })
             );
             await server.addDriveOperation('1', drive.operations.global[0]!);

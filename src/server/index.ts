@@ -26,10 +26,11 @@ import {
     SynchronizationUnit,
     UpdateStatus
 } from './types';
+import { ListenerManager } from './listener-manager';
 
 export type * from './types';
 
-export class DocumentDriveServer implements BaseDocumentDriveServer {
+export class DocumentDriveServer extends ListenerManager implements BaseDocumentDriveServer {
     private documentModels: DocumentModel[];
     private storage: IDriveStorage;
 
@@ -37,8 +38,11 @@ export class DocumentDriveServer implements BaseDocumentDriveServer {
         documentModels: DocumentModel[],
         storage: IDriveStorage = new MemoryStorage()
     ) {
+
         this.documentModels = documentModels;
         this.storage = storage;
+
+        super(storage);
     }
 
     protected async getSynchronizationUnits(

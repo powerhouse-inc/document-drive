@@ -59,6 +59,7 @@ export type DocumentOperations = {
 };
 
 export type Listener = {
+    driveId: string;
     listenerId: string;
     label?: string;
     block: boolean;
@@ -206,3 +207,22 @@ export type IDocumentDriveServer = Pick<
     BaseDocumentDriveServer,
     keyof BaseDocumentDriveServer
 >;
+
+export enum ListenerStatus {
+    CREATED,
+    PENDING,
+    SUCCESS,
+    MISSING,
+    CONFLICT,
+    ERROR
+}
+
+export interface CacheEntry {
+    listenerId: string;
+    syncId: string;
+    syncRev: number;
+    block: boolean;
+    listenerRev: number;
+    listenerStatus: ListenerStatus;
+    pendingTimeout: string;
+}
