@@ -225,4 +225,5 @@ export interface CacheEntry {
     listenerRev: number;
     listenerStatus: ListenerStatus;
     pendingTimeout: string;
+    listener: Listener;
 }

@@ -1,4 +1,7 @@
 import { IDriveStorage } from '..';
+import { InternalTransmitter } from '../transmitters/internal';
+import { PullResponderTransmitter } from '../transmitters/pull-responder';
+import { SwitchboardPushTransmitter } from '../transmitters/switchboard-push';
 import {
     CacheEntry,
     Listener,
@@ -9,6 +12,16 @@ import {
 
 export class ListenerManager {
     private cache: CacheEntry[] = [];
+
+    // according to enum value
+    private transmitters = [
+        InternalTransmitter,
+        SwitchboardPushTransmitter,
+        PullResponderTransmitter,
+        null,
+        null,
+        null
+    ];
     private storage: IDriveStorage;
 
     constructor(storage: IDriveStorage) {
@@ -26,7 +39,8 @@ export class ListenerManager {
                     listenerStatus: ListenerStatus.CREATED,
                     syncId: syncUnit.syncId,
                     syncRev: syncUnit.revision,
-                    pendingTimeout: '0'
+                    pendingTimeout: '0',
+                    listener
                 });
             }
         }
@@ -76,7 +90,8 @@ export class ListenerManager {
                         listenerStatus: ListenerStatus.CREATED,
                         syncId: syncUnit.syncId,
                         syncRev: syncUnit.revision,
-                        pendingTimeout: '0'
+                        pendingTimeout: '0',
+                        listener
                     });
                 }
             }
@@ -95,12 +110,16 @@ export class ListenerManager {
         if (cacheEntry.listenerRev === cacheEntry.syncRev) {
             return;
         } else if (cacheEntry.listenerRev < cacheEntry.syncRev) {
-            // sync is ahead of listener
-            // push strands and update cache
+            const { data, name, transmitterType } =
+                cacheEntry.listener.callInfo!;
+
+            this.transmitters[transmitterType]?.process(
+                cacheEntry.listenerId,
+                name,
+                data
+            );
         }
+        // sync is ahead of listener
+        // push strands and update cache
     }
-
-    pushStrands(listenerId: string) {}
-
-    pullStrands() {}
 }

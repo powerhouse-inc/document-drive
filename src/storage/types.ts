@@ -44,10 +44,9 @@ export interface IDriveStorage extends IStorage {
         header: DocumentHeader
     ): Promise<void>;
 
-    registerListener(input: CreateListenerInput): Promise<Listener>;
-    removeListener(listenerId: string): Promise<boolean>;
-    cleanAllListener(): Promise<boolean>;
+    addListener(input: CreateListenerInput): Promise<Listener>;
+    deleteListener(listenerId: string): Promise<boolean>;
 
     getSyncUnits(): Promise<SynchronizationUnit[]>;
-    getListener(): Promise<Listener[]>;
+    getListeners(): Promise<Listener[]>;
 }

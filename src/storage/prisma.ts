@@ -24,14 +24,10 @@ export class PrismaStorage implements IDriveStorage {
     constructor(db: PrismaClient) {
         this.db = db;
     }
-    async registerListener(
-        driveId: string,
-        input: CreateListenerInput
-    ): Promise<Listener> {
+    async addListener(input: CreateListenerInput): Promise<Listener> {
         const result = await this.db.listener.create({
             data: {
                 ...input,
-                driveId,
                 callInfo: input.callInfo ? input.callInfo : {}
             }
         });
@@ -48,18 +44,13 @@ export class PrismaStorage implements IDriveStorage {
         return listener;
     }
 
-    async removeListener(listenerId: string): Promise<boolean> {
+    async deleteListener(listenerId: string): Promise<boolean> {
         const result = await this.db.listener.delete({
             where: {
                 listenerId
             }
         });
 
-        return result !== null;
-    }
-
-    async cleanAllListener(): Promise<boolean> {
-        const result = await this.db.listener.deleteMany({});
         return result !== null;
     }
 
