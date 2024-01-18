@@ -55,28 +55,6 @@ jobs:
             - name: Test
               run: yarn test
 
-    storybook:
-        name: Storybook
-        runs-on: ubuntu-latest
-
-        steps:
-            - name: Check out code
-              uses: actions/checkout@v3
-              with:
-                  fetch-depth: 2
-
-            - name: Setup Node.js environment
-              uses: actions/setup-node@v3
-              with:
-                  node-version: 20
-                  cache: 'yarn'
-
-            - name: Install dependencies
-              run: yarn --frozen-lockfile
-
-            - name: Build storybook
-              run: yarn build-storybook
-
     build:
         name: Build
         timeout-minutes: 15
