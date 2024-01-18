@@ -15,7 +15,7 @@ model Document {
   driveId      String
   created      DateTime    @default(now())
   lastModified DateTime    @default(now())
-  revision     Int
+  revision     Json
   name         String?
   operations   Operation[]
   initialState Json // json object with the scope as keys of the root object
