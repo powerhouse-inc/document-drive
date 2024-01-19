@@ -39,7 +39,7 @@ export class DocumentDriveServer implements BaseDocumentDriveServer {
         this.storage = storage;
     }
 
-    public async getSynchronizationUnits(
+    protected async getSynchronizationUnits(
         driveId: string,
         documentId: string,
         scope?: string,
@@ -331,7 +331,7 @@ export class DocumentDriveServer implements BaseDocumentDriveServer {
             );
 
             // update listener cache
-            await this.updateCache(drive, id, operations);
+            await this.listenerStateManager.updateCache(drive, id, operations);
 
             return {
                 success: true,

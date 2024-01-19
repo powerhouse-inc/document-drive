@@ -49,41 +49,25 @@ export class ListenerStateManager {
         documentId: string,
         operations: Operation[]
     ) {
-        for (const operation of operations) {
-            const scope = operation.scope;
-            const branch = 'main';
+        this.cache.forEach((entry, i) => {
+            if (
+                entry.syncUnit.driveId !== driveId ||
+                entry.syncUnit.documentId !== documentId
+            )
+                return;
+            for (const operation of operations) {
+                if (
+                    operation.scope !== entry.syncUnit.scope ||
+                    'main' !== entry.syncUnit.branch
+                )
+                    continue;
+                if (operation.index > entry.syncRev) {
+                    entry.syncRev = operation.index;
+                }
+            }
 
-            const syncUnits = await this.drive.getSynchronizationUnits(
-                driveId,
-                documentId,
-                scope,
-                branch
-            );
-            const syncUnitIds = syncUnits.map(e => e.syncId);
-
-            this.cache.forEach((e, i) => {
-                if (!syncUnitIds.includes(e.syncId)) return;
-                this.cache[i]!.syncRev = operation.index;
-                this.cache[i]!.pendingTimeout = (
-                    new Date().getTime() / 1000 +
-                    300
-                ).toString();
-
-                this.cache[i]!.listenerStatus = ListenerStatus.PENDING;
-            });
-        }
-    }
-
-    // @todo: needs to be implemtend
-    private async _getSyncUnits(
-        listener: Listener
-    ): Promise<SynchronizationUnit[]> {
-        const drives = await this.drive.getDrives();
-        // for (const drive of drives) {
-        //     this.drive.ge;
-        // }
-
-        return [];
+            this.cache[i] = entry;
+        });
     }
 
     private async _getAllSyncUnits() {
