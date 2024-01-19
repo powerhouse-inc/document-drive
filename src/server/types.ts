@@ -139,14 +139,14 @@ export abstract class BaseDocumentDriveServer {
     abstract getDocument(drive: string, id: string): Promise<Document>;
 
     /** Synchronization methods */
-    public abstract getSynchronizationUnits: (
+    abstract getSynchronizationUnits(
         driveId: string,
         documentId?: string[],
         scope?: string[],
         branch?: string[]
-    ) => Promise<SynchronizationUnit[]>;
+    ): Promise<SynchronizationUnit[]>;
 
-    public abstract getSynchronizationUnit(
+    abstract getSynchronizationUnit(
         driveId: string,
         syncId: string
     ): Promise<SynchronizationUnit>;

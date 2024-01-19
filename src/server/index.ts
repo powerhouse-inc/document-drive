@@ -14,7 +14,7 @@ import {
 import { DocumentStorage, IDriveStorage } from '../storage';
 import { MemoryStorage } from '../storage/memory';
 import { isDocumentDrive } from '../utils';
-import { ListenerStateManager } from './listener-manager';
+import { ListenerManager } from './listener-manager';
 import {
     BaseDocumentDriveServer,
     CreateDocumentInput,
@@ -26,21 +26,22 @@ import {
 
 export type * from './types';
 
-export class DocumentDriveServer implements BaseDocumentDriveServer {
+export class DocumentDriveServer extends BaseDocumentDriveServer {
     private documentModels: DocumentModel[];
     private storage: IDriveStorage;
-    private listenerStateManager: ListenerStateManager;
+    private listenerStateManager: ListenerManager;
 
     constructor(
         documentModels: DocumentModel[],
         storage: IDriveStorage = new MemoryStorage()
     ) {
-        this.listenerStateManager = new ListenerStateManager(storage, this);
+        super();
+        this.listenerStateManager = new ListenerManager(this);
         this.documentModels = documentModels;
         this.storage = storage;
     }
 
-    protected async getSynchronizationUnits(
+    public async getSynchronizationUnits(
         driveId: string,
         documentId?: string[],
         scope?: string[],
@@ -95,7 +96,7 @@ export class DocumentDriveServer implements BaseDocumentDriveServer {
         return synchronizationUnits;
     }
 
-    protected async getSynchronizationUnit(
+    public async getSynchronizationUnit(
         driveId: string,
         syncId: string
     ): Promise<SynchronizationUnit> {
@@ -130,6 +131,7 @@ export class DocumentDriveServer implements BaseDocumentDriveServer {
             revision: lastOperation?.index ?? 0
         };
     }
+
     protected async getOperationData(
         driveId: string,
         syncId: string,
@@ -340,7 +342,11 @@ export class DocumentDriveServer implements BaseDocumentDriveServer {
             );
 
             // update listener cache
-            await this.listenerStateManager.updateCache(drive, id, operations);
+            await this.listenerStateManager.updateSynchronizationRevision(
+                drive,
+                id,
+                operations
+            );
 
             return {
                 success: true,
