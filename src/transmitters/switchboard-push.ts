@@ -15,7 +15,7 @@ export class SwitchboardPushTransmitter {
 
     async pushStrands(strands: StrandUpdate[]): Promise<ListenerRevision[]> {
         const results = await Promise.all(
-            strands.map(strand => {
+            strands.map(async strand => {
                 const drive = strand.driveId;
                 const documentId = strand.documentId;
                 const scope = strand.scope;
@@ -32,7 +32,9 @@ export class SwitchboardPushTransmitter {
                     }
                 );
 
-                return this.drive.addOperations(drive, documentId, operations);
+                const driveDoc = await this.drive.getDrive(strand.driveId);
+                const baseUrl = driveDoc.state.global.remoteUrl; // switchboard.powerhouse.xyz
+                // Send Graphql mutation to switchboard
             })
         );
 

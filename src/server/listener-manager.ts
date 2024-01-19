@@ -1,7 +1,6 @@
 import { FileNode, ListenerCallInfo } from 'document-model-libs/document-drive';
-import { Operation } from 'document-model/document';
-import { DocumentDriveServer, IDriveStorage } from '..';
 import {
+    BaseListenerManager,
     Listener,
     ListenerFilter,
     ListenerStateCacheEntry,
@@ -9,19 +8,15 @@ import {
     SynchronizationUnit
 } from './types';
 
-export class ListenerStateManager {
-    protected cache: ListenerStateCacheEntry[] = [];
-
-    private db: IDriveStorage;
-    private drive: DocumentDriveServer;
-
-    constructor(storage: IDriveStorage, drive: DocumentDriveServer) {
-        this.db = storage;
-        this.drive = drive;
-    }
-
+export class ListenerManager extends BaseListenerManager {
     async addListener(listener: Listener) {
-        const syncUnits = await this._getSyncUnits(listener);
+        const { documentId, scope, branch } = listener.filter;
+        const syncUnits = await this.drive.getSynchronizationUnits(
+            listener.driveId,
+            documentId,
+            scope,
+            branch
+        );
         for (const syncUnit of syncUnits) {
             if (this._checkFilter(listener.filter, syncUnit)) {
                 this.cache.push({
@@ -41,33 +36,44 @@ export class ListenerStateManager {
     }
 
     async removeListener(listenerId: string) {
-        this.cache = this.cache.filter(e => e.listenerId !== listenerId);
+        let removed = false;
+        this.cache = this.cache.filter(e => {
+            const remove = e.listenerId === listenerId;
+            if (remove) {
+                removed = true;
+            }
+            return !remove;
+        });
+        return removed;
     }
 
-    async updateCache(
+    async updateSynchronizationRevision(
         driveId: string,
-        documentId: string,
-        operations: Operation[]
+        syncId: string,
+        syncRev: number
     ) {
-        this.cache.forEach((entry, i) => {
-            if (
-                entry.syncUnit.driveId !== driveId ||
-                entry.syncUnit.documentId !== documentId
-            )
-                return;
-            for (const operation of operations) {
-                if (
-                    operation.scope !== entry.syncUnit.scope ||
-                    'main' !== entry.syncUnit.branch
-                )
-                    continue;
-                if (operation.index > entry.syncRev) {
-                    entry.syncRev = operation.index;
-                }
+        for (const entry of this.cache) {
+            if (entry.driveId === driveId && entry.syncUnit.syncId === syncId) {
+                entry.syncRev = syncRev;
             }
+        }
+    }
 
-            this.cache[i] = entry;
-        });
+    async updateListenerRevision(
+        listenerId: string,
+        driveId: string,
+        syncId: string,
+        listenerRev: number
+    ): Promise<void> {
+        const entry = this.cache.find(
+            e =>
+                e.listenerId === listenerId &&
+                e.driveId === driveId &&
+                e.syncUnit.syncId === syncId
+        );
+        if (entry) {
+            entry.listenerRev = listenerRev;
+        }
     }
 
     private async _getAllSyncUnits() {

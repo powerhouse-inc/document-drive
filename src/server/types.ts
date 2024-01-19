@@ -138,6 +138,28 @@ export abstract class BaseDocumentDriveServer {
     abstract getDocuments(drive: string): Promise<string[]>;
     abstract getDocument(drive: string, id: string): Promise<Document>;
 
+    /** Synchronization methods */
+    public abstract getSynchronizationUnits: (
+        driveId: string,
+        documentId?: string[],
+        scope?: string[],
+        branch?: string[]
+    ) => Promise<SynchronizationUnit[]>;
+
+    public abstract getSynchronizationUnit(
+        driveId: string,
+        syncId: string
+    ): Promise<SynchronizationUnit>;
+
+    protected abstract getOperationData(
+        driveId: string,
+        syncId: string,
+        filter: {
+            since?: string;
+            fromRevision?: number;
+        }
+    ): Promise<DocumentOperations[]>;
+
     /** Internal methods **/
     protected abstract createDocument(
         drive: string,
@@ -163,27 +185,35 @@ export abstract class BaseDocumentDriveServer {
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[]
     ): Promise<IOperationResult<DocumentDriveDocument>>;
+}
 
-    protected abstract getSynchronizationUnits: (
-        driveId: string,
-        documentId: string,
-        scope?: string,
-        branch?: string
-    ) => Promise<SynchronizationUnit[]>;
+export abstract class BaseListenerManager {
+    protected drive: BaseDocumentDriveServer;
+    protected cache: ListenerStateCacheEntry[];
 
-    protected abstract getSynchronizationUnit(
-        driveId: string,
-        syncId: string
-    ): Promise<SynchronizationUnit>;
+    constructor(
+        drive: BaseDocumentDriveServer,
+        cache: ListenerStateCacheEntry[] = []
+    ) {
+        this.drive = drive;
+        this.cache = cache;
+    }
 
-    protected abstract getOperationData(
+    abstract init(): Promise<void>;
+    abstract addListener(listener: Listener): Promise<void>;
+    abstract removeListener(listenerUd: string): Promise<boolean>;
+    abstract updateSynchronizationRevision(
         driveId: string,
         syncId: string,
-        filter: {
-            since?: string;
-            fromRevision?: number;
-        }
-    ): Promise<DocumentOperations[]>;
+        syncRev: number
+    ): Promise<void>;
+
+    abstract updateListenerRevision(
+        listenerId: string,
+        driveId: string,
+        syncId: string,
+        listenerRev: number
+    ): Promise<void>;
 }
 
 export type IDocumentDriveServer = Pick<

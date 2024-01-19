@@ -1,5 +1,6 @@
 import {
     DocumentDriveAction,
+    FileNode,
     isFileNode,
     utils
 } from 'document-model-libs/document-drive';
@@ -13,7 +14,7 @@ import {
 import { DocumentStorage, IDriveStorage } from '../storage';
 import { MemoryStorage } from '../storage/memory';
 import { isDocumentDrive } from '../utils';
-import { ListenerStateManager } from './listener-state-manager';
+import { ListenerStateManager } from './listener-manager';
 import {
     BaseDocumentDriveServer,
     CreateDocumentInput,
@@ -41,47 +42,55 @@ export class DocumentDriveServer implements BaseDocumentDriveServer {
 
     protected async getSynchronizationUnits(
         driveId: string,
-        documentId: string,
-        scope?: string,
-        branch?: string
+        documentId?: string[],
+        scope?: string[],
+        branch?: string[]
     ) {
         const drive = await this.getDrive(driveId);
-        const node = drive.state.global.nodes.find(
-            node => isFileNode(node) && node.id === documentId
-        );
 
-        if (!node || !isFileNode(node)) {
+        const nodes = drive.state.global.nodes.filter(
+            node =>
+                isFileNode(node) &&
+                (!documentId?.length || documentId.includes(node.id)) // TODO support * as documentId
+        ) as FileNode[];
+
+        if (documentId && !nodes.length) {
             throw new Error('File node not found');
         }
 
-        const document = await this.getDocument(driveId, documentId);
+        const synchronizationUnits: SynchronizationUnit[] = [];
 
-        const synchronizationUnits = node.synchronizationUnits
-            .filter(
-                unit =>
-                    (scope === undefined || unit.scope === scope) &&
-                    (branch === undefined || unit.branch === branch)
-            )
-            .map(({ syncId, scope, branch }) => {
+        for (const node of nodes) {
+            const nodeUnits =
+                scope?.length || branch?.length
+                    ? node.synchronizationUnits.filter(
+                          unit =>
+                              (!scope?.length || scope.includes(unit.scope)) &&
+                              (!branch?.length || branch.includes(unit.scope))
+                      )
+                    : node.synchronizationUnits;
+            if (!nodeUnits.length) {
+                continue;
+            }
+
+            const document = await this.getDocument(driveId, node.id);
+
+            for (const { syncId, scope, branch } of nodeUnits) {
                 const operations =
                     document.operations[scope as OperationScope] ?? [];
                 const lastOperation = operations.pop();
-
-                return {
+                synchronizationUnits.push({
                     syncId,
                     scope,
                     branch,
                     driveId,
-                    documentId,
+                    documentId: node.id,
                     documentType: node.documentType,
                     lastUpdated:
                         lastOperation?.timestamp ?? document.lastModified,
                     revision: lastOperation?.index ?? 0
-                };
-            });
-
-        if (!synchronizationUnits.length) {
-            throw new Error('Synchronization unit not found');
+                });
+            }
         }
         return synchronizationUnits;
     }
