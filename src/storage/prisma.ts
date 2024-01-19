@@ -10,12 +10,6 @@ import {
     Operation,
     OperationScope
 } from 'document-model/document';
-import {
-    CreateListenerInput,
-    Listener,
-    ListenerCallInfo,
-    ListenerFilter
-} from '..';
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 
 export class PrismaStorage implements IDriveStorage {
@@ -23,45 +17,6 @@ export class PrismaStorage implements IDriveStorage {
 
     constructor(db: PrismaClient) {
         this.db = db;
-    }
-    async addListener(input: CreateListenerInput): Promise<Listener> {
-        const result = await this.db.listener.create({
-            data: {
-                ...input,
-                callInfo: input.callInfo ? input.callInfo : {}
-            }
-        });
-
-        const listener: Listener = {
-            ...result,
-            label: result.label ? result.label : '',
-            filter: result.filter as ListenerFilter,
-            callInfo: result.callInfo
-                ? (result.callInfo as ListenerCallInfo)
-                : undefined
-        };
-
-        return listener;
-    }
-
-    async deleteListener(listenerId: string): Promise<boolean> {
-        const result = await this.db.listener.delete({
-            where: {
-                listenerId
-            }
-        });
-
-        return result !== null;
-    }
-
-    async getListeners(): Promise<Listener[]> {
-        const result = await this.db.listener.findMany({});
-        return result.map(e => ({
-            ...e,
-            label: e.label ? e.label : '',
-            filter: e.filter as ListenerFilter,
-            callInfo: e.callInfo ? (e.callInfo as ListenerCallInfo) : undefined
-        }));
     }
 
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
@@ -136,7 +91,8 @@ export class PrismaStorage implements IDriveStorage {
                             timestamp: op.timestamp,
                             type: op.type,
                             scope: op.scope,
-                            branch: 'main'
+                            branch: 'main',
+                            skip: op.skip
                         },
                         update: {
                             driveId: drive,
@@ -147,7 +103,8 @@ export class PrismaStorage implements IDriveStorage {
                             timestamp: op.timestamp,
                             type: op.type,
                             scope: op.scope,
-                            branch: 'main'
+                            branch: 'main',
+                            skip: op.skip
                         }
                     });
                 })
@@ -239,6 +196,7 @@ export class PrismaStorage implements IDriveStorage {
                 global: dbDoc.operations
                     .filter(op => op.scope === 'global')
                     .map(op => ({
+                        skip: op.skip,
                         hash: op.hash,
                         index: op.index,
                         timestamp: new Date(op.timestamp).toISOString(),
@@ -250,6 +208,7 @@ export class PrismaStorage implements IDriveStorage {
                 local: dbDoc.operations
                     .filter(op => op.scope === 'local')
                     .map(op => ({
+                        skip: op.skip,
                         hash: op.hash,
                         index: op.index,
                         timestamp: new Date(op.timestamp).toISOString(),
@@ -259,7 +218,7 @@ export class PrismaStorage implements IDriveStorage {
                         // attachments: fileRegistry
                     }))
             },
-            revision: dbDoc.revision
+            revision: dbDoc.revision as Record<OperationScope, number>
         };
 
         return doc;

@@ -13,39 +13,33 @@ import {
 import { DocumentStorage, IDriveStorage } from '../storage';
 import { MemoryStorage } from '../storage/memory';
 import { isDocumentDrive } from '../utils';
+import { ListenerStateManager } from './listener-state-manager';
 import {
     BaseDocumentDriveServer,
     CreateDocumentInput,
-    CreateListenerInput,
     DocumentOperations,
     DriveInput,
-    Listener,
-    ListenerRevision,
     SignalResult,
-    StrandUpdate,
-    SynchronizationUnit,
-    UpdateStatus
+    SynchronizationUnit
 } from './types';
-import { ListenerManager } from './listener-manager';
 
 export type * from './types';
 
-export class DocumentDriveServer extends ListenerManager implements BaseDocumentDriveServer {
+export class DocumentDriveServer implements BaseDocumentDriveServer {
     private documentModels: DocumentModel[];
     private storage: IDriveStorage;
+    private listenerStateManager: ListenerStateManager;
 
     constructor(
         documentModels: DocumentModel[],
         storage: IDriveStorage = new MemoryStorage()
     ) {
-
+        this.listenerStateManager = new ListenerStateManager(storage, this);
         this.documentModels = documentModels;
         this.storage = storage;
-
-        super(storage);
     }
 
-    protected async getSynchronizationUnits(
+    public async getSynchronizationUnits(
         driveId: string,
         documentId: string,
         scope?: string,
@@ -235,7 +229,10 @@ export class DocumentDriveServer extends ListenerManager implements BaseDocument
         return this.storage.getDocuments(drive);
     }
 
-    async createDocument(driveId: string, input: CreateDocumentInput) {
+    protected async createDocument(
+        driveId: string,
+        input: CreateDocumentInput
+    ) {
         const documentModel = this._getDocumentModel(input.documentType);
 
         // TODO validate input.document is of documentType
@@ -333,6 +330,9 @@ export class DocumentDriveServer extends ListenerManager implements BaseDocument
                 document
             );
 
+            // update listener cache
+            await this.updateCache(drive, id, operations);
+
             return {
                 success: true,
                 document,
@@ -399,62 +399,7 @@ export class DocumentDriveServer extends ListenerManager implements BaseDocument
         }
     }
 
-    registerListener(
-        input: CreateListenerInput
-    ): Promise<Listener> {
-        return this.storage.registerListener(input);
-    }
+    async addOperationsToListenerCache() {}
 
-    removeListener(listenerId: string): Promise<boolean> {
-        return this.storage.removeListener(listenerId);
-    }
-
-    cleanAllListener(): Promise<boolean> {
-        return this.storage.cleanAllListener();
-    }
-
-    async pushStrands(strands: StrandUpdate[]): Promise<ListenerRevision[]> {
-        const results = await Promise.all(
-            strands.map(strand => {
-                const drive = strand.driveId;
-                const documentId = strand.documentId;
-                const scope = strand.scope;
-                const branch = strand.branch;
-                const operations: Operation[] = strand.operations.map(
-                    operation => {
-                        return {
-                            ...operation,
-                            scope,
-                            branch,
-                            index: operation.revision,
-                            timestamp: new Date().toTimeString()
-                        };
-                    }
-                );
-
-                return this.addOperations(drive, documentId, operations);
-            })
-        );
-
-        return results.map((result, i) => {
-            const status: UpdateStatus = result.success
-                ? UpdateStatus.SUCCESS
-                : UpdateStatus.ERROR;
-
-            return {
-                driveId: strands[i]!.driveId,
-                documentId: strands[i]!.documentId,
-                scope: strands[i]!.scope,
-                branch: strands[i]!.branch,
-                status: status,
-                revision: 0
-            };
-        });
-    }
-    getStrands(listenerId: string): Promise<StrandUpdate[]> {
-        throw new Error('Method not implemented.');
-    }
-    getStrandsSince(listenerId: string, since: Date): Promise<StrandUpdate[]> {
-        throw new Error('Method not implemented.');
-    }
+    async removeOperationsFromListenerCache() {}
 }

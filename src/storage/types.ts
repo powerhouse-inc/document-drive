@@ -8,7 +8,6 @@ import type {
     DocumentHeader,
     Operation
 } from 'document-model/document';
-import { CreateListenerInput, Listener, SynchronizationUnit } from '..';
 
 export type DocumentStorage<D extends Document = Document> = Omit<
     D,
@@ -43,10 +42,4 @@ export interface IDriveStorage extends IStorage {
         operations: Operation<DocumentDriveAction | BaseAction>[],
         header: DocumentHeader
     ): Promise<void>;
-
-    addListener(input: CreateListenerInput): Promise<Listener>;
-    deleteListener(listenerId: string): Promise<boolean>;
-
-    getSyncUnits(): Promise<SynchronizationUnit[]>;
-    getListeners(): Promise<Listener[]>;
 }

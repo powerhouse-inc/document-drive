@@ -2,7 +2,8 @@ import type {
     DocumentDriveAction,
     DocumentDriveDocument,
     DocumentDriveLocalState,
-    DocumentDriveState
+    DocumentDriveState,
+    ListenerCallInfo
 } from 'document-model-libs/document-drive';
 import type {
     BaseAction,
@@ -77,12 +78,6 @@ export type CreateListenerInput = {
     callInfo?: ListenerCallInfo;
 };
 
-export type ListenerCallInfo = {
-    transmitterType: TransmitterType;
-    name: string;
-    data: string;
-};
-
 export enum TransmitterType {
     Internal,
     SwitchboardPush,
@@ -93,10 +88,10 @@ export enum TransmitterType {
 }
 
 export type ListenerFilter = {
-    documentType: string[];
-    documentId: string[];
-    scope: string[];
-    branch: string[];
+    documentType?: string[];
+    documentId?: string[];
+    scope?: string[];
+    branch?: string[];
 };
 
 export type ListenerRevision = {
@@ -109,10 +104,10 @@ export type ListenerRevision = {
 };
 
 export enum UpdateStatus {
-    SUCCESS,
-    MISSING,
-    CONFLICT,
-    ERROR
+    SUCCESS = 'SUCCESS',
+    MISSING = 'MISSING',
+    CONFLICT = 'CONFLICT',
+    ERROR = 'ERROR'
 }
 
 export type StrandUpdate = {
@@ -120,11 +115,11 @@ export type StrandUpdate = {
     documentId: string;
     scope: OperationScope;
     branch: string;
-    operations: OperationUpdate[];
+    operations: Operation[];
 };
 
 // maybe change to Operation?
-export type OperationUpdate = {
+export type OperationUpdate = Operation & {
     revision: number;
     skip: number;
     name: string;
@@ -142,18 +137,6 @@ export abstract class BaseDocumentDriveServer {
 
     abstract getDocuments(drive: string): Promise<string[]>;
     abstract getDocument(drive: string, id: string): Promise<Document>;
-
-    /** Sync protocol methods **/
-    abstract registerListener(input: CreateListenerInput): Promise<Listener>;
-    abstract removeListener(listenerId: string): Promise<boolean>;
-    abstract cleanAllListener(): Promise<boolean>;
-
-    abstract pushStrands(strands: StrandUpdate[]): Promise<ListenerRevision[]>;
-    abstract getStrands(listenerId: string): Promise<StrandUpdate[]>;
-    abstract getStrandsSince(
-        listenerId: string,
-        since: string
-    ): Promise<StrandUpdate[]>;
 
     /** Internal methods **/
     protected abstract createDocument(
@@ -217,8 +200,9 @@ export enum ListenerStatus {
     ERROR
 }
 
-export interface CacheEntry {
+export interface ListenerStateCacheEntry {
     listenerId: string;
+    driveId: string;
     syncId: string;
     syncRev: number;
     block: boolean;
@@ -226,4 +210,5 @@ export interface CacheEntry {
     listenerStatus: ListenerStatus;
     pendingTimeout: string;
     listener: Listener;
+    syncUnit: SynchronizationUnit;
 }

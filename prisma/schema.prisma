@@ -33,6 +33,7 @@ model Operation {
   scope      String
   branch     String
   index      Int
+  skip       Int
 
   hash        String
   timestamp   DateTime
