@@ -1,10 +1,5 @@
-import { Operation } from 'document-model/document';
-import {
-    DocumentDriveServer,
-    ListenerRevision,
-    StrandUpdate,
-    UpdateStatus
-} from '..';
+import { gql, request } from 'graphql-request';
+import { DocumentDriveServer, ListenerRevision, StrandUpdate } from '..';
 
 export class SwitchboardPushTransmitter {
     protected drive: DocumentDriveServer;
@@ -13,44 +8,36 @@ export class SwitchboardPushTransmitter {
         this.drive = drive;
     }
 
-    async pushStrands(strands: StrandUpdate[]): Promise<ListenerRevision[]> {
-        const results = await Promise.all(
+    pushStrands(strands: StrandUpdate[]): Promise<ListenerRevision[]> {
+        return Promise.all(
             strands.map(async strand => {
-                const drive = strand.driveId;
-                const documentId = strand.documentId;
-                const scope = strand.scope;
-                const branch = strand.branch;
-                const operations: Operation[] = strand.operations.map(
-                    operation => {
-                        return {
-                            ...operation,
-                            scope,
-                            branch,
-                            index: operation.index,
-                            timestamp: new Date().toTimeString()
-                        };
-                    }
+                const driveDoc = await this.drive.getDrive(strand.driveId);
+                const baseUrl = driveDoc.state.global.remoteUrl!; // switchboard.powerhouse.xyz
+
+                // Send Graphql mutation to switchboard
+                const [listenerRevision] = await request<ListenerRevision[]>(
+                    baseUrl,
+                    gql`
+                        mutation pushUpdates($strands: [InputStrandUpdate!]) {
+                            pushUpdates(strands: $strands) {
+                                driveId
+                                documentId
+                                scope
+                                branch
+                                status
+                                revision
+                            }
+                        }
+                    `,
+                    { strands: [strand] }
                 );
 
-                const driveDoc = await this.drive.getDrive(strand.driveId);
-                const baseUrl = driveDoc.state.global.remoteUrl; // switchboard.powerhouse.xyz
-                // Send Graphql mutation to switchboard
+                if (!listenerRevision) {
+                    throw new Error("Couldn't update listener revision");
+                }
+
+                return listenerRevision;
             })
         );
-
-        return results.map((result, i) => {
-            const status: UpdateStatus = (
-                result.success ? 'SUCCESS' : 'ERROR'
-            ) as UpdateStatus;
-
-            return {
-                driveId: strands[i]!.driveId,
-                documentId: strands[i]!.documentId,
-                scope: strands[i]!.scope,
-                branch: strands[i]!.branch,
-                status: status,
-                revision: 0
-            };
-        });
     }
 }

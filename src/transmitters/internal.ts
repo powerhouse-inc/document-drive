@@ -1,4 +1,4 @@
-export class InternalTransmitter {
+export class InternalTransmitterService {
     static process() {
         console.log('InternalTransmitter.process()');
     }
