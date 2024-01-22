@@ -1,17 +1,15 @@
 import { gql, request } from 'graphql-request';
-import { DocumentDriveServer, ListenerRevision, StrandUpdate } from '..';
+import { BaseDocumentDriveServer, ListenerRevision, StrandUpdate } from '..';
 
 export class SwitchboardPushTransmitter {
-    protected drive: DocumentDriveServer;
-
-    constructor(drive: DocumentDriveServer) {
-        this.drive = drive;
-    }
-
-    pushStrands(strands: StrandUpdate[]): Promise<ListenerRevision[]> {
-        return Promise.all(
+    static async pushStrands(
+        drive: BaseDocumentDriveServer,
+        strands: StrandUpdate[]
+    ): Promise<ListenerRevision[]> {
+        console.log('push strands', strands);
+        const result = await Promise.all(
             strands.map(async strand => {
-                const driveDoc = await this.drive.getDrive(strand.driveId);
+                const driveDoc = await drive.getDrive(strand.driveId);
                 const baseUrl = driveDoc.state.global.remoteUrl!; // switchboard.powerhouse.xyz
 
                 // Send Graphql mutation to switchboard
@@ -39,5 +37,7 @@ export class SwitchboardPushTransmitter {
                 return listenerRevision;
             })
         );
+
+        return result;
     }
 }

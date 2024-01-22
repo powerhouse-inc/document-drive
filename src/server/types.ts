@@ -189,14 +189,14 @@ export abstract class BaseDocumentDriveServer {
 
 export abstract class BaseListenerManager {
     protected drive: BaseDocumentDriveServer;
-    protected cache: ListenerStateCacheEntry[];
+    protected listenerState: ListenerState[];
 
     constructor(
         drive: BaseDocumentDriveServer,
-        cache: ListenerStateCacheEntry[] = []
+        listenerState: ListenerState[] = []
     ) {
         this.drive = drive;
-        this.cache = cache;
+        this.listenerState = listenerState;
     }
 
     abstract init(): Promise<void>;
@@ -230,7 +230,7 @@ export enum ListenerStatus {
     ERROR
 }
 
-export interface ListenerStateCacheEntry {
+export interface ListenerState {
     listenerId: string;
     driveId: string;
     syncId: string;

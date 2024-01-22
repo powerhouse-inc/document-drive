@@ -11,10 +11,10 @@ import {
     OperationScope,
     utils as baseUtils
 } from 'document-model/document';
+import { ListenerManager } from '../listener/manager';
 import { DocumentStorage, IDriveStorage } from '../storage';
 import { MemoryStorage } from '../storage/memory';
 import { isDocumentDrive } from '../utils';
-import { ListenerManager } from './listener-manager';
 import {
     BaseDocumentDriveServer,
     CreateDocumentInput,
@@ -39,6 +39,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         this.listenerStateManager = new ListenerManager(this);
         this.documentModels = documentModels;
         this.storage = storage;
+    }
+
+    async initialize() {
+        await this.listenerStateManager.init();
     }
 
     public async getSynchronizationUnits(
@@ -191,7 +195,26 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const document = utils.createDocument({
             state: drive
         });
-        return this.storage.createDrive(id, document);
+
+        await this.storage.createDrive(id, document);
+
+        // add listeners to state manager
+        for (const listener of drive.local.listeners) {
+            await this.listenerStateManager.addListener({
+                block: listener.block,
+                driveId: id,
+                filter: {
+                    branch: listener.filter.branch ?? [],
+                    documentId: listener.filter.documentId ?? [],
+                    documentType: listener.filter.documentType ?? [],
+                    scope: listener.filter.scope ?? []
+                },
+                listenerId: listener.listenerId,
+                system: listener.system,
+                callInfo: listener.callInfo ?? undefined,
+                label: listener.label ?? ''
+            });
+        }
     }
 
     deleteDrive(id: string) {
@@ -345,7 +368,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             await this.listenerStateManager.updateSynchronizationRevision(
                 drive,
                 id,
-                operations
+                operations.pop()?.index ?? 0
             );
 
             return {
