@@ -13,6 +13,7 @@ import type {
     Signal,
     State
 } from 'document-model/document';
+import { ITransmitter } from '../transmitter/types';
 
 export type DriveInput = State<
     Omit<DocumentDriveState, '__typename' | 'nodes'>,
@@ -47,16 +48,6 @@ export type SynchronizationUnit = {
     branch: string;
     lastUpdated: string;
     revision: number;
-};
-
-export type DocumentOperations = {
-    syncId: string;
-    revision: number;
-    committed: string;
-    operation: string;
-    params: object;
-    stateHash: string;
-    skip: number;
 };
 
 export type Listener = {
@@ -110,22 +101,21 @@ export enum UpdateStatus {
     ERROR = 'ERROR'
 }
 
+export type OperationUpdate = {
+    committed: string;
+    revision: number;
+    skip: number;
+    operation: string;
+    input: object;
+    hash: string;
+};
+
 export type StrandUpdate = {
     driveId: string;
     documentId: string;
     scope: OperationScope;
     branch: string;
-    operations: Operation[];
-};
-
-// maybe change to Operation?
-export type OperationUpdate = Operation & {
-    revision: number;
-    skip: number;
-    name: string;
-    input: string;
-    hash: string;
-    type: string;
+    operations: OperationUpdate[];
 };
 
 export abstract class BaseDocumentDriveServer {
@@ -151,14 +141,14 @@ export abstract class BaseDocumentDriveServer {
         syncId: string
     ): Promise<SynchronizationUnit>;
 
-    protected abstract getOperationData(
+    abstract getOperationData(
         driveId: string,
         syncId: string,
         filter: {
             since?: string;
             fromRevision?: number;
         }
-    ): Promise<DocumentOperations[]>;
+    ): Promise<OperationUpdate[]>;
 
     /** Internal methods **/
     protected abstract createDocument(
@@ -185,11 +175,20 @@ export abstract class BaseDocumentDriveServer {
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[]
     ): Promise<IOperationResult<DocumentDriveDocument>>;
+
+    abstract getTransmitter(
+        driveId: string,
+        listenerId: string
+    ): Promise<ITransmitter | undefined>;
 }
 
 export abstract class BaseListenerManager {
     protected drive: BaseDocumentDriveServer;
     protected listenerState: ListenerState[];
+    protected transmitters: Record<
+        DocumentDriveState['id'],
+        Record<Listener['listenerId'], ITransmitter>
+    > = {};
 
     constructor(
         drive: BaseDocumentDriveServer,
@@ -200,8 +199,12 @@ export abstract class BaseListenerManager {
     }
 
     abstract init(): Promise<void>;
-    abstract addListener(listener: Listener): Promise<void>;
+    abstract addListener(listener: Listener): Promise<ITransmitter>;
     abstract removeListener(listenerUd: string): Promise<boolean>;
+    abstract getTransmitter(
+        driveId: string,
+        listenerId: string
+    ): Promise<ITransmitter | undefined>;
     abstract updateSynchronizationRevision(
         driveId: string,
         syncId: string,

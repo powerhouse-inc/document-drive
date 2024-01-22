@@ -1,43 +1,46 @@
 import { gql, request } from 'graphql-request';
-import { BaseDocumentDriveServer, ListenerRevision, StrandUpdate } from '..';
+import {
+    BaseDocumentDriveServer,
+    Listener,
+    ListenerRevision,
+    StrandUpdate
+} from '..';
+import { ITransmitter } from './types';
 
-export class SwitchboardPushTransmitter {
-    static async pushStrands(
-        drive: BaseDocumentDriveServer,
-        strands: StrandUpdate[]
-    ): Promise<ListenerRevision[]> {
-        console.log('push strands', strands);
-        const result = await Promise.all(
-            strands.map(async strand => {
-                const driveDoc = await drive.getDrive(strand.driveId);
-                const baseUrl = driveDoc.state.global.remoteUrl!; // switchboard.powerhouse.xyz
+export class SwitchboardPushTransmitter implements ITransmitter {
+    private drive: BaseDocumentDriveServer;
+    private listener: Listener;
+    private targetURL: string;
 
-                // Send Graphql mutation to switchboard
-                const [listenerRevision] = await request<ListenerRevision[]>(
-                    baseUrl,
-                    gql`
-                        mutation pushUpdates($strands: [InputStrandUpdate!]) {
-                            pushUpdates(strands: $strands) {
-                                driveId
-                                documentId
-                                scope
-                                branch
-                                status
-                                revision
-                            }
-                        }
-                    `,
-                    { strands: [strand] }
-                );
+    constructor(listener: Listener, drive: BaseDocumentDriveServer) {
+        this.listener = listener;
+        this.drive = drive;
+        this.targetURL = listener.callInfo!.data!;
+    }
 
-                if (!listenerRevision) {
-                    throw new Error("Couldn't update listener revision");
+    async transmit(strands: StrandUpdate[]): Promise<ListenerRevision[]> {
+        // Send Graphql mutation to switchboard
+        const listenerRevisions = await request<ListenerRevision[]>(
+            this.targetURL,
+            gql`
+                mutation pushUpdates($strands: [InputStrandUpdate!]) {
+                    pushUpdates(strands: $strands) {
+                        driveId
+                        documentId
+                        scope
+                        branch
+                        status
+                        revision
+                    }
                 }
-
-                return listenerRevision;
-            })
+            `,
+            { strands }
         );
 
-        return result;
+        if (!listenerRevisions) {
+            throw new Error("Couldn't update listener revision");
+        }
+
+        return listenerRevisions;
     }
 }

@@ -1,14 +1,9 @@
-import { Operation, State } from 'document-model/document-model';
+import { ListenerRevision, StrandUpdate } from '..';
 
-export interface InternalTransmitterService {
+export interface ITransmitter {
+    transmit(strands: StrandUpdate[]): Promise<ListenerRevision[]>;
+}
+
+export interface InternalTransmitterService extends ITransmitter {
     getName(): string;
-    processUpdate(
-        driveId: string,
-        documentId: string,
-        scope: string,
-        branch: string,
-        revisionIndex: string,
-        operations: Operation[],
-        resultingState: State
-    ): void;
 }

@@ -1,4 +1,5 @@
 import { ListenerCallInfo } from 'document-model-libs/document-drive';
+import { OperationScope } from 'document-model/document';
 import {
     BaseListenerManager,
     Listener,
@@ -8,8 +9,16 @@ import {
     SynchronizationUnit
 } from '../server/types';
 import { SwitchboardPushTransmitter } from '../transmitter/switchboard-push';
+import { ITransmitter } from '../transmitter/types';
 
 export class ListenerManager extends BaseListenerManager {
+    async getTransmitter(
+        driveId: string,
+        listenerId: string
+    ): Promise<ITransmitter | undefined> {
+        return this.transmitters[driveId]?.[listenerId];
+    }
+
     async addListener(listener: Listener) {
         const drive = listener.driveId;
 
@@ -30,6 +39,24 @@ export class ListenerManager extends BaseListenerManager {
                     syncUnit
                 });
             }
+        }
+        let transmitter: ITransmitter | undefined;
+
+        switch (listener.callInfo?.transmitterType) {
+            case 'SwitchboardPush': {
+                transmitter = new SwitchboardPushTransmitter(
+                    this.drive,
+                    listener
+                );
+                break;
+            }
+        }
+
+        if (transmitter) {
+            const driveTransmitters = this.transmitters[drive] || {};
+            driveTransmitters[listener.listenerId] = transmitter;
+            this.transmitters[drive] = driveTransmitters;
+            return transmitter;
         }
     }
 
@@ -62,42 +89,6 @@ export class ListenerManager extends BaseListenerManager {
                 entry.listenerStatus = ListenerStatus.SUCCESS;
                 continue;
             }
-
-            if (
-                entry.listener.callInfo?.transmitterType === 'SwitchboardPush'
-            ) {
-                try {
-                    entry.listenerStatus = ListenerStatus.PENDING;
-                    entry.pendingTimeout = (
-                        new Date().getTime() / 1000 +
-                        300
-                    ).toString();
-                    await SwitchboardPushTransmitter.pushStrands(this.drive, [
-                        {
-                            branch: 'main',
-                            documentId: '1',
-                            driveId: '1',
-                            operations: [
-                                {
-                                    hash: '1',
-                                    index: 1,
-                                    input: {},
-                                    scope: 'global',
-                                    skip: 0,
-                                    timestamp: new Date().toISOString(),
-                                    type: 'create'
-                                }
-                            ],
-                            scope: 'global'
-                        }
-                    ]);
-                    entry.pendingTimeout = '0';
-                    entry.listenerStatus = ListenerStatus.SUCCESS;
-                } catch (e) {
-                    entry.pendingTimeout = '0';
-                    entry.listenerStatus = ListenerStatus.ERROR;
-                }
-            }
         }
     }
 
@@ -115,6 +106,61 @@ export class ListenerManager extends BaseListenerManager {
         );
         if (entry) {
             entry.listenerRev = listenerRev;
+        }
+    }
+
+    async triggerUpdate() {
+        for (const listener of this.listenerState) {
+            if (listener.listenerRev < listener.syncRev) {
+                const {
+                    driveId,
+                    listenerId,
+                    listenerRev,
+                    syncId,
+                    syncUnit: { documentId, scope, branch }
+                } = listener;
+                const transmitter = await this.getTransmitter(
+                    driveId,
+                    listenerId
+                );
+                if (!transmitter) {
+                    continue;
+                }
+
+                // TODO retrieve strands from listenerRev to syncRev
+                const operations = await this.drive.getOperationData(
+                    driveId,
+                    syncId,
+                    {
+                        fromRevision: listenerRev
+                    }
+                );
+
+                try {
+                    listener.listenerStatus = ListenerStatus.PENDING;
+                    listener.pendingTimeout = new Date(
+                        new Date().getTime() / 1000 +
+                        300
+                    ).toISOString();
+                    const listenerRevisions = await transmitter?.transmit([
+                        {
+                            driveId,
+                            documentId,
+                            scope: scope as OperationScope,
+                            branch,
+                            operations
+                        }]
+                    );
+                    listener.pendingTimeout = '0';
+                    listener.listenerStatus = ListenerStatus.SUCCESS;
+                    listener.listenerRev = listenerRevision;
+                } catch (e) {
+                    listener.pendingTimeout = '0';
+                    listener.listenerStatus = ListenerStatus.ERROR;
+                } finally {
+                    listener.listenerStatus = ListenerStatus.
+                }
+            }
         }
     }
 

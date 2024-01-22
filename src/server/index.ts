@@ -18,8 +18,8 @@ import { isDocumentDrive } from '../utils';
 import {
     BaseDocumentDriveServer,
     CreateDocumentInput,
-    DocumentOperations,
     DriveInput,
+    OperationUpdate,
     SignalResult,
     SynchronizationUnit
 } from './types';
@@ -136,14 +136,14 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         };
     }
 
-    protected async getOperationData(
+    async getOperationData(
         driveId: string,
         syncId: string,
         filter: {
             since?: string | undefined;
             fromRevision?: number | undefined;
         }
-    ): Promise<DocumentOperations[]> {
+    ): Promise<OperationUpdate[]> {
         const { documentId, scope } = await this.getSynchronizationUnit(
             driveId,
             syncId
@@ -159,13 +159,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         );
 
         return filteredOperations.map(operation => ({
-            syncId,
+            hash: operation.hash,
             revision: operation.index,
             committed: operation.timestamp,
             operation: operation.type,
-            params: operation.input as object,
-            stateHash: operation.hash,
-            skip: 0 // TODO operation.skip
+            input: operation.input as object,
+            skip: operation.skip
         }));
     }
 
@@ -365,11 +364,14 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             );
 
             // update listener cache
-            await this.listenerStateManager.updateSynchronizationRevision(
-                drive,
-                id,
-                operations.pop()?.index ?? 0
-            );
+            const lastOperation = operations.pop();
+            if (lastOperation) {
+                await this.listenerStateManager.updateSynchronizationRevision(
+                    drive,
+                    id,
+                    lastOperation.index
+                );
+            }
 
             return {
                 success: true,
