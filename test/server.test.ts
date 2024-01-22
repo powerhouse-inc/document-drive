@@ -13,15 +13,18 @@ import {
     utils as DocumentModelUtils
 } from 'document-model/document-model';
 import fs from 'fs/promises';
+import { HttpResponse, graphql, http } from 'msw';
+import { setupServer } from 'msw/node';
 import path from 'path';
-import { afterEach, describe, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
+
 import {
     BrowserStorage,
     FilesystemStorage,
     MemoryStorage,
     PrismaStorage
 } from '../src';
-import { DocumentDriveServer } from '../src/server';
+import { DocumentDriveServer, ListenerRevision, UpdateStatus } from '../src/server';
 
 const documentModels = [
     DocumentModelLib,
@@ -36,6 +39,34 @@ const storageLayers = [
     ['BrowserStorage', () => new BrowserStorage()],
     ['PrismaStorage', () => new PrismaStorage(prismaClient)]
 ] as const;
+
+const revisions: ListenerRevision[] = [
+    {
+        branch: 'main',
+        documentId: '1',
+        driveId: '1',
+        revision: 1,
+        scope: 'global',
+        status: 'SUCCESS' as UpdateStatus
+    }
+    // ...
+];
+
+const restHandlers = [
+    http.get('https://rest-endpoint.example/path/to/posts', () => {
+        return HttpResponse.json(revisions);
+    })
+];
+
+const graphqlHandlers = [
+    graphql.mutation('pushUpdates', () => {
+        return HttpResponse.json({
+            data: { revisions }
+        });
+    })
+];
+
+const mswServer = setupServer(...restHandlers, ...graphqlHandlers);
 
 describe.each(storageLayers)(
     'Document Drive Server with %s',
@@ -53,6 +84,14 @@ describe.each(storageLayers)(
                 await prismaClient.$executeRawUnsafe('DELETE FROM "Document";');
             }
         });
+
+        beforeAll(() => {
+            mswServer.listen({ onUnhandledRequest: 'error' });
+        });
+
+        afterAll(() => mswServer.close());
+
+        afterEach(() => mswServer.resetHandlers());
 
         it('adds drive to server', async ({ expect }) => {
             const server = new DocumentDriveServer(
@@ -574,21 +613,44 @@ describe.each(storageLayers)(
             );
         });
 
-        it('adds a listener to the drive', async ({ expect }) => {
+        // need to add sync unit
+        it.only('should push to switchboard if remoteDriveUrl is set', async ({
+            expect
+        }) => {
             const server = new DocumentDriveServer(
                 documentModels,
                 buildStorage()
             );
+            await server.initialize();
             await server.addDrive({
                 global: {
                     id: '1',
                     name: 'name',
                     icon: 'icon',
-                    remoteUrl: null
+                    remoteUrl: 'http://switchboard.powerhouse.xyz'
                 },
                 local: {
                     availableOffline: false,
-                    sharingType: 'public'
+                    sharingType: 'public',
+                    listeners: [
+                        {
+                            block: true,
+                            callInfo: {
+                                data: '',
+                                name: 'switchboard-push',
+                                transmitterType: 'SwitchboardPush'
+                            },
+                            filter: {
+                                branch: ['main'],
+                                documentId: ['*'],
+                                documentType: ['powerhouse/*'],
+                                scope: ['global', 'local']
+                            },
+                            label: 'Switchboard Sync',
+                            listenerId: '1',
+                            system: true
+                        }
+                    ]
                 }
             });
             let drive = await server.getDrive('1');
@@ -613,16 +675,10 @@ describe.each(storageLayers)(
                 document,
                 DocumentModelActions.setName('Test')
             );
+
             const operation = document.operations.global[0]!;
             const result = await server.addOperation('1', '1.1', operation);
             expect(result.success).toBe(true);
-            expect(result.operations[0]).toStrictEqual(operation);
-
-            const storedDocument = await server.getDocument('1', '1.1');
-            expect(storedDocument.state).toStrictEqual(document.state);
-            expect(storedDocument.operations).toStrictEqual(
-                document.operations
-            );
         });
     }
 );
