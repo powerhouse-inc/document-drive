@@ -184,7 +184,8 @@ export abstract class BaseDocumentDriveServer {
 
 export abstract class BaseListenerManager {
     protected drive: BaseDocumentDriveServer;
-    protected listenerState: ListenerState[];
+    protected listenerState: Map<string, Map<string, ListenerState>> =
+        new Map();
     protected transmitters: Record<
         DocumentDriveState['id'],
         Record<Listener['listenerId'], ITransmitter>
@@ -192,7 +193,7 @@ export abstract class BaseListenerManager {
 
     constructor(
         drive: BaseDocumentDriveServer,
-        listenerState: ListenerState[] = []
+        listenerState: Map<string, Map<string, ListenerState>> = new Map()
     ) {
         this.drive = drive;
         this.listenerState = listenerState;
@@ -200,7 +201,10 @@ export abstract class BaseListenerManager {
 
     abstract init(): Promise<void>;
     abstract addListener(listener: Listener): Promise<ITransmitter>;
-    abstract removeListener(listenerUd: string): Promise<boolean>;
+    abstract removeListener(
+        driveId: string,
+        listenerId: string
+    ): Promise<boolean>;
     abstract getTransmitter(
         driveId: string,
         listenerId: string
@@ -234,14 +238,15 @@ export enum ListenerStatus {
 }
 
 export interface ListenerState {
-    listenerId: string;
     driveId: string;
-    syncId: string;
-    syncRev: number;
     block: boolean;
-    listenerRev: number;
-    listenerStatus: ListenerStatus;
     pendingTimeout: string;
     listener: Listener;
-    syncUnit: SynchronizationUnit;
+    syncUnits: SyncronizationUnitState[];
+    listenerStatus: ListenerStatus;
+}
+
+export interface SyncronizationUnitState extends SynchronizationUnit {
+    listenerRev: number;
+    syncRev: number;
 }

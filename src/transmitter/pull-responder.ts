@@ -32,17 +32,20 @@ export class PullResponderTransmitter implements ITransmitter {
         since?: string
     ): Promise<StrandUpdate[]> {
         // fetch listenerState from listenerManager
-        const entries = this.manager.getCacheEntries(listenerId);
+        const entries = this.manager.getListener(
+            this.listener.driveId,
+            listenerId
+        );
 
         // fetch operations from drive  and prepare strands
         const strands: StrandUpdate[] = [];
 
-        for (const entry of entries) {
+        for (const entry of entries.syncUnits) {
             if (entry.listenerRev >= entry.syncRev) {
                 continue;
             }
 
-            const { documentId, driveId, scope, branch } = entry.syncUnit;
+            const { documentId, driveId, scope, branch } = entry;
             const operations = await this.drive.getOperationData(
                 entry.driveId,
                 entry.syncId,

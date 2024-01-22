@@ -14,6 +14,7 @@ import {
 import { ListenerManager } from '../listener/manager';
 import { DocumentStorage, IDriveStorage } from '../storage';
 import { MemoryStorage } from '../storage/memory';
+import { ITransmitter } from '../transmitter/types';
 import { isDocumentDrive } from '../utils';
 import {
     BaseDocumentDriveServer,
@@ -439,7 +440,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         }
     }
 
-    async addOperationsToListenerCache() {}
-
-    async removeOperationsFromListenerCache() {}
+    getTransmitter(
+        driveId: string,
+        listenerId: string
+    ): Promise<ITransmitter | undefined> {
+        return this.listenerStateManager.getTransmitter(driveId, listenerId);
+    }
 }

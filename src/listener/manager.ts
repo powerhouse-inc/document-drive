@@ -6,6 +6,7 @@ import {
     ListenerFilter,
     ListenerState,
     ListenerStatus,
+    StrandUpdate,
     SynchronizationUnit
 } from '../server/types';
 import { SwitchboardPushTransmitter } from '../transmitter/switchboard-push';
@@ -22,54 +23,62 @@ export class ListenerManager extends BaseListenerManager {
     async addListener(listener: Listener) {
         const drive = listener.driveId;
 
-        //TODO: should sync unit contain documentType?
         const syncUnits = await this.drive.getSynchronizationUnits(drive);
+        const filteredSyncUnits = [];
         for (const syncUnit of syncUnits) {
             if (this._checkFilter(listener.filter, syncUnit)) {
-                this.listenerState.push({
-                    driveId: syncUnit.driveId,
-                    block: listener.block,
-                    listenerId: listener.listenerId,
-                    listenerRev: 0,
-                    listenerStatus: ListenerStatus.CREATED,
-                    syncId: syncUnit.syncId,
-                    syncRev: syncUnit.revision,
-                    pendingTimeout: '0',
-                    listener,
-                    syncUnit
-                });
+                filteredSyncUnits.push(syncUnit);
             }
         }
+
+        if (!this.listenerState.has(drive)) {
+            this.listenerState.set(drive, new Map());
+        }
+
+        const driveMap = this.listenerState.get(drive)!;
+
+        driveMap.set(listener.listenerId, {
+            block: listener.block,
+            driveId: listener.driveId,
+            pendingTimeout: '0',
+            listener,
+            listenerStatus: ListenerStatus.CREATED,
+            syncUnits: filteredSyncUnits.map(e => ({
+                ...e,
+                listenerRev: 0,
+                syncRev: e.revision
+            }))
+        });
+
         let transmitter: ITransmitter | undefined;
 
         switch (listener.callInfo?.transmitterType) {
             case 'SwitchboardPush': {
                 transmitter = new SwitchboardPushTransmitter(
-                    this.drive,
-                    listener
+                    listener,
+                    this.drive
                 );
                 break;
             }
         }
 
-        if (transmitter) {
-            const driveTransmitters = this.transmitters[drive] || {};
-            driveTransmitters[listener.listenerId] = transmitter;
-            this.transmitters[drive] = driveTransmitters;
-            return transmitter;
+        if (!transmitter) {
+            throw new Error('Transmitter not found');
         }
+
+        const driveTransmitters = this.transmitters[drive] || {};
+        driveTransmitters[listener.listenerId] = transmitter;
+        this.transmitters[drive] = driveTransmitters;
+        return transmitter;
     }
 
-    async removeListener(listenerId: string) {
-        let removed = false;
-        this.listenerState = this.listenerState.filter(e => {
-            const remove = e.listenerId === listenerId;
-            if (remove) {
-                removed = true;
-            }
-            return !remove;
-        });
-        return removed;
+    async removeListener(driveId: string, listenerId: string) {
+        const driveMap = this.listenerState.get(driveId);
+        if (!driveMap) {
+            return false;
+        }
+
+        return driveMap.delete(listenerId);
     }
 
     async updateSynchronizationRevision(
@@ -77,17 +86,25 @@ export class ListenerManager extends BaseListenerManager {
         syncId: string,
         syncRev: number
     ) {
-        for (const entry of this.listenerState) {
-            if (entry.driveId !== driveId || entry.syncUnit.syncId !== syncId) {
+        const drive = this.listenerState.get(driveId);
+        if (!drive) {
+            return;
+        }
+        for (const [, listener] of drive) {
+            const syncUnits = listener.syncUnits.filter(
+                e => e.syncId === syncId
+            );
+            if (listener.driveId !== driveId) {
                 continue;
             }
 
-            entry.syncRev = syncRev;
-            entry.syncUnit.lastUpdated = new Date().toISOString();
+            for (const syncUnit of syncUnits) {
+                if (syncUnit.syncId !== syncId) {
+                    continue;
+                }
 
-            if (entry.listenerRev >= entry.syncRev) {
-                entry.listenerStatus = ListenerStatus.SUCCESS;
-                continue;
+                syncUnit.syncRev = syncRev;
+                syncUnit.lastUpdated = new Date().toISOString();
             }
         }
     }
@@ -98,67 +115,93 @@ export class ListenerManager extends BaseListenerManager {
         syncId: string,
         listenerRev: number
     ): Promise<void> {
-        const entry = this.listenerState.find(
-            e =>
-                e.listenerId === listenerId &&
-                e.driveId === driveId &&
-                e.syncUnit.syncId === syncId
-        );
+        const drive = this.listenerState.get(driveId);
+        if (!drive) {
+            return;
+        }
+
+        const listener = drive.get(listenerId);
+        if (!listener) {
+            return;
+        }
+
+        const entry = listener.syncUnits.find(s => s.syncId === syncId);
         if (entry) {
             entry.listenerRev = listenerRev;
+            entry.lastUpdated = new Date().toISOString();
         }
     }
 
     async triggerUpdate() {
-        for (const listener of this.listenerState) {
-            if (listener.listenerRev < listener.syncRev) {
-                const {
-                    driveId,
-                    listenerId,
-                    listenerRev,
-                    syncId,
-                    syncUnit: { documentId, scope, branch }
-                } = listener;
-                const transmitter = await this.getTransmitter(
-                    driveId,
-                    listenerId
-                );
+        for (const [driveId, drive] of this.listenerState) {
+            for (const [id, listener] of drive) {
+                const transmitter = await this.getTransmitter(driveId, id);
                 if (!transmitter) {
                     continue;
                 }
 
-                // TODO retrieve strands from listenerRev to syncRev
-                const operations = await this.drive.getOperationData(
-                    driveId,
-                    syncId,
-                    {
-                        fromRevision: listenerRev
+                const strandUpdates: StrandUpdate[] = [];
+                for (const unit of listener.syncUnits) {
+                    if (unit.listenerRev >= unit.syncRev) {
+                        continue;
                     }
-                );
+
+                    const opData = await this.drive.getOperationData(
+                        driveId,
+                        unit.syncId,
+                        {
+                            fromRevision: unit.listenerRev
+                        }
+                    );
+
+                    strandUpdates.push({
+                        ...unit,
+                        operations: opData,
+                        scope: unit.scope as OperationScope,
+                        branch: unit.branch
+                    });
+                }
+
+                if (strandUpdates.length == 0) {
+                    continue;
+                }
+
+                listener.pendingTimeout = new Date(
+                    new Date().getTime() / 1000 + 300
+                ).toISOString();
+
+                listener.listenerStatus = ListenerStatus.PENDING;
+                listener.pendingTimeout = new Date(
+                    new Date().getTime() / 1000 + 300
+                ).toISOString();
 
                 try {
+                    const listenerRevisions =
+                        await transmitter?.transmit(strandUpdates);
+                    if (!listenerRevisions) {
+                        throw new Error("Couldn't update listener revision");
+                    }
+
+                    listener.pendingTimeout = '0';
                     listener.listenerStatus = ListenerStatus.PENDING;
-                    listener.pendingTimeout = new Date(
-                        new Date().getTime() / 1000 +
-                        300
-                    ).toISOString();
-                    const listenerRevisions = await transmitter?.transmit([
-                        {
-                            driveId,
-                            documentId,
-                            scope: scope as OperationScope,
-                            branch,
-                            operations
-                        }]
-                    );
-                    listener.pendingTimeout = '0';
-                    listener.listenerStatus = ListenerStatus.SUCCESS;
-                    listener.listenerRev = listenerRevision;
+
+                    for (const unit of listener.syncUnits) {
+                        const revision = listenerRevisions.find(
+                            e =>
+                                e.documentId === unit.documentId &&
+                                e.scope === unit.scope &&
+                                e.branch === unit.branch
+                        );
+                        if (!revision) {
+                            continue;
+                        }
+
+                        unit.listenerRev = revision.revision;
+                    }
                 } catch (e) {
-                    listener.pendingTimeout = '0';
                     listener.listenerStatus = ListenerStatus.ERROR;
                 } finally {
-                    listener.listenerStatus = ListenerStatus.
+                    listener.listenerStatus = ListenerStatus.CREATED;
                 }
             }
         }
@@ -190,10 +233,6 @@ export class ListenerManager extends BaseListenerManager {
     }
 
     async init() {
-        if (this.listenerState.length !== 0) {
-            this.listenerState = [];
-        }
-
         const drives = await this.drive.getDrives();
         for (const driveId of drives) {
             const drive = await this.drive.getDrive(driveId);
@@ -223,14 +262,11 @@ export class ListenerManager extends BaseListenerManager {
         }
     }
 
-    async getListener(id: string) {
-        const listener = await this.listenerState.find(
-            e => e.listenerId === id
-        );
+    getListener(driveId: string, listenerId: string): ListenerState {
+        const drive = this.listenerState.get(driveId);
+        if (!drive) throw new Error('Drive not found');
+        const listener = drive.get(listenerId);
+        if (!listener) throw new Error('Listener not found');
         return listener;
-    }
-
-    getCacheEntries(listenerId: string): ListenerState[] {
-        return this.listenerState.filter(e => e.listenerId === listenerId);
     }
 }
