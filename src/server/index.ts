@@ -1,5 +1,6 @@
 import {
     DocumentDriveAction,
+    DocumentDriveDocument,
     FileNode,
     isFileNode,
     utils
@@ -14,6 +15,7 @@ import {
 import { ListenerManager } from '../listener/manager';
 import { DocumentStorage, IDriveStorage } from '../storage';
 import { MemoryStorage } from '../storage/memory';
+import { PullResponderTransmitter } from '../transmitter';
 import { ITransmitter } from '../transmitter/types';
 import { isDocumentDrive } from '../utils';
 import {
@@ -27,10 +29,14 @@ import {
 
 export type * from './types';
 
+const PULL_DRIVE_INTERVAL = 30000;
+
 export class DocumentDriveServer extends BaseDocumentDriveServer {
     private documentModels: DocumentModel[];
     private storage: IDriveStorage;
     private listenerStateManager: ListenerManager;
+
+    private syncDrivesMap: Map<string, NodeJS.Timeout> = new Map();
 
     constructor(
         documentModels: DocumentModel[],
@@ -40,6 +46,50 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         this.listenerStateManager = new ListenerManager(this);
         this.documentModels = documentModels;
         this.storage = storage;
+    }
+
+    private shouldSyncDrive(drive: DocumentDriveDocument) {
+        return (
+            drive.state.global.remoteUrl &&
+            drive.state.local.sharingType !== 'private' &&
+            drive.state.local.availableOffline
+        );
+    }
+
+    private async startSyncRemoteDrive(driveId: string) {
+        const drive = await this.getDrive(driveId);
+        const sync = this.syncDrivesMap.get(driveId);
+        if (sync) {
+            return;
+        }
+
+        const { remoteUrl } = drive.state.global;
+        if (!remoteUrl) {
+            throw new Error('Remote drive URL not found');
+        }
+
+        // TODO get listener Id
+
+        const timeoutId = setInterval(() => {
+            /** TODO pull operations */
+            PullResponderTransmitter.pullStrands(
+                driveId,
+                remoteUrl,
+                listenerId
+                // since ?
+            );
+        }, PULL_DRIVE_INTERVAL);
+
+        this.syncDrivesMap.set(driveId, timeoutId);
+    }
+
+    private async stopSyncRemoteDrive(driveId: string) {
+        const sync = this.syncDrivesMap.get(driveId);
+        if (!sync) {
+            return;
+        }
+        clearInterval(sync);
+        this.syncDrivesMap.delete(driveId);
     }
 
     async initialize() {
@@ -215,9 +265,16 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 label: listener.label ?? ''
             });
         }
+
+        // if it is a remote drive that should be available offline, starts
+        // the sync process to pull changes from remote every 30 seconds
+        if (this.shouldSyncDrive(document)) {
+            this.startSyncRemoteDrive(drive.global.id);
+        }
     }
 
     deleteDrive(id: string) {
+        this.stopSyncRemoteDrive(id);
         return this.storage.deleteDrive(id);
     }
 
@@ -419,6 +476,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     operations as Operation<DocumentDriveAction | BaseAction>[], // TODO check?
                     document
                 );
+
+                if (this.shouldSyncDrive(document)) {
+                    this.startSyncRemoteDrive(document.state.global.id);
+                } else {
+                    this.stopSyncRemoteDrive(document.state.global.id);
+                }
             } else {
                 throw new Error('Invalid Document Drive document');
             }

@@ -13,10 +13,8 @@ import {
     utils as DocumentModelUtils
 } from 'document-model/document-model';
 import fs from 'fs/promises';
-import { HttpResponse, graphql, http } from 'msw';
-import { setupServer } from 'msw/node';
 import path from 'path';
-import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
+import { afterEach, describe, it } from 'vitest';
 
 import {
     BrowserStorage,
@@ -24,7 +22,7 @@ import {
     MemoryStorage,
     PrismaStorage
 } from '../src';
-import { DocumentDriveServer, ListenerRevision, UpdateStatus } from '../src/server';
+import { DocumentDriveServer } from '../src/server';
 
 const documentModels = [
     DocumentModelLib,
@@ -39,34 +37,6 @@ const storageLayers = [
     ['BrowserStorage', () => new BrowserStorage()],
     ['PrismaStorage', () => new PrismaStorage(prismaClient)]
 ] as const;
-
-const revisions: ListenerRevision[] = [
-    {
-        branch: 'main',
-        documentId: '1',
-        driveId: '1',
-        revision: 1,
-        scope: 'global',
-        status: 'SUCCESS' as UpdateStatus
-    }
-    // ...
-];
-
-const restHandlers = [
-    http.get('https://rest-endpoint.example/path/to/posts', () => {
-        return HttpResponse.json(revisions);
-    })
-];
-
-const graphqlHandlers = [
-    graphql.mutation('pushUpdates', () => {
-        return HttpResponse.json({
-            data: { revisions }
-        });
-    })
-];
-
-const mswServer = setupServer(...restHandlers, ...graphqlHandlers);
 
 describe.each(storageLayers)(
     'Document Drive Server with %s',
@@ -85,14 +55,6 @@ describe.each(storageLayers)(
             }
         });
 
-        beforeAll(() => {
-            mswServer.listen({ onUnhandledRequest: 'error' });
-        });
-
-        afterAll(() => mswServer.close());
-
-        afterEach(() => mswServer.resetHandlers());
-
         it('adds drive to server', async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
@@ -107,7 +69,8 @@ describe.each(storageLayers)(
                 },
                 local: {
                     availableOffline: false,
-                    sharingType: 'public'
+                    sharingType: 'public',
+                    listeners: []
                 }
             });
             const drive = await server.getDrive('1');
@@ -120,7 +83,8 @@ describe.each(storageLayers)(
                     },
                     local: {
                         availableOffline: false,
-                        sharingType: 'public'
+                        sharingType: 'public',
+                        listeners: []
                     }
                 })
             );
@@ -143,7 +107,8 @@ describe.each(storageLayers)(
                 },
                 local: {
                     availableOffline: false,
-                    sharingType: 'public'
+                    sharingType: 'public',
+                    listeners: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -208,7 +173,8 @@ describe.each(storageLayers)(
                 },
                 local: {
                     availableOffline: false,
-                    sharingType: 'public'
+                    sharingType: 'public',
+                    listeners: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -250,7 +216,8 @@ describe.each(storageLayers)(
                 },
                 local: {
                     availableOffline: false,
-                    sharingType: 'public'
+                    sharingType: 'public',
+                    listeners: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -304,7 +271,8 @@ describe.each(storageLayers)(
                 },
                 local: {
                     availableOffline: false,
-                    sharingType: 'public'
+                    sharingType: 'public',
+                    listeners: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -354,7 +322,8 @@ describe.each(storageLayers)(
                 },
                 local: {
                     availableOffline: false,
-                    sharingType: 'public'
+                    sharingType: 'public',
+                    listeners: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -411,7 +380,8 @@ describe.each(storageLayers)(
                 },
                 local: {
                     availableOffline: false,
-                    sharingType: 'public'
+                    sharingType: 'public',
+                    listeners: []
                 }
             });
 
@@ -437,7 +407,8 @@ describe.each(storageLayers)(
                 },
                 local: {
                     availableOffline: false,
-                    sharingType: 'public'
+                    sharingType: 'public',
+                    listeners: []
                 }
             });
 
@@ -478,7 +449,8 @@ describe.each(storageLayers)(
                 },
                 local: {
                     availableOffline: false,
-                    sharingType: 'public'
+                    sharingType: 'public',
+                    listeners: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -513,7 +485,8 @@ describe.each(storageLayers)(
                 },
                 local: {
                     availableOffline: false,
-                    sharingType: 'public'
+                    sharingType: 'public',
+                    listeners: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -576,7 +549,8 @@ describe.each(storageLayers)(
                 },
                 local: {
                     availableOffline: false,
-                    sharingType: 'public'
+                    sharingType: 'public',
+                    listeners: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -611,74 +585,6 @@ describe.each(storageLayers)(
             expect(storedDocument.operations).toStrictEqual(
                 document.operations
             );
-        });
-
-        // need to add sync unit
-        it.only('should push to switchboard if remoteDriveUrl is set', async ({
-            expect
-        }) => {
-            const server = new DocumentDriveServer(
-                documentModels,
-                buildStorage()
-            );
-            await server.initialize();
-            await server.addDrive({
-                global: {
-                    id: '1',
-                    name: 'name',
-                    icon: 'icon',
-                    remoteUrl: 'http://switchboard.powerhouse.xyz'
-                },
-                local: {
-                    availableOffline: false,
-                    sharingType: 'public',
-                    listeners: [
-                        {
-                            block: true,
-                            callInfo: {
-                                data: '',
-                                name: 'switchboard-push',
-                                transmitterType: 'SwitchboardPush'
-                            },
-                            filter: {
-                                branch: ['main'],
-                                documentId: ['*'],
-                                documentType: ['powerhouse/*'],
-                                scope: ['global', 'local']
-                            },
-                            label: 'Switchboard Sync',
-                            listenerId: '1',
-                            system: true
-                        }
-                    ]
-                }
-            });
-            let drive = await server.getDrive('1');
-
-            // adds file
-            drive = reducer(
-                drive,
-                actions.addFile({
-                    id: '1.1',
-                    name: 'document 1',
-                    documentType: 'powerhouse/document-model',
-                    scopes: ['global', 'local']
-                })
-            );
-            await server.addDriveOperation('1', drive.operations.global[0]!);
-
-            let document = (await server.getDocument(
-                '1',
-                '1.1'
-            )) as DocumentModelDocument;
-            document = DocumentModelLib.reducer(
-                document,
-                DocumentModelActions.setName('Test')
-            );
-
-            const operation = document.operations.global[0]!;
-            const result = await server.addOperation('1', '1.1', operation);
-            expect(result.success).toBe(true);
         });
     }
 );

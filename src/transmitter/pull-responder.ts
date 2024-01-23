@@ -95,4 +95,13 @@ export class PullResponderTransmitter implements ITransmitter {
 
         return success;
     }
+
+    static pullStrands(
+        driveId: string,
+        remoteUrl: string,
+        listenerId: string,
+        since?: string
+    ) {
+        // TODO fetch strands
+    }
 }
