@@ -27,6 +27,7 @@ import {
     SynchronizationUnit
 } from './types';
 
+export * from './listener';
 export type * from './types';
 
 const PULL_DRIVE_INTERVAL = 30000;
