@@ -95,4 +95,8 @@ export class PullResponderTransmitter implements ITransmitter {
 
         return success;
     }
+
+    async registerListener(listener: Listener) {
+        return this.manager.addListener(listener);
+    }
 }
