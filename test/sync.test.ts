@@ -50,6 +50,11 @@ describe('Document Drive Server with %s', () => {
             return HttpResponse.json({
                 data: { revisions }
             });
+        }),
+        graphql.mutation('registerPullResponderListener', () => {
+            return HttpResponse.json({
+                data: { listenerId: '1' }
+            });
         })
     ];
 
@@ -133,9 +138,10 @@ describe('Document Drive Server with %s', () => {
         expect(result.success).toBe(true);
     });
 
-    it.only('should pull to switchboard if remoteDriveUrl is set', async ({
+    it.only('should pull from switchboard if remoteDriveUrl is set', async ({
         expect
     }) => {
+        // switchboard document drive server
         const server = new DocumentDriveServer(documentModels, storageLayer);
         await server.initialize();
         await server.addDrive({
@@ -143,7 +149,7 @@ describe('Document Drive Server with %s', () => {
                 id: '1',
                 name: 'name',
                 icon: 'icon',
-                remoteUrl: 'http://switchboard.powerhouse.xyz'
+                remoteUrl: ''
             },
             local: {
                 availableOffline: false,
@@ -176,6 +182,7 @@ describe('Document Drive Server with %s', () => {
         const operation = document.operations.global[0]!;
         await server.addOperation('1', '1.1', operation);
 
+        // Connect document drive server
         const connect = new DocumentDriveServer(documentModels, storageLayer);
         await connect.initialize();
         await server.addDrive({
@@ -186,39 +193,11 @@ describe('Document Drive Server with %s', () => {
                 remoteUrl: 'http://switchboard.powerhouse.xyz'
             },
             local: {
-                availableOffline: false,
+                availableOffline: true,
                 sharingType: 'public',
                 listeners: []
             }
         });
-
-        const localDrive = reducer(
-            drive,
-            actions.addListener({
-                listener: {
-                    block: false,
-                    callInfo: {
-                        data: '',
-                        name: 'switchboard-pull',
-                        transmitterType: 'PullResponder'
-                    },
-                    filter: {
-                        branch: ['main'],
-                        documentId: ['*'],
-                        documentType: ['powerhouse/*'],
-                        scope: ['global']
-                    },
-                    label: 'Connect',
-                    listenerId: '1',
-                    system: false
-                }
-            })
-        );
-
-        const result = await server.addDriveOperation(
-            '1',
-            localDrive.operations.local[0]!
-        );
 
         expect(result.success).toBe(true);
         expect(result.document?.state.local.listeners[0]?.listenerId).toBe('1');

@@ -4,7 +4,7 @@ import {
     Listener,
     ListenerRevision,
     StrandUpdate
-} from '..';
+} from '../../types';
 import { ITransmitter } from './types';
 
 export class SwitchboardPushTransmitter implements ITransmitter {

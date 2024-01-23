@@ -1,11 +1,13 @@
+import { ListenerFilter } from 'document-model-libs/document-drive';
 import { OperationScope } from 'document-model/document';
+import request, { gql } from 'graphql-request';
 import {
     BaseDocumentDriveServer,
     Listener,
     ListenerRevision,
     StrandUpdate
-} from '..';
-import { ListenerManager } from '../server/listener/manager';
+} from '../../types';
+import { ListenerManager } from '../manager';
 import { ITransmitter } from './types';
 
 export class PullResponderTransmitter implements ITransmitter {
@@ -96,12 +98,55 @@ export class PullResponderTransmitter implements ITransmitter {
         return success;
     }
 
-    static pullStrands(
+    static async registerPullResponder(
+        driveId: string,
+        remoteUrl: string,
+        filter: ListenerFilter
+    ): Promise<Listener['listenerId']> {
+        // graphql request to switchboard
+        const listenerId = await request<Listener['listenerId']>(
+            `${remoteUrl}/${driveId}/graphql`,
+            gql`
+                mutation registerPullResponderListener(
+                    $filter: ListenerFilter!
+                ) {
+                    registerPullResponderListener(filter: $filter) {
+                        listenerId
+                    }
+                }
+            `,
+            { filter }
+        );
+        return listenerId;
+    }
+
+    static async pullStrands(
         driveId: string,
         remoteUrl: string,
         listenerId: string,
-        since?: string
-    ) {
-        // TODO fetch strands
+        since?: string // TODO add support for since
+    ): Promise<StrandUpdate[]> {
+        const result = await request<StrandUpdate[]>(
+            `${remoteUrl}/${driveId}/graphql`,
+            gql`
+                query strands($listenerId: ID!) {
+                    strands(listenerId: $listenerId) {
+                        driveId
+                        documentId
+                        scope
+                        branch
+                        operations {
+                            revision
+                            skip
+                            name
+                            inputJson
+                            stateHash
+                        }
+                    }
+                }
+            `,
+            { listenerId }
+        );
+        return result;
     }
 }

@@ -2,6 +2,7 @@ import {
     DocumentDriveAction,
     DocumentDriveDocument,
     FileNode,
+    ListenerFilter,
     isFileNode,
     utils
 } from 'document-model-libs/document-drive';
@@ -36,7 +37,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     private documentModels: DocumentModel[];
     private storage: IDriveStorage;
     private listenerStateManager: ListenerManager;
-
     private syncDrivesMap: Map<string, NodeJS.Timeout> = new Map();
 
     constructor(
@@ -57,7 +57,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         );
     }
 
-    private async startSyncRemoteDrive(driveId: string) {
+    private async startSyncRemoteDrive(
+        driveId: string,
+        filter?: ListenerFilter
+    ) {
         const drive = await this.getDrive(driveId);
         const sync = this.syncDrivesMap.get(driveId);
         if (sync) {
@@ -69,16 +72,57 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             throw new Error('Remote drive URL not found');
         }
 
-        // TODO get listener Id
+        const listenerId = await PullResponderTransmitter.registerPullResponder(
+            driveId,
+            remoteUrl,
+            filter ?? {
+                documentId: ['*'],
+                documentType: ['*'],
+                branch: ['*'],
+                scope: ['*']
+            }
+        );
 
-        const timeoutId = setInterval(() => {
+        // TODO save listener on local state
+
+        const timeoutId = setInterval(async () => {
             /** TODO pull operations */
-            PullResponderTransmitter.pullStrands(
+            const strands = await PullResponderTransmitter.pullStrands(
                 driveId,
                 remoteUrl,
                 listenerId
                 // since ?
             );
+
+            for (const strand of strands) {
+                const operations: Operation[] = strand.operations.map(
+                    ({
+                        revision,
+                        operation,
+                        hash,
+                        input,
+                        skip,
+                        committed
+                    }) => ({
+                        index: revision,
+                        type: operation,
+                        hash,
+                        input,
+                        skip,
+                        scope: strand.scope,
+                        branch: strand.branch,
+                        timestamp: committed
+                    })
+                );
+
+                !strand.documentId
+                    ? await this.addDriveOperations(strand.driveId, operations)
+                    : await this.addOperations(
+                          driveId,
+                          strand.documentId,
+                          operations
+                      );
+            }
         }, PULL_DRIVE_INTERVAL);
 
         this.syncDrivesMap.set(driveId, timeoutId);
