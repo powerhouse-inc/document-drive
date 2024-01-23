@@ -467,7 +467,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             );
 
             // update listener cache
-            const lastOperation = operations.pop();
+            const lastOperation = operations[operations.length - 1];
             if (lastOperation) {
                 await this.listenerStateManager.updateSynchronizationRevision(
                     drive,
