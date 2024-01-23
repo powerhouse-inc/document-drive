@@ -9,6 +9,7 @@ import {
     StrandUpdate,
     SynchronizationUnit
 } from '../server/types';
+import { PullResponderTransmitter } from '../transmitter';
 import { SwitchboardPushTransmitter } from '../transmitter/switchboard-push';
 import { ITransmitter } from '../transmitter/types';
 
@@ -59,6 +60,14 @@ export class ListenerManager extends BaseListenerManager {
                     this.drive
                 );
                 break;
+            }
+
+            case 'PullResponder': {
+                transmitter = new PullResponderTransmitter(
+                    listener,
+                    this.drive,
+                    this
+                );
             }
         }
 
