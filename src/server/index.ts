@@ -1,4 +1,5 @@
 import {
+    AddListenerInput,
     DocumentDriveAction,
     DocumentDriveDocument,
     FileNode,
@@ -438,6 +439,29 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             );
             const results = await Promise.all(operationSignals);
             signalResults.push(...results);
+
+            if (operation.type === 'ADD_LISTENER') {
+                const { listener } = operation.input as AddListenerInput;
+                await this.listenerStateManager.addListener({
+                    ...listener,
+                    driveId: drive,
+                    label: listener.label ?? '',
+                    system: listener.system ?? false,
+                    filter: {
+                        branch: listener.filter.branch ?? [],
+                        documentId: listener.filter.documentId ?? [],
+                        documentType: listener.filter.documentType ?? [],
+                        scope: listener.filter.scope ?? []
+                    },
+                    callInfo: {
+                        data: listener.callInfo?.data ?? '',
+                        name: listener.callInfo?.name ?? 'PullResponder',
+                        transmitterType:
+                            listener.callInfo?.transmitterType ??
+                            'PullResponder'
+                    }
+                });
+            }
         }
         return { document: newDocument, signals: signalResults };
     }

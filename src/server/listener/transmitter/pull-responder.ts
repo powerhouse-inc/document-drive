@@ -73,10 +73,7 @@ export class PullResponderTransmitter implements ITransmitter {
         listenerId: string,
         revisions: ListenerRevision[]
     ): Promise<boolean> {
-        const listener = this.manager.getListener(
-            this.listener.driveId,
-            listenerId
-        );
+        const listener = this.manager.getListener(driveId, listenerId);
         let success = true;
         for (const revision of revisions) {
             const syncId = listener.syncUnits.find(
