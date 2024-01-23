@@ -12,12 +12,12 @@ import {
     OperationScope,
     utils as baseUtils
 } from 'document-model/document';
-import { ListenerManager } from '../listener/manager';
 import { DocumentStorage, IDriveStorage } from '../storage';
 import { MemoryStorage } from '../storage/memory';
-import { PullResponderTransmitter } from '../transmitter';
-import { ITransmitter } from '../transmitter/types';
 import { isDocumentDrive } from '../utils';
+import { ListenerManager } from './listener/manager';
+import { PullResponderTransmitter } from './listener/transmitter';
+import { ITransmitter } from './listener/transmitter/types';
 import {
     BaseDocumentDriveServer,
     CreateDocumentInput,

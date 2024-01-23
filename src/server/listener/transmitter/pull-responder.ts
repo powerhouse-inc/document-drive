@@ -5,7 +5,7 @@ import {
     ListenerRevision,
     StrandUpdate
 } from '..';
-import { ListenerManager } from '../listener/manager';
+import { ListenerManager } from '../server/listener/manager';
 import { ITransmitter } from './types';
 
 export class PullResponderTransmitter implements ITransmitter {

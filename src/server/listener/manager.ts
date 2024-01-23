@@ -8,10 +8,10 @@ import {
     ListenerStatus,
     StrandUpdate,
     SynchronizationUnit
-} from '../server/types';
-import { PullResponderTransmitter } from '../transmitter';
-import { SwitchboardPushTransmitter } from '../transmitter/switchboard-push';
-import { ITransmitter } from '../transmitter/types';
+} from '../types';
+import { PullResponderTransmitter } from './transmitter';
+import { SwitchboardPushTransmitter } from './transmitter/switchboard-push';
+import { ITransmitter } from './transmitter/types';
 
 export class ListenerManager extends BaseListenerManager {
     async getTransmitter(
