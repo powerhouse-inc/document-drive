@@ -101,7 +101,9 @@ export class PullResponderTransmitter implements ITransmitter {
         filter: ListenerFilter
     ): Promise<Listener['listenerId']> {
         // graphql request to switchboard
-        const listenerId = await request<Listener['listenerId']>(
+        const { listenerId } = await request<{
+            listenerId: Listener['listenerId'];
+        }>(
             `${remoteUrl}/${driveId}/graphql`,
             gql`
                 mutation registerPullResponderListener(
@@ -123,7 +125,7 @@ export class PullResponderTransmitter implements ITransmitter {
         listenerId: string,
         since?: string // TODO add support for since
     ): Promise<StrandUpdate[]> {
-        const result = await request<StrandUpdate[]>(
+        const { strands } = await request<{ strands: StrandUpdate[] }>(
             `${remoteUrl}/${driveId}/graphql`,
             gql`
                 query strands($listenerId: ID!) {
@@ -144,6 +146,6 @@ export class PullResponderTransmitter implements ITransmitter {
             `,
             { listenerId }
         );
-        return result;
+        return strands;
     }
 }

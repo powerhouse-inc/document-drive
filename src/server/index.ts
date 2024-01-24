@@ -4,6 +4,7 @@ import {
     DocumentDriveDocument,
     FileNode,
     ListenerFilter,
+    RemoveListenerInput,
     isFileNode,
     utils
 } from 'document-model-libs/document-drive';
@@ -32,7 +33,7 @@ import {
 export * from './listener';
 export type * from './types';
 
-const PULL_DRIVE_INTERVAL = 30000;
+export const PULL_DRIVE_INTERVAL = 30000;
 
 export class DocumentDriveServer extends BaseDocumentDriveServer {
     private documentModels: DocumentModel[];
@@ -116,13 +117,20 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     })
                 );
 
-                !strand.documentId
-                    ? await this.addDriveOperations(strand.driveId, operations)
-                    : await this.addOperations(
-                          driveId,
-                          strand.documentId,
-                          operations
-                      );
+                try {
+                    !strand.documentId
+                        ? await this.addDriveOperations(
+                              strand.driveId,
+                              operations
+                          )
+                        : await this.addOperations(
+                              driveId,
+                              strand.documentId,
+                              operations
+                          );
+                } catch (e) {
+                    console.error('Sync error', e);
+                }
             }
         }, PULL_DRIVE_INTERVAL);
 
@@ -315,7 +323,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         // if it is a remote drive that should be available offline, starts
         // the sync process to pull changes from remote every 30 seconds
         if (this.shouldSyncDrive(document)) {
-            this.startSyncRemoteDrive(drive.global.id);
+            await this.startSyncRemoteDrive(drive.global.id);
         }
     }
 
@@ -461,6 +469,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                             'PullResponder'
                     }
                 });
+            } else if (operation.type === 'REMOVE_LISTENER') {
+                const { listenerId } = operation.input as RemoveListenerInput;
+                await this.listenerStateManager.removeListener(
+                    drive,
+                    listenerId
+                );
             }
         }
         return { document: newDocument, signals: signalResults };
