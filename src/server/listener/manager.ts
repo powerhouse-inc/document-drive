@@ -209,23 +209,23 @@ export class ListenerManager extends BaseListenerManager {
 
                 const strandUpdates: StrandUpdate[] = [];
                 for (const unit of listener.syncUnits) {
-                    if (unit.listenerRev >= unit.syncRev) {
+                    const { syncRev, syncId, listenerRev, ...strand } = unit;
+                    if (listenerRev >= syncRev) {
                         continue;
                     }
 
                     const opData = await this.drive.getOperationData(
                         driveId,
-                        unit.syncId,
+                        syncId,
                         {
-                            fromRevision: unit.listenerRev
+                            fromRevision: listenerRev
                         }
                     );
 
                     strandUpdates.push({
-                        ...unit,
+                        ...strand,
                         operations: opData,
-                        scope: unit.scope as OperationScope,
-                        branch: unit.branch
+                        scope: unit.scope as OperationScope
                     });
                 }
 

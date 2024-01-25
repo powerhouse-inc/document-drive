@@ -201,7 +201,6 @@ describe('Document Drive Server with %s', () => {
                             documentType: 'powerhouse/document-model',
                             driveId: '1',
                             lastUpdated: '2024-01-01T00:00:00.000Z',
-                            listenerRev: -1,
                             operations: [
                                 {
                                     committed: '2024-01-01T00:00:00.000Z',
@@ -213,9 +212,7 @@ describe('Document Drive Server with %s', () => {
                                 }
                             ],
                             revision: 0,
-                            scope: 'global',
-                            syncId: '1',
-                            syncRev: 0
+                            scope: 'global'
                         },
                         {
                             branch: 'main',
@@ -223,12 +220,9 @@ describe('Document Drive Server with %s', () => {
                             documentType: 'powerhouse/document-model',
                             driveId: '1',
                             lastUpdated: '2024-01-01T00:00:00.000Z',
-                            listenerRev: -1,
                             operations: [],
                             revision: 0,
-                            scope: 'local',
-                            syncId: '2',
-                            syncRev: 0
+                            scope: 'local'
                         }
                     ]
                 }
