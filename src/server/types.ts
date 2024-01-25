@@ -99,10 +99,10 @@ export enum UpdateStatus {
 }
 
 export type OperationUpdate = {
-    committed: string;
-    revision: number;
+    timestamp: string;
+    index: number;
     skip: number;
-    operation: string;
+    type: string;
     input: object;
     hash: string;
 };

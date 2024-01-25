@@ -98,15 +98,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
             for (const strand of strands) {
                 const operations: Operation[] = strand.operations.map(
-                    ({
-                        revision,
-                        operation,
-                        hash,
-                        input,
-                        skip,
-                        committed
-                    }) => ({
-                        index: revision,
+                    ({ index, operation, hash, input, skip, committed }) => ({
+                        index,
                         type: operation,
                         hash,
                         input,
@@ -249,12 +242,16 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             fromRevision?: number | undefined;
         }
     ): Promise<OperationUpdate[]> {
-        const { documentId, scope } = await this.getSynchronizationUnit(
-            driveId,
-            syncId
-        );
+        const { documentId, scope } =
+            syncId === '0'
+                ? { documentId: '', scope: 'global' }
+                : await this.getSynchronizationUnit(driveId, syncId);
 
-        const document = await this.getDocument(driveId, documentId); // TODO replace with getDocumentOperations
+        const document =
+            syncId === '0'
+                ? await this.getDrive(driveId)
+                : await this.getDocument(driveId, documentId); // TODO replace with getDocumentOperations
+
         const operations = document.operations[scope as OperationScope] ?? []; // TODO filter by branch also
         const filteredOperations = operations.filter(
             operation =>
@@ -267,9 +264,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
         return filteredOperations.map(operation => ({
             hash: operation.hash,
-            revision: operation.index,
-            committed: operation.timestamp,
-            operation: operation.type,
+            index: operation.index,
+            timestamp: operation.timestamp,
+            type: operation.type,
             input: operation.input as object,
             skip: operation.skip
         }));
@@ -597,6 +594,19 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     operations as Operation<DocumentDriveAction | BaseAction>[], // TODO check?
                     document
                 );
+
+                const lastOperation = document.operations['global']
+                    .slice()
+                    .pop();
+                // update listener cache
+                if (lastOperation) {
+                    await this.listenerStateManager.updateSynchronizationRevision(
+                        drive,
+                        '0',
+                        lastOperation.index,
+                        lastOperation.timestamp
+                    );
+                }
 
                 if (this.shouldSyncDrive(document)) {
                     this.startSyncRemoteDrive(document.state.global.id);

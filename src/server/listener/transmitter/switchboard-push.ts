@@ -20,27 +20,42 @@ export class SwitchboardPushTransmitter implements ITransmitter {
 
     async transmit(strands: StrandUpdate[]): Promise<ListenerRevision[]> {
         // Send Graphql mutation to switchboard
-        const { revisions } = await request<{ revisions: ListenerRevision[] }>(
-            this.targetURL,
-            gql`
-                mutation pushUpdates($strands: [InputStrandUpdate!]) {
-                    pushUpdates(strands: $strands) {
-                        driveId
-                        documentId
-                        scope
-                        branch
-                        status
-                        revision
+        try {
+            const { pushUpdates } = await request<{
+                pushUpdates: ListenerRevision[];
+            }>(
+                this.targetURL,
+                gql`
+                    mutation pushUpdates($strands: [InputStrandUpdate!]) {
+                        pushUpdates(strands: $strands) {
+                            driveId
+                            documentId
+                            scope
+                            branch
+                            status
+                            revision
+                        }
                     }
+                `,
+                {
+                    strands: strands.map(strand => ({
+                        ...strand,
+                        operations: strand.operations.map(op => ({
+                            ...op,
+                            input: JSON.stringify(op.input)
+                        }))
+                    }))
                 }
-            `,
-            { strands }
-        );
+            );
 
-        if (!revisions) {
-            throw new Error("Couldn't update listener revision");
+            if (!pushUpdates) {
+                throw new Error("Couldn't update listener revision");
+            }
+
+            return pushUpdates;
+        } catch (e) {
+            console.error(e);
         }
-
-        return revisions;
+        return [];
     }
 }
