@@ -7,24 +7,21 @@ import type {
 } from 'document-model-libs/document-drive';
 import type {
     BaseAction,
+    CreateChildDocumentInput,
     Document,
     Operation,
     OperationScope,
     Signal,
     State
 } from 'document-model/document';
-import { ITransmitter } from '../transmitter/types';
+import { ITransmitter } from './listener/transmitter/types';
 
 export type DriveInput = State<
     Omit<DocumentDriveState, '__typename' | 'nodes'>,
     DocumentDriveLocalState
 >;
 
-export type CreateDocumentInput = {
-    id: string;
-    documentType: string;
-    document?: Document;
-};
+export type CreateDocumentInput = CreateChildDocumentInput;
 
 export type SignalResult = {
     signal: Signal;
@@ -154,7 +151,7 @@ export abstract class BaseDocumentDriveServer {
     protected abstract createDocument(
         drive: string,
         document: CreateDocumentInput
-    ): Promise<void>;
+    ): Promise<Document>;
     protected abstract deleteDocument(drive: string, id: string): Promise<void>;
 
     protected abstract addOperation(
@@ -212,7 +209,8 @@ export abstract class BaseListenerManager {
     abstract updateSynchronizationRevision(
         driveId: string,
         syncId: string,
-        syncRev: number
+        syncRev: number,
+        lastUpdated: string
     ): Promise<void>;
 
     abstract updateListenerRevision(

@@ -93,12 +93,15 @@ export class ListenerManager extends BaseListenerManager {
     async updateSynchronizationRevision(
         driveId: string,
         syncId: string,
-        syncRev: number
+        syncRev: number,
+        lastUpdated: string
     ) {
         const drive = this.listenerState.get(driveId);
         if (!drive) {
             return;
         }
+
+        let newRevision = false;
         for (const [, listener] of drive) {
             const syncUnits = listener.syncUnits.filter(
                 e => e.syncId === syncId
@@ -113,7 +116,62 @@ export class ListenerManager extends BaseListenerManager {
                 }
 
                 syncUnit.syncRev = syncRev;
-                syncUnit.lastUpdated = new Date().toISOString();
+                syncUnit.lastUpdated = lastUpdated;
+                newRevision = true;
+            }
+        }
+
+        if (newRevision) {
+            return this.triggerUpdate();
+        }
+    }
+
+    async addSyncUnits(syncUnits: SynchronizationUnit[]) {
+        for (const [driveId, drive] of this.listenerState) {
+            for (const [id, listenerState] of drive) {
+                const transmitter = await this.getTransmitter(driveId, id);
+                if (!transmitter) {
+                    continue;
+                }
+                const filteredSyncUnits = [];
+                const { listener } = listenerState;
+                for (const syncUnit of syncUnits) {
+                    if (!this._checkFilter(listener.filter, syncUnit)) {
+                        continue;
+                    }
+                    const existingSyncUnit = listenerState.syncUnits.find(
+                        unit => unit.syncId === syncUnit.syncId
+                    );
+                    if (existingSyncUnit) {
+                        existingSyncUnit.syncRev = syncUnit.revision;
+                        existingSyncUnit.lastUpdated = syncUnit.lastUpdated;
+                    } else {
+                        filteredSyncUnits.push(syncUnit);
+                    }
+                }
+
+                // TODO is this possible?
+                if (!this.listenerState.has(driveId)) {
+                    this.listenerState.set(driveId, new Map());
+                }
+
+                const driveMap = this.listenerState.get(driveId)!;
+
+                // TODO reuse existing state
+                driveMap.set(listener.listenerId, {
+                    block: listener.block,
+                    driveId: listener.driveId,
+                    pendingTimeout: '0',
+                    listener,
+                    listenerStatus: ListenerStatus.CREATED,
+                    syncUnits: listenerState.syncUnits.concat(
+                        filteredSyncUnits.map(e => ({
+                            ...e,
+                            listenerRev: -1,
+                            syncRev: e.revision
+                        }))
+                    )
+                });
             }
         }
     }
@@ -184,6 +242,7 @@ export class ListenerManager extends BaseListenerManager {
                     new Date().getTime() / 1000 + 300
                 ).toISOString();
 
+                // TODO update listeners in parallel, blocking for listeners with block=true
                 try {
                     const listenerRevisions =
                         await transmitter?.transmit(strandUpdates);
@@ -207,10 +266,10 @@ export class ListenerManager extends BaseListenerManager {
 
                         unit.listenerRev = revision.revision;
                     }
+                    listener.listenerStatus = ListenerStatus.SUCCESS;
                 } catch (e) {
                     listener.listenerStatus = ListenerStatus.ERROR;
-                } finally {
-                    listener.listenerStatus = ListenerStatus.CREATED;
+                    throw e;
                 }
             }
         }

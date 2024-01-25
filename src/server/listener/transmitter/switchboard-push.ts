@@ -20,7 +20,7 @@ export class SwitchboardPushTransmitter implements ITransmitter {
 
     async transmit(strands: StrandUpdate[]): Promise<ListenerRevision[]> {
         // Send Graphql mutation to switchboard
-        const listenerRevisions = await request<ListenerRevision[]>(
+        const { revisions } = await request<{ revisions: ListenerRevision[] }>(
             this.targetURL,
             gql`
                 mutation pushUpdates($strands: [InputStrandUpdate!]) {
@@ -37,10 +37,10 @@ export class SwitchboardPushTransmitter implements ITransmitter {
             { strands }
         );
 
-        if (!listenerRevisions) {
+        if (!revisions) {
             throw new Error("Couldn't update listener revision");
         }
 
-        return listenerRevisions;
+        return revisions;
     }
 }

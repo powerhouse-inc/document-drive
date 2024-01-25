@@ -176,7 +176,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     ? node.synchronizationUnits.filter(
                           unit =>
                               (!scope?.length || scope.includes(unit.scope)) &&
-                              (!branch?.length || branch.includes(unit.scope))
+                              (!branch?.length || branch.includes(unit.branch))
                       )
                     : node.synchronizationUnits;
             if (!nodeUnits.length) {
@@ -381,11 +381,28 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         input: CreateDocumentInput
     ) {
         const documentModel = this._getDocumentModel(input.documentType);
-
         // TODO validate input.document is of documentType
         const document = input.document ?? documentModel.utils.createDocument();
 
         await this.storage.createDocument(driveId, input.id, document);
+
+        await this.listenerStateManager.addSyncUnits(
+            input.synchronizationUnits.map(({ syncId, scope, branch }) => {
+                const lastOperation = document.operations[scope].slice().pop();
+                return {
+                    syncId,
+                    scope,
+                    branch,
+                    driveId,
+                    documentId: input.id,
+                    documentType: document.documentType,
+                    lastUpdated:
+                        lastOperation?.timestamp ?? document.lastModified,
+                    revision: lastOperation?.index ?? 0
+                };
+            })
+        );
+        return document;
     }
 
     async deleteDocument(driveId: string, id: string) {
@@ -435,7 +452,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                                 this.createDocument(drive, {
                                     id: signal.input.newId,
                                     documentType: documentToCopy.documentType,
-                                    document: documentToCopy
+                                    document: documentToCopy,
+                                    synchronizationUnits:
+                                        signal.input.synchronizationUnits // TODO add this to COPY_CHILD_DOCUMENT signal input on document-model
                                 })
                             );
                             break;
@@ -506,13 +525,30 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 document
             );
 
+            // gets all the different scopes and branches combinations from the operations
+            const { scopes, branches } = operations.reduce(
+                (acc, operation) => {
+                    if (!acc.scopes.includes(operation.scope)) {
+                        acc.scopes.push(operation.scope);
+                    }
+                    return acc;
+                },
+                { scopes: [] as string[], branches: ['main'] }
+            );
+
+            const syncUnits = await this.getSynchronizationUnits(
+                drive,
+                [id],
+                scopes,
+                branches
+            );
             // update listener cache
-            const lastOperation = operations[operations.length - 1];
-            if (lastOperation) {
+            for (const syncUnit of syncUnits) {
                 await this.listenerStateManager.updateSynchronizationRevision(
                     drive,
-                    id,
-                    lastOperation.index
+                    syncUnit.syncId,
+                    syncUnit.revision,
+                    syncUnit.lastUpdated
                 );
             }
 

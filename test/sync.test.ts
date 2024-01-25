@@ -63,9 +63,9 @@ describe('Document Drive Server with %s', () => {
     const revisions: ListenerRevision[] = [
         {
             branch: 'main',
-            documentId: '1',
+            documentId: '1.1',
             driveId: '1',
-            revision: 1,
+            revision: 0,
             scope: 'global',
             status: 'SUCCESS' as UpdateStatus
         }
@@ -98,15 +98,15 @@ describe('Document Drive Server with %s', () => {
 
     const mswServer = setupServer(...restHandlers, ...graphqlHandlers);
 
-    beforeEach(() => {
-        vi.useFakeTimers();
-    });
-
-    afterEach(async () => {
+    beforeEach(async () => {
         await prismaClient.$executeRawUnsafe('DELETE FROM "Attachment";');
         await prismaClient.$executeRawUnsafe('DELETE FROM "Operation";');
         await prismaClient.$executeRawUnsafe('DELETE FROM "Document";');
         mswServer.resetHandlers();
+        vi.useFakeTimers().setSystemTime(new Date('2024-01-01'));
+    });
+
+    afterEach(async () => {
         vi.useRealTimers();
     });
 
@@ -135,14 +135,14 @@ describe('Document Drive Server with %s', () => {
                     {
                         block: true,
                         callInfo: {
-                            data: '',
+                            data: 'http://switchboard.powerhouse.xyz/1/graphql',
                             name: 'switchboard-push',
                             transmitterType: 'SwitchboardPush'
                         },
                         filter: {
                             branch: ['main'],
                             documentId: ['*'],
-                            documentType: ['powerhouse/*'],
+                            documentType: ['*'],
                             scope: ['global', 'local']
                         },
                         label: 'Switchboard Sync',
@@ -175,15 +175,89 @@ describe('Document Drive Server with %s', () => {
             DocumentModelActions.setName('Test')
         );
 
+        const pushRequest = new Promise<Request>(resolve => {
+            mswServer.events.on('request:start', ({ request }) => {
+                resolve(request);
+            });
+        });
+
         const operation = document.operations.global[0]!;
         const result = await server.addOperation('1', '1.1', operation);
         expect(result.success).toBe(true);
+
+        const request = await pushRequest;
+        expect(request.url).toStrictEqual(
+            'http://switchboard.powerhouse.xyz/1/graphql'
+        );
+        const body = await request.json();
+        expect(body).toEqual(
+            expect.objectContaining({
+                operationName: 'pushUpdates',
+                variables: {
+                    strands: [
+                        {
+                            branch: 'main',
+                            documentId: '1.1',
+                            documentType: 'powerhouse/document-model',
+                            driveId: '1',
+                            lastUpdated: '2024-01-01T00:00:00.000Z',
+                            listenerRev: -1,
+                            operations: [
+                                {
+                                    committed: '2024-01-01T00:00:00.000Z',
+                                    hash: 'Fd20qtObIUDJwJHse6VqFK8ObWY=',
+                                    input: 'Test',
+                                    operation: 'SET_NAME',
+                                    revision: 0,
+                                    skip: 0
+                                }
+                            ],
+                            revision: 0,
+                            scope: 'global',
+                            syncId: '1',
+                            syncRev: 0
+                        },
+                        {
+                            branch: 'main',
+                            documentId: '1.1',
+                            documentType: 'powerhouse/document-model',
+                            driveId: '1',
+                            lastUpdated: '2024-01-01T00:00:00.000Z',
+                            listenerRev: -1,
+                            operations: [],
+                            revision: 0,
+                            scope: 'local',
+                            syncId: '2',
+                            syncRev: 0
+                        }
+                    ]
+                }
+            })
+        );
+        expect(body.query.replace(/\s+/g, ' ').trim()).toStrictEqual(
+            `mutation pushUpdates($strands: [InputStrandUpdate!]) {
+            pushUpdates(strands: $strands) {
+                driveId
+                documentId
+                scope
+                branch
+                status
+                revision
+            }
+        }
+    `
+                .replace(/\s+/g, ' ')
+                .trim()
+        );
     });
 
     it.only('should pull from switchboard if remoteDriveUrl is set', async ({
         expect
     }) => {
         // Connect document drive server
+        mswServer.events.on('request:start', ({ request, requestId }) => {
+            console.log('Outgoing request:', request.method, request.url);
+        });
         const server = new DocumentDriveServer(documentModels, storageLayer);
         await server.initialize();
         await server.addDrive({
