@@ -5,10 +5,19 @@ import {
     BaseDocumentDriveServer,
     Listener,
     ListenerRevision,
+    OperationUpdate,
     StrandUpdate
 } from '../../types';
 import { ListenerManager } from '../manager';
 import { ITransmitter } from './types';
+
+type OperationUpdateGraphQL = Omit<OperationUpdate, 'input'> & {
+    input: string;
+};
+
+type StrandUpdateGraphQL = Omit<StrandUpdate, 'operations'> & {
+    operations: OperationUpdateGraphQL[];
+};
 
 export class PullResponderTransmitter implements ITransmitter {
     private drive: BaseDocumentDriveServer;
@@ -127,7 +136,7 @@ export class PullResponderTransmitter implements ITransmitter {
         listenerId: string,
         since?: string // TODO add support for since
     ): Promise<StrandUpdate[]> {
-        const { strands } = await request<{ strands: StrandUpdate[] }>(
+        const { strands } = await request<{ strands: StrandUpdateGraphQL[] }>(
             `${remoteUrl}/${driveId}/graphql`,
             gql`
                 query strands($listenerId: ID!) {
@@ -137,17 +146,23 @@ export class PullResponderTransmitter implements ITransmitter {
                         scope
                         branch
                         operations {
-                            revision
+                            timestamp
                             skip
-                            name
-                            inputJson
-                            stateHash
+                            type
+                            input
+                            hash
                         }
                     }
                 }
             `,
             { listenerId }
         );
-        return strands;
+        return strands.map(s => ({
+            ...s,
+            operations: s.operations.map(o => ({
+                ...o,
+                input: JSON.parse(o.input)
+            }))
+        }));
     }
 }
