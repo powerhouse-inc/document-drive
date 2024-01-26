@@ -151,6 +151,7 @@ export class PullResponderTransmitter implements ITransmitter {
                             type
                             input
                             hash
+                            index
                         }
                     }
                 }

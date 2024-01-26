@@ -516,6 +516,11 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     async addOperations(drive: string, id: string, operations: Operation[]) {
         // retrieves document from storage
         const documentStorage = await this.storage.getDocument(drive, id);
+
+        // TODO check if existing operations hash is the same
+        operations = operations.filter(
+            op => op.index >= documentStorage.operations[op.scope].length
+        );
         try {
             // retrieves the document's document model and
             // applies the operations using its reducer
@@ -590,6 +595,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     ) {
         // retrieves document from storage
         const documentStorage = await this.storage.getDrive(drive);
+
+        // TODO check if existing operations hash is the same
+        operations = operations.filter(
+            op => op.index >= documentStorage.operations[op.scope].length
+        );
+
         try {
             // retrieves the document's document model and
             // applies the operations using its reducer
