@@ -145,6 +145,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
     async initialize() {
         await this.listenerStateManager.init();
+        const drives = await this.getDrives();
+        for (const id of drives) {
+            const drive = await this.getDrive(id);
+            if (this.shouldSyncDrive(drive)) {
+                this.startSyncRemoteDrive(id);
+            }
+        }
     }
 
     public async getSynchronizationUnits(
