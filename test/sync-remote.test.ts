@@ -151,8 +151,9 @@ describe('Document Drive Server with %s', () => {
             skip: 0,
             type: 'ADD_FILE',
             scope: 'global',
-            hash: 'ReImxJnUT6Gt2yRRq0q3PzPY2s4=',
-            timestamp: '2024-01-24T18:57:33.899Z',
+            branch: 'main',
+            hash: 'c0cCAhio27QJGRtJpg5V3nq2JXw=',
+            timestamp: '2024-01-01T00:00:00.000Z',
             input: {
                 id: '1.1',
                 name: 'document 1',
@@ -160,5 +161,11 @@ describe('Document Drive Server with %s', () => {
                 scopes: ['global', 'local']
             }
         });
+
+        const document = (await server.getDocument(
+            '1',
+            '1.1'
+        )) as DocumentModelDocument;
+        expect(document.state.global.author.name).toBe('test');
     });
 });

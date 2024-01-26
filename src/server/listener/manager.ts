@@ -68,7 +68,7 @@ export class ListenerManager extends BaseListenerManager {
             ].concat(
                 filteredSyncUnits.map(e => ({
                     ...e,
-                    listenerRev: 0,
+                    listenerRev: -1,
                     syncRev: e.revision
                 }))
             )
