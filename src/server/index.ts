@@ -33,7 +33,7 @@ import {
 export * from './listener';
 export type * from './types';
 
-export const PULL_DRIVE_INTERVAL = 30000;
+export const PULL_DRIVE_INTERVAL = 5000;
 
 export class DocumentDriveServer extends BaseDocumentDriveServer {
     private documentModels: DocumentModel[];
