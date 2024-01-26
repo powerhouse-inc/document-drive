@@ -279,12 +279,6 @@ export class ListenerManager extends BaseListenerManager {
                 try {
                     const listenerRevisions =
                         await transmitter?.transmit(strandUpdates);
-                    if (
-                        !listenerRevisions ||
-                        listenerRevisions.length < strandUpdates.length
-                    ) {
-                        throw new Error("Couldn't update listener revision");
-                    }
 
                     listener.pendingTimeout = '0';
                     listener.listenerStatus = ListenerStatus.PENDING;
