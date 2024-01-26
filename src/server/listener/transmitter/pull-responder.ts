@@ -101,13 +101,15 @@ export class PullResponderTransmitter implements ITransmitter {
         filter: ListenerFilter
     ): Promise<Listener['listenerId']> {
         // graphql request to switchboard
-        const { listenerId } = await request<{
-            listenerId: Listener['listenerId'];
+        const { registerPullResponderListener } = await request<{
+            registerPullResponderListener: {
+                listenerId: Listener['listenerId'];
+            };
         }>(
             `${remoteUrl}/${driveId}/graphql`,
             gql`
                 mutation registerPullResponderListener(
-                    $filter: ListenerFilter!
+                    $filter: InputListenerFilter!
                 ) {
                     registerPullResponderListener(filter: $filter) {
                         listenerId
@@ -116,7 +118,7 @@ export class PullResponderTransmitter implements ITransmitter {
             `,
             { filter }
         );
-        return listenerId;
+        return registerPullResponderListener.listenerId;
     }
 
     static async pullStrands(

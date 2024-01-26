@@ -89,41 +89,45 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
         const timeoutId = setInterval(async () => {
             /** TODO pull operations */
-            const strands = await PullResponderTransmitter.pullStrands(
-                driveId,
-                remoteUrl,
-                listenerId
-                // since ?
-            );
-
-            for (const strand of strands) {
-                const operations: Operation[] = strand.operations.map(
-                    ({ index, operation, hash, input, skip, committed }) => ({
-                        index,
-                        type: operation,
-                        hash,
-                        input,
-                        skip,
-                        scope: strand.scope,
-                        branch: strand.branch,
-                        timestamp: committed
-                    })
+            try {
+                const strands = await PullResponderTransmitter.pullStrands(
+                    driveId,
+                    remoteUrl,
+                    listenerId
+                    // since ?
                 );
 
-                try {
-                    !strand.documentId
-                        ? await this.addDriveOperations(
-                              strand.driveId,
-                              operations
-                          )
-                        : await this.addOperations(
-                              driveId,
-                              strand.documentId,
-                              operations
-                          );
-                } catch (e) {
-                    console.error('Sync error', e);
+                for (const strand of strands) {
+                    const operations: Operation[] = strand.operations.map(
+                        ({ index, type, hash, input, skip, timestamp }) => ({
+                            index,
+                            type,
+                            hash,
+                            input,
+                            skip,
+                            timestamp,
+                            scope: strand.scope,
+                            branch: strand.branch
+                        })
+                    );
+
+                    try {
+                        !strand.documentId
+                            ? await this.addDriveOperations(
+                                  strand.driveId,
+                                  operations
+                              )
+                            : await this.addOperations(
+                                  driveId,
+                                  strand.documentId,
+                                  operations
+                              );
+                    } catch (e) {
+                        console.error('Sync error', e);
+                    }
                 }
+            } catch (error) {
+                console.error(error);
             }
         }, PULL_DRIVE_INTERVAL);
 

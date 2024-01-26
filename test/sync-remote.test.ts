@@ -9,7 +9,7 @@ import {
 } from 'document-model/document-model';
 import { afterEach, beforeEach, describe, it, vi } from 'vitest';
 
-import { PrismaStorage } from '../src';
+import { MemoryStorage } from '../src';
 import { DocumentDriveServer } from '../src/server';
 
 describe('Document Drive Server with %s', () => {
@@ -19,7 +19,7 @@ describe('Document Drive Server with %s', () => {
     ] as DocumentModel[];
 
     const prismaClient = new PrismaClient();
-    const storageLayer = new PrismaStorage(prismaClient);
+    const storageLayer = new MemoryStorage();
 
     beforeEach(async () => {
         await prismaClient.$executeRawUnsafe('DELETE FROM "Attachment";');
@@ -96,84 +96,16 @@ describe('Document Drive Server with %s', () => {
             DocumentModelActions.setAuthorName({ authorName: 'test' })
         );
 
-        // const pushRequest = new Promise<Request>(resolve => {
-        //     mswServer.events.on('request:start', ({ request }) => {
-        //         resolve(request);
-        //     });
-        // });
-
         const operation = document.operations.global[0]!;
         const result = await server.addOperation('1', '1.1', operation);
         expect(result.error).toBeUndefined();
         expect(result.success).toBe(true);
-
-        //     const request = await pushRequest;
-        //     expect(request.url).toStrictEqual(
-        //         'http://switchboard.powerhouse.xyz/1/graphql'
-        //     );
-        //     const body = await request.json();
-        //     expect(body).toEqual(
-        //         expect.objectContaining({
-        //             operationName: 'pushUpdates',
-        //             variables: {
-        //                 strands: [
-        //                     {
-        //                         branch: 'main',
-        //                         documentId: '1.1',
-        //                         documentType: 'powerhouse/document-model',
-        //                         driveId: '1',
-        //                         lastUpdated: '2024-01-01T00:00:00.000Z',
-        //                         operations: [
-        //                             {
-        //                                 committed: '2024-01-01T00:00:00.000Z',
-        //                                 hash: 'Fd20qtObIUDJwJHse6VqFK8ObWY=',
-        //                                 input: 'Test',
-        //                                 operation: 'SET_NAME',
-        //                                 revision: 0,
-        //                                 skip: 0
-        //                             }
-        //                         ],
-        //                         revision: 0,
-        //                         scope: 'global'
-        //                     },
-        //                     {
-        //                         branch: 'main',
-        //                         documentId: '1.1',
-        //                         documentType: 'powerhouse/document-model',
-        //                         driveId: '1',
-        //                         lastUpdated: '2024-01-01T00:00:00.000Z',
-        //                         operations: [],
-        //                         revision: 0,
-        //                         scope: 'local'
-        //                     }
-        //                 ]
-        //             }
-        //         })
-        //     );
-        //     expect(body.query.replace(/\s+/g, ' ').trim()).toStrictEqual(
-        //         `mutation pushUpdates($strands: [InputStrandUpdate!]) {
-        //         pushUpdates(strands: $strands) {
-        //             driveId
-        //             documentId
-        //             scope
-        //             branch
-        //             status
-        //             revision
-        //         }
-        //     }
-        // `
-        //             .replace(/\s+/g, ' ')
-        //             .trim()
-        //     );
     });
 
     it.only('should pull from switchboard if remoteDriveUrl is set', async ({
         expect
     }) => {
         // Connect document drive server
-        mswServer.events.on('request:start', ({ request, requestId }) => {
-            console.log('Outgoing request:', request.method, request.url);
-        });
         const server = new DocumentDriveServer(documentModels, storageLayer);
         await server.initialize();
         await server.addDrive({
@@ -181,7 +113,7 @@ describe('Document Drive Server with %s', () => {
                 id: '1',
                 name: 'name',
                 icon: 'icon',
-                remoteUrl: 'http://switchboard.powerhouse.xyz'
+                remoteUrl: 'http://localhost:3001/graphql/'
             },
             local: {
                 availableOffline: true,
@@ -189,6 +121,16 @@ describe('Document Drive Server with %s', () => {
                 listeners: []
             }
         });
+
+        await vi.waitFor(
+            async () => {
+                await server.getDrive('1');
+            },
+            {
+                timeout: 500,
+                interval: 20
+            }
+        );
 
         vi.advanceTimersToNextTimer();
 
