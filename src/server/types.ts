@@ -125,6 +125,26 @@ export abstract class BaseDocumentDriveServer {
     abstract getDocuments(drive: string): Promise<string[]>;
     abstract getDocument(drive: string, id: string): Promise<Document>;
 
+    abstract addOperation(
+        drive: string,
+        id: string,
+        operation: Operation
+    ): Promise<IOperationResult<Document>>;
+    abstract addOperations(
+        drive: string,
+        id: string,
+        operations: Operation[]
+    ): Promise<IOperationResult<Document>>;
+
+    abstract addDriveOperation(
+        drive: string,
+        operation: Operation<DocumentDriveAction | BaseAction>
+    ): Promise<IOperationResult<DocumentDriveDocument>>;
+    abstract addDriveOperations(
+        drive: string,
+        operations: Operation<DocumentDriveAction | BaseAction>[]
+    ): Promise<IOperationResult<DocumentDriveDocument>>;
+
     /** Synchronization methods */
     abstract getSynchronizationUnits(
         driveId: string,
@@ -153,25 +173,6 @@ export abstract class BaseDocumentDriveServer {
         document: CreateDocumentInput
     ): Promise<Document>;
     protected abstract deleteDocument(drive: string, id: string): Promise<void>;
-
-    protected abstract addOperation(
-        drive: string,
-        id: string,
-        operation: Operation
-    ): Promise<IOperationResult<Document>>;
-    protected abstract addOperations(
-        drive: string,
-        id: string,
-        operations: Operation[]
-    ): Promise<IOperationResult<Document>>;
-    protected abstract addDriveOperation(
-        drive: string,
-        operation: Operation<DocumentDriveAction | BaseAction>
-    ): Promise<IOperationResult<DocumentDriveDocument>>;
-    protected abstract addDriveOperations(
-        drive: string,
-        operations: Operation<DocumentDriveAction | BaseAction>[]
-    ): Promise<IOperationResult<DocumentDriveDocument>>;
 
     abstract getTransmitter(
         driveId: string,
