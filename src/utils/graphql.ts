@@ -8,35 +8,30 @@ export type DriveInfo = {
 };
 
 export async function requestPublicDrive(url: string): Promise<DriveInfo> {
+    let drive: DriveInfo;
     try {
-        const { drives } = await request<{ drives: string[] }>(
+        const result = await request<{ drive: DriveInfo }>(
             url,
             gql`
                 {
-                    drives
+                    drive {
+                        id
+                        name
+                        icon
+                        remoteUrl
+                    }
                 }
             `
         );
-        const driveId = drives.pop();
-        if (!driveId) {
-            throw new Error('Drive not found');
-        }
-
-        const { drive } = await request<{ drive: DriveInfo }>(
-            url,
-            gql`
-            drive(id: $driveId) {
-                id
-                name
-                icon
-                remoteUrl
-            }
-        `,
-            { driveId }
-        );
-        return drive;
+        drive = result.drive;
     } catch (e) {
         console.error(e);
         throw new Error("Couldn't find drive info");
     }
+
+    if (!drive) {
+        throw new Error('Drive not found');
+    }
+
+    return drive;
 }
