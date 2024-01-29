@@ -1,4 +1,4 @@
-import { gql, request } from 'graphql-request';
+import { gql, requestGraphql } from '../../../utils/graphql';
 import {
     BaseDocumentDriveServer,
     Listener,
@@ -21,7 +21,7 @@ export class SwitchboardPushTransmitter implements ITransmitter {
     async transmit(strands: StrandUpdate[]): Promise<ListenerRevision[]> {
         // Send Graphql mutation to switchboard
         try {
-            const { pushUpdates } = await request<{
+            const { pushUpdates } = await requestGraphql<{
                 pushUpdates: ListenerRevision[];
             }>(
                 this.targetURL,

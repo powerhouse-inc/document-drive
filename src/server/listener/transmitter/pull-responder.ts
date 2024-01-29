@@ -1,6 +1,6 @@
 import { ListenerFilter } from 'document-model-libs/document-drive';
 import { OperationScope } from 'document-model/document';
-import request, { gql } from 'graphql-request';
+import { gql, requestGraphql } from '../../../utils/graphql';
 import {
     BaseDocumentDriveServer,
     Listener,
@@ -110,7 +110,7 @@ export class PullResponderTransmitter implements ITransmitter {
         filter: ListenerFilter
     ): Promise<Listener['listenerId']> {
         // graphql request to switchboard
-        const { registerPullResponderListener } = await request<{
+        const { registerPullResponderListener } = await requestGraphql<{
             registerPullResponderListener: {
                 listenerId: Listener['listenerId'];
             };
@@ -136,7 +136,9 @@ export class PullResponderTransmitter implements ITransmitter {
         listenerId: string,
         since?: string // TODO add support for since
     ): Promise<StrandUpdate[]> {
-        const { strands } = await request<{ strands: StrandUpdateGraphQL[] }>(
+        const { strands } = await requestGraphql<{
+            strands: StrandUpdateGraphQL[];
+        }>(
             `${remoteUrl}/${driveId}/graphql`,
             gql`
                 query strands($listenerId: ID!) {
