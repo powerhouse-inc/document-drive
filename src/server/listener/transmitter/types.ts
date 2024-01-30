@@ -1,4 +1,4 @@
-import { ListenerRevision, StrandUpdate } from '..';
+import { ListenerRevision, StrandUpdate } from '../..';
 
 export interface ITransmitter {
     transmit(strands: StrandUpdate[]): Promise<ListenerRevision[]>;

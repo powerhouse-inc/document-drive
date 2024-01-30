@@ -9,8 +9,10 @@
         ".": "./src/index.ts",
         "./server": "./src/server/index.ts",
         "./storage": "./src/storage/index.ts",
-        "./storage/filesystem": "./src/storage/filesystem.ts",
         "./storage/browser": "./src/storage/browser.ts",
+        "./storage/filesystem": "./src/storage/filesystem.ts",
+        "./storage/memory": "./src/storage/memory.ts",
+        "./storage/prisma": "./src/storage/prisma.ts",
         "./utils": "./src/utils/index.ts",
         "./utils/graphql": "./src/utils/graphql.ts"
     },

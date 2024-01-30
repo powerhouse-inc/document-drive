@@ -15,14 +15,11 @@ import {
 import fs from 'fs/promises';
 import path from 'path';
 import { afterEach, describe, it } from 'vitest';
-
-import {
-    BrowserStorage,
-    FilesystemStorage,
-    MemoryStorage,
-    PrismaStorage
-} from '../src';
 import { DocumentDriveServer } from '../src/server';
+import { BrowserStorage } from '../src/storage/browser';
+import { FilesystemStorage } from '../src/storage/filesystem';
+import { MemoryStorage } from '../src/storage/memory';
+import { PrismaStorage } from '../src/storage/prisma';
 
 const documentModels = [
     DocumentModelLib,

@@ -15,19 +15,19 @@ import {
     OperationScope,
     utils as baseUtils
 } from 'document-model/document';
-import { DocumentStorage, IDriveStorage } from '../storage';
 import { MemoryStorage } from '../storage/memory';
+import type { DocumentStorage, IDriveStorage } from '../storage/types';
 import { isDocumentDrive } from '../utils';
 import { ListenerManager } from './listener/manager';
 import { PullResponderTransmitter } from './listener/transmitter';
-import { ITransmitter } from './listener/transmitter/types';
+import type { ITransmitter } from './listener/transmitter/types';
 import {
     BaseDocumentDriveServer,
-    CreateDocumentInput,
-    DriveInput,
-    OperationUpdate,
-    SignalResult,
-    SynchronizationUnit
+    type CreateDocumentInput,
+    type DriveInput,
+    type OperationUpdate,
+    type SignalResult,
+    type SynchronizationUnit
 } from './types';
 
 export * from './listener';

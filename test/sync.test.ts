@@ -19,13 +19,13 @@ import {
     vi
 } from 'vitest';
 
-import { PrismaStorage } from '../src';
 import {
     DocumentDriveServer,
     ListenerRevision,
     StrandUpdate,
     UpdateStatus
 } from '../src/server';
+import { PrismaStorage } from '../src/storage/prisma';
 
 describe('Document Drive Server with %s', () => {
     const documentModels = [

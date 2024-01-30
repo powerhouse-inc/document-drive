@@ -8,9 +8,8 @@ import {
     module as DocumentModelLib
 } from 'document-model/document-model';
 import { afterEach, beforeEach, describe, it, vi } from 'vitest';
-
-import { MemoryStorage } from '../src';
-import { DocumentDriveServer } from '../src/server';
+import { DocumentDriveServer, PullResponderTransmitter } from '../src/server';
+import { MemoryStorage } from '../src/storage/memory';
 
 describe('Document Drive Server with %s', () => {
     const documentModels = [
@@ -30,6 +29,41 @@ describe('Document Drive Server with %s', () => {
 
     afterEach(async () => {
         vi.useRealTimers();
+    });
+
+    it.only('should add pull listeners', async ({ expect }) => {
+        const server = new DocumentDriveServer(documentModels, storageLayer);
+        await server.initialize();
+        await server.addDrive({
+            global: {
+                id: '1',
+                name: 'name',
+                icon: 'icon',
+                remoteUrl: null
+            },
+            local: {
+                availableOffline: false,
+                sharingType: 'public',
+                listeners: []
+            }
+        });
+        let drive = await server.getDrive("1");
+        drive = reducer(drive, actions.addListener({listener: {
+
+        }})) 
+        await PullResponderTransmitter.registerPullResponder(
+            '1',
+            remoteUrl,
+            filter ?? {
+                documentId: ['*'],
+                documentType: ['*'],
+                branch: ['*'],
+                scope: ['*']
+            }
+        );
+
+
+        const listenerId = await server.addDriveOperation("1"
     });
 
     it.only('should push to switchboard if remoteDriveUrl is set', async ({
