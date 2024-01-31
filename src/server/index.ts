@@ -23,6 +23,8 @@ import { PullResponderTransmitter } from './listener/transmitter';
 import type { ITransmitter } from './listener/transmitter/types';
 import {
     BaseDocumentDriveServer,
+    ListenerRevision,
+    UpdateStatus,
     type CreateDocumentInput,
     type DriveInput,
     type OperationUpdate,
@@ -97,6 +99,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     // since ?
                 );
 
+                const listenerRevisions: ListenerRevision[] = [];
+
                 for (const strand of strands) {
                     const operations: Operation[] = strand.operations.map(
                         ({ index, type, hash, input, skip, timestamp }) => ({
@@ -111,6 +115,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                         })
                     );
 
+                    let error: Error | undefined = undefined;
+
                     try {
                         !strand.documentId
                             ? await this.addDriveOperations(
@@ -123,9 +129,27 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                                   operations
                               );
                     } catch (e) {
+                        error = e as Error;
                         console.error('Sync error', e);
                     }
+
+                    listenerRevisions.push({
+                        branch: strand.branch,
+                        documentId: strand.documentId ?? '',
+                        driveId: strand.driveId,
+                        revision: operations.pop()?.index ?? -1,
+                        scope: strand.scope as OperationScope,
+                        status: (error ? 'ERROR' : 'SUCCESS') as UpdateStatus
+                    });
                 }
+
+                const ackRequest = PullResponderTransmitter.acknowledgeStrands(
+                    driveId,
+                    remoteUrl,
+                    listenerId,
+                    listenerRevisions
+                );
+                ackRequest.then(success => console.log('ack', success));
             } catch (error) {
                 console.error(error);
             }

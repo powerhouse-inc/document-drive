@@ -11,11 +11,11 @@ import {
 import { ListenerManager } from '../manager';
 import { ITransmitter } from './types';
 
-type OperationUpdateGraphQL = Omit<OperationUpdate, 'input'> & {
+export type OperationUpdateGraphQL = Omit<OperationUpdate, 'input'> & {
     input: string;
 };
 
-type StrandUpdateGraphQL = Omit<StrandUpdate, 'operations'> & {
+export type StrandUpdateGraphQL = Omit<StrandUpdate, 'operations'> & {
     operations: OperationUpdateGraphQL[];
 };
 
@@ -77,7 +77,7 @@ export class PullResponderTransmitter implements ITransmitter {
         return strands;
     }
 
-    async acknowledgeStrands(
+    async processAcknowledge(
         driveId: string,
         listenerId: string,
         revisions: ListenerRevision[]
@@ -115,7 +115,7 @@ export class PullResponderTransmitter implements ITransmitter {
                 listenerId: Listener['listenerId'];
             };
         }>(
-            `${remoteUrl}/${driveId}/graphql`,
+            `${remoteUrl}/${driveId}`,
             gql`
                 mutation registerPullResponderListener(
                     $filter: InputListenerFilter!
@@ -167,5 +167,26 @@ export class PullResponderTransmitter implements ITransmitter {
                 input: JSON.parse(o.input)
             }))
         }));
+    }
+
+    static async acknowledgeStrands(
+        driveId: string,
+        remoteUrl: string,
+        listenerId: string,
+        revisions: ListenerRevision[]
+    ): Promise<boolean> {
+        const result = await requestGraphql<boolean>(
+            `${remoteUrl}/${driveId}`,
+            gql`
+                mutation acknowledge(
+                    $listenerId: String!
+                    $revisions: [ListenerRevisionInput]
+                ) {
+                    acknowledge(listenerId: $listenerId, revisions: $revisions)
+                }
+            `,
+            { listenerId, revisions }
+        );
+        return result;
     }
 }

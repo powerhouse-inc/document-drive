@@ -253,6 +253,10 @@ export class ListenerManager extends BaseListenerManager {
                         }
                     );
 
+                    if (!opData.length) {
+                        continue;
+                    }
+
                     strandUpdates.push({
                         driveId,
                         documentId,
