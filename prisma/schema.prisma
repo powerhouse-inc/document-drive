@@ -20,7 +20,6 @@ model Document {
   operations   Operation[]
   initialState Json // json object with the scope as keys of the root object
   documentType String
-
   syncronizationUnits SyncronizationUnit[]
 
   @@id([id, driveId])

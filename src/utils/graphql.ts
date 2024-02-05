@@ -5,8 +5,8 @@ export { gql } from 'graphql-request';
 export type DriveInfo = {
     id: string;
     name: string;
+    slug: string;
     icon?: string;
-    remoteUrl?: string;
 };
 
 // replaces fetch so it can be used in Node and Browser envs
@@ -22,12 +22,12 @@ export async function requestPublicDrive(url: string): Promise<DriveInfo> {
         const result = await requestGraphql<{ drive: DriveInfo }>(
             url,
             gql`
-                {
+                query getDrive {
                     drive {
                         id
                         name
                         icon
-                        remoteUrl
+                        slug
                     }
                 }
             `

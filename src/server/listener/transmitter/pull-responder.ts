@@ -1,15 +1,18 @@
-import { ListenerFilter } from 'document-model-libs/document-drive';
-import { OperationScope } from 'document-model/document';
+import { ListenerFilter, Trigger, z } from 'document-model-libs/document-drive';
+import { Operation, OperationScope } from 'document-model/document';
+import { PULL_DRIVE_INTERVAL } from '../..';
 import { gql, requestGraphql } from '../../../utils/graphql';
 import {
     BaseDocumentDriveServer,
+    IOperationResult,
     Listener,
     ListenerRevision,
     OperationUpdate,
-    StrandUpdate
+    StrandUpdate,
+    UpdateStatus
 } from '../../types';
 import { ListenerManager } from '../manager';
-import { ITransmitter } from './types';
+import { ITransmitter, PullResponderTrigger } from './types';
 
 export type OperationUpdateGraphQL = Omit<OperationUpdate, 'input'> & {
     input: string;
@@ -106,7 +109,7 @@ export class PullResponderTransmitter implements ITransmitter {
 
     static async registerPullResponder(
         driveId: string,
-        remoteUrl: string,
+        url: string,
         filter: ListenerFilter
     ): Promise<Listener['listenerId']> {
         // graphql request to switchboard
@@ -115,7 +118,7 @@ export class PullResponderTransmitter implements ITransmitter {
                 listenerId: Listener['listenerId'];
             };
         }>(
-            `${remoteUrl}/${driveId}`,
+            url,
             gql`
                 mutation registerPullResponderListener(
                     $filter: InputListenerFilter!
@@ -132,14 +135,14 @@ export class PullResponderTransmitter implements ITransmitter {
 
     static async pullStrands(
         driveId: string,
-        remoteUrl: string,
+        url: string,
         listenerId: string,
         since?: string // TODO add support for since
     ): Promise<StrandUpdate[]> {
         const { strands } = await requestGraphql<{
             strands: StrandUpdateGraphQL[];
         }>(
-            `${remoteUrl}/${driveId}/graphql`,
+            url,
             gql`
                 query strands($listenerId: ID!) {
                     strands(listenerId: $listenerId) {
@@ -171,12 +174,12 @@ export class PullResponderTransmitter implements ITransmitter {
 
     static async acknowledgeStrands(
         driveId: string,
-        remoteUrl: string,
+        url: string,
         listenerId: string,
         revisions: ListenerRevision[]
     ): Promise<boolean> {
         const result = await requestGraphql<boolean>(
-            `${remoteUrl}/${driveId}`,
+            url,
             gql`
                 mutation acknowledge(
                     $listenerId: String!
@@ -188,5 +191,94 @@ export class PullResponderTransmitter implements ITransmitter {
             { listenerId, revisions }
         );
         return result;
+    }
+
+    static async setupPull(
+        driveId: string,
+        trigger: PullResponderTrigger,
+        onStrandUpdate: (strand: StrandUpdate) => Promise<IOperationResult>,
+        onError: (error: Error) => void,
+        onAcknowledge?: (success: boolean) => void
+    ): Promise<NodeJS.Timeout> {
+        const { url, listenerId, interval } = trigger.data;
+        let loopInterval = PULL_DRIVE_INTERVAL;
+        if (interval) {
+            try {
+                const intervalNumber = parseInt(interval);
+                if (intervalNumber) {
+                    loopInterval = intervalNumber;
+                }
+            } catch {
+                // ignore invalid interval
+            }
+        }
+
+        return setInterval(async () => {
+            try {
+                const strands = await PullResponderTransmitter.pullStrands(
+                    driveId,
+                    url,
+                    listenerId
+                    // since ?
+                );
+
+                const listenerRevisions: ListenerRevision[] = [];
+
+                for (const strand of strands) {
+                    const operations: Operation[] = strand.operations.map(
+                        ({ index, type, hash, input, skip, timestamp }) => ({
+                            index,
+                            type,
+                            hash,
+                            input,
+                            skip,
+                            timestamp,
+                            scope: strand.scope,
+                            branch: strand.branch
+                        })
+                    );
+
+                    let error: Error | undefined = undefined;
+
+                    try {
+                        const result = await onStrandUpdate(strand);
+                        if (result.error) {
+                            throw result.error;
+                        }
+                    } catch (e) {
+                        error = e as Error;
+                        console.error('Sync error', e);
+                    }
+
+                    listenerRevisions.push({
+                        branch: strand.branch,
+                        documentId: strand.documentId ?? '',
+                        driveId: strand.driveId,
+                        revision: operations.pop()?.index ?? -1,
+                        scope: strand.scope as OperationScope,
+                        status: (error ? 'ERROR' : 'SUCCESS') as UpdateStatus
+                    });
+                }
+
+                const ackRequest = PullResponderTransmitter.acknowledgeStrands(
+                    driveId,
+                    url,
+                    listenerId,
+                    listenerRevisions
+                );
+                ackRequest.then(onAcknowledge);
+            } catch (error) {
+                onError(error as Error);
+            }
+        }, loopInterval);
+    }
+
+    static isPullResponderTrigger(
+        trigger: Trigger
+    ): trigger is PullResponderTrigger {
+        return (
+            trigger.type === 'PullResponder' &&
+            z.PullResponderTriggerDataSchema().safeParse(trigger.data).success
+        );
     }
 }

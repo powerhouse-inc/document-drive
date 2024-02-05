@@ -3,7 +3,8 @@ import type {
     DocumentDriveDocument,
     DocumentDriveLocalState,
     DocumentDriveState,
-    ListenerCallInfo
+    ListenerCallInfo,
+    ListenerFilter
 } from 'document-model-libs/document-drive';
 import type {
     BaseAction,
@@ -17,9 +18,15 @@ import type {
 import { ITransmitter } from './listener/transmitter/types';
 
 export type DriveInput = State<
-    Omit<DocumentDriveState, '__typename' | 'nodes'>,
+    Omit<DocumentDriveState, '__typename' | 'id' | 'nodes'> & { id?: string },
     DocumentDriveLocalState
 >;
+
+export type RemoteDriveOptions = DocumentDriveLocalState & {
+    // TODO make local state optional
+    pullFilter?: ListenerFilter;
+    pullInterval?: number;
+};
 
 export type CreateDocumentInput = CreateChildDocumentInput;
 
@@ -75,13 +82,6 @@ export enum TransmitterType {
     RESTWebhook
 }
 
-export type ListenerFilter = {
-    documentType?: string[];
-    documentId?: string[];
-    scope?: string[];
-    branch?: string[];
-};
-
 export type ListenerRevision = {
     driveId: string;
     documentId: string;
@@ -119,6 +119,10 @@ export abstract class BaseDocumentDriveServer {
     /** Public methods **/
     abstract getDrives(): Promise<string[]>;
     abstract addDrive(drive: DriveInput): Promise<void>;
+    abstract addRemoteDrive(
+        url: string,
+        options: RemoteDriveOptions
+    ): Promise<void>;
     abstract deleteDrive(id: string): Promise<void>;
     abstract getDrive(id: string): Promise<DocumentDriveDocument>;
 

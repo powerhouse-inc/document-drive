@@ -2,9 +2,10 @@ import {
     AddListenerInput,
     DocumentDriveAction,
     DocumentDriveDocument,
+    DocumentDriveState,
     FileNode,
-    ListenerFilter,
     RemoveListenerInput,
+    Trigger,
     isFileNode,
     utils
 } from 'document-model-libs/document-drive';
@@ -17,14 +18,15 @@ import {
 } from 'document-model/document';
 import { MemoryStorage } from '../storage/memory';
 import type { DocumentStorage, IDriveStorage } from '../storage/types';
-import { isDocumentDrive } from '../utils';
+import { generateUUID, isDocumentDrive } from '../utils';
+import { requestPublicDrive } from '../utils/graphql';
 import { ListenerManager } from './listener/manager';
 import { PullResponderTransmitter } from './listener/transmitter';
 import type { ITransmitter } from './listener/transmitter/types';
 import {
     BaseDocumentDriveServer,
-    ListenerRevision,
-    UpdateStatus,
+    RemoteDriveOptions,
+    StrandUpdate,
     type CreateDocumentInput,
     type DriveInput,
     type OperationUpdate,
@@ -41,7 +43,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     private documentModels: DocumentModel[];
     private storage: IDriveStorage;
     private listenerStateManager: ListenerManager;
-    private syncDrivesMap: Map<string, NodeJS.Timeout> = new Map();
+    private triggerMap: Map<
+        DocumentDriveState['id'],
+        Map<Trigger['id'], NodeJS.Timeout>
+    > = new Map();
 
     constructor(
         documentModels: DocumentModel[],
@@ -53,118 +58,70 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         this.storage = storage;
     }
 
-    private shouldSyncDrive(drive: DocumentDriveDocument) {
+    private async saveStrand(strand: StrandUpdate) {
+        const operations: Operation[] = strand.operations.map(
+            ({ index, type, hash, input, skip, timestamp }) => ({
+                index,
+                type,
+                hash,
+                input,
+                skip,
+                timestamp,
+                scope: strand.scope,
+                branch: strand.branch
+            })
+        );
+
+        return !strand.documentId
+            ? await this.addDriveOperations(
+                  strand.driveId,
+                  operations as Operation<DocumentDriveAction | BaseAction>[]
+              )
+            : await this.addOperations(
+                  strand.driveId,
+                  strand.documentId,
+                  operations
+              );
+    }
+
+    private shouldSyncRemoteDrive(drive: DocumentDriveDocument) {
         return (
-            drive.state.global.remoteUrl &&
-            drive.state.local.sharingType !== 'private' &&
-            drive.state.local.availableOffline
+            drive.state.local.availableOffline &&
+            drive.state.local.triggers.length > 0
         );
     }
 
-    private async startSyncRemoteDrive(
-        driveId: string,
-        filter?: ListenerFilter
-    ) {
+    private async startSyncRemoteDrive(driveId: string) {
         const drive = await this.getDrive(driveId);
-        const sync = this.syncDrivesMap.get(driveId);
-        if (sync) {
-            return;
-        }
+        let driveTriggers = this.triggerMap.get(driveId);
 
-        const { remoteUrl } = drive.state.global;
-        if (!remoteUrl) {
-            throw new Error('Remote drive URL not found');
-        }
-
-        const listenerId = await PullResponderTransmitter.registerPullResponder(
-            driveId,
-            remoteUrl,
-            filter ?? {
-                documentId: ['*'],
-                documentType: ['*'],
-                branch: ['*'],
-                scope: ['*']
+        for (const trigger of drive.state.local.triggers) {
+            if (driveTriggers && driveTriggers.get(trigger.id)) {
+                continue;
             }
-        );
 
-        // TODO save listener on local state
-
-        const timeoutId = setInterval(async () => {
-            /** TODO pull operations */
-            try {
-                const strands = await PullResponderTransmitter.pullStrands(
-                    driveId,
-                    remoteUrl,
-                    listenerId
-                    // since ?
-                );
-
-                const listenerRevisions: ListenerRevision[] = [];
-
-                for (const strand of strands) {
-                    const operations: Operation[] = strand.operations.map(
-                        ({ index, type, hash, input, skip, timestamp }) => ({
-                            index,
-                            type,
-                            hash,
-                            input,
-                            skip,
-                            timestamp,
-                            scope: strand.scope,
-                            branch: strand.branch
-                        })
-                    );
-
-                    let error: Error | undefined = undefined;
-
-                    try {
-                        !strand.documentId
-                            ? await this.addDriveOperations(
-                                  strand.driveId,
-                                  operations
-                              )
-                            : await this.addOperations(
-                                  driveId,
-                                  strand.documentId,
-                                  operations
-                              );
-                    } catch (e) {
-                        error = e as Error;
-                        console.error('Sync error', e);
-                    }
-
-                    listenerRevisions.push({
-                        branch: strand.branch,
-                        documentId: strand.documentId ?? '',
-                        driveId: strand.driveId,
-                        revision: operations.pop()?.index ?? -1,
-                        scope: strand.scope as OperationScope,
-                        status: (error ? 'ERROR' : 'SUCCESS') as UpdateStatus
-                    });
-                }
-
-                const ackRequest = PullResponderTransmitter.acknowledgeStrands(
-                    driveId,
-                    remoteUrl,
-                    listenerId,
-                    listenerRevisions
-                );
-                ackRequest.then(success => console.log('ack', success));
-            } catch (error) {
-                console.error(error);
+            if (!driveTriggers) {
+                driveTriggers = new Map();
             }
-        }, PULL_DRIVE_INTERVAL);
 
-        this.syncDrivesMap.set(driveId, timeoutId);
+            if (PullResponderTransmitter.isPullResponderTrigger(trigger)) {
+                const intervalId = await PullResponderTransmitter.setupPull(
+                    driveId,
+                    trigger,
+                    this.saveStrand.bind(this),
+                    error => console.error(error),
+                    acknowledgeSuccess => console.log('ack', acknowledgeSuccess)
+                );
+                driveTriggers.set(trigger.id, intervalId);
+                this.triggerMap.set(trigger.id, driveTriggers);
+            }
+        }
     }
 
     private async stopSyncRemoteDrive(driveId: string) {
-        const sync = this.syncDrivesMap.get(driveId);
-        if (!sync) {
-            return;
-        }
-        clearInterval(sync);
-        this.syncDrivesMap.delete(driveId);
+        const triggers = this.triggerMap.get(driveId);
+        triggers?.forEach(clearInterval);
+        return this.triggerMap.delete(driveId);
     }
 
     async initialize() {
@@ -172,7 +129,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const drives = await this.getDrives();
         for (const id of drives) {
             const drive = await this.getDrive(id);
-            if (this.shouldSyncDrive(drive)) {
+            if (this.shouldSyncRemoteDrive(drive)) {
                 this.startSyncRemoteDrive(id);
             }
         }
@@ -318,7 +275,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     }
 
     async addDrive(drive: DriveInput) {
-        const id = drive.global.id;
+        const id = drive.global.id ?? generateUUID();
         if (!id) {
             throw new Error('Invalid Drive Id');
         }
@@ -356,9 +313,56 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
         // if it is a remote drive that should be available offline, starts
         // the sync process to pull changes from remote every 30 seconds
-        if (this.shouldSyncDrive(document)) {
-            await this.startSyncRemoteDrive(drive.global.id);
+        if (this.shouldSyncRemoteDrive(document)) {
+            await this.startSyncRemoteDrive(id);
         }
+    }
+
+    async addRemoteDrive(url: string, options: RemoteDriveOptions) {
+        const { id, name, slug, icon } = await requestPublicDrive(url);
+        const {
+            pullFilter,
+            pullInterval,
+            availableOffline,
+            sharingType,
+            listeners,
+            triggers
+        } = options;
+        const listenerId = await PullResponderTransmitter.registerPullResponder(
+            id,
+            url,
+            pullFilter ?? {
+                documentId: ['*'],
+                documentType: ['*'],
+                branch: ['*'],
+                scope: ['*']
+            }
+        );
+
+        const pullTrigger: Trigger = {
+            id: generateUUID(),
+            type: 'PullResponder',
+            data: {
+                url,
+                listenerId,
+                interval: pullInterval?.toString() ?? ''
+            }
+        };
+
+        return await this.addDrive({
+            global: {
+                id: id,
+                name,
+                slug,
+                icon: icon ?? null
+            },
+            local: {
+                triggers: [...triggers, pullTrigger],
+                listeners: listeners,
+                availableOffline,
+                sharingType
+            }
+        });
     }
 
     deleteDrive(id: string) {
@@ -486,7 +490,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                                     documentType: documentToCopy.documentType,
                                     document: documentToCopy,
                                     synchronizationUnits:
-                                        signal.input.synchronizationUnits // TODO add this to COPY_CHILD_DOCUMENT signal input on document-model
+                                        signal.input.synchronizationUnits
                                 })
                             );
                             break;
@@ -501,33 +505,36 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             const results = await Promise.all(operationSignals);
             signalResults.push(...results);
 
-            if (operation.type === 'ADD_LISTENER') {
-                const { listener } = operation.input as AddListenerInput;
-                await this.listenerStateManager.addListener({
-                    ...listener,
-                    driveId: drive,
-                    label: listener.label ?? '',
-                    system: listener.system ?? false,
-                    filter: {
-                        branch: listener.filter.branch ?? [],
-                        documentId: listener.filter.documentId ?? [],
-                        documentType: listener.filter.documentType ?? [],
-                        scope: listener.filter.scope ?? []
-                    },
-                    callInfo: {
-                        data: listener.callInfo?.data ?? '',
-                        name: listener.callInfo?.name ?? 'PullResponder',
-                        transmitterType:
-                            listener.callInfo?.transmitterType ??
-                            'PullResponder'
-                    }
-                });
-            } else if (operation.type === 'REMOVE_LISTENER') {
-                const { listenerId } = operation.input as RemoveListenerInput;
-                await this.listenerStateManager.removeListener(
-                    drive,
-                    listenerId
-                );
+            if (isDocumentDrive(document)) {
+                if (operation.type === 'ADD_LISTENER') {
+                    const { listener } = operation.input as AddListenerInput;
+                    await this.listenerStateManager.addListener({
+                        ...listener,
+                        driveId: drive,
+                        label: listener.label ?? '',
+                        system: listener.system ?? false,
+                        filter: {
+                            branch: listener.filter.branch ?? [],
+                            documentId: listener.filter.documentId ?? [],
+                            documentType: listener.filter.documentType ?? [],
+                            scope: listener.filter.scope ?? []
+                        },
+                        callInfo: {
+                            data: listener.callInfo?.data ?? '',
+                            name: listener.callInfo?.name ?? 'PullResponder',
+                            transmitterType:
+                                listener.callInfo?.transmitterType ??
+                                'PullResponder'
+                        }
+                    });
+                } else if (operation.type === 'REMOVE_LISTENER') {
+                    const { listenerId } =
+                        operation.input as RemoveListenerInput;
+                    await this.listenerStateManager.removeListener(
+                        drive,
+                        listenerId
+                    );
+                }
             }
         }
         return { document: newDocument, signals: signalResults };
@@ -654,7 +661,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     );
                 }
 
-                if (this.shouldSyncDrive(document)) {
+                if (this.shouldSyncRemoteDrive(document)) {
                     this.startSyncRemoteDrive(document.state.global.id);
                 } else {
                     this.stopSyncRemoteDrive(document.state.global.id);

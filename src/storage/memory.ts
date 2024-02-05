@@ -30,6 +30,7 @@ export class MemoryStorage implements IDriveStorage {
         if (!document) {
             throw new Error(`Document with id ${id} not found`);
         }
+
         return document;
     }
 

@@ -95,6 +95,13 @@ describe('Document Drive Server with %s', () => {
     ];
 
     const graphqlHandlers = [
+        graphql.query('getDrive', () => {
+            return HttpResponse.json({
+                data: {
+                    drive: { id: '1', name: 'name', icon: 'icon', slug: 'slug' }
+                }
+            });
+        }),
         graphql.mutation('pushUpdates', () => {
             return HttpResponse.json({
                 data: { pushUpdates: revisions }
@@ -102,7 +109,9 @@ describe('Document Drive Server with %s', () => {
         }),
         graphql.mutation('registerPullResponderListener', () => {
             return HttpResponse.json({
-                data: { registerPullResponderListener: { listenerId: '1' } }
+                data: {
+                    registerPullResponderListener: { listenerId: 'listener-1' }
+                }
             });
         }),
         graphql.query('strands', () => {
@@ -137,6 +146,50 @@ describe('Document Drive Server with %s', () => {
 
     afterAll(() => mswServer.close());
 
+    it.only('should add pull trigger from remote drive', async ({ expect }) => {
+        const server = new DocumentDriveServer(documentModels, storageLayer);
+        await server.initialize();
+        await server.addRemoteDrive('http://switchboard.powerhouse.xyz/1', {
+            availableOffline: true,
+            sharingType: 'PUBLIC',
+            listeners: [],
+            triggers: [],
+            pullFilter: {
+                branch: ['main'],
+                documentId: ['*'],
+                documentType: ['*'],
+                scope: ['global', 'local']
+            },
+            pullInterval: 5000
+        });
+        const drive = await server.getDrive('1');
+
+        expect(drive.state.global).toStrictEqual({
+            id: '1',
+            name: 'name',
+            icon: 'icon',
+            slug: 'slug',
+            nodes: []
+        });
+
+        expect(drive.state.local).toStrictEqual({
+            availableOffline: true,
+            sharingType: 'PUBLIC',
+            listeners: [],
+            triggers: [
+                {
+                    id: expect.any(String),
+                    type: 'PullResponder',
+                    data: {
+                        interval: '5000',
+                        listenerId: 'listener-1',
+                        url: 'http://switchboard.powerhouse.xyz/1'
+                    }
+                }
+            ]
+        });
+    });
+
     it.only('should push to switchboard if remoteDriveUrl is set', async ({
         expect
     }) => {
@@ -161,35 +214,34 @@ describe('Document Drive Server with %s', () => {
 
         const server = new DocumentDriveServer(documentModels, storageLayer);
         await server.initialize();
-        await server.addDrive({
-            global: {
-                id: '1',
-                name: 'name',
-                icon: 'icon',
-                remoteUrl: 'http://switchboard.powerhouse.xyz'
-            },
-            local: {
-                availableOffline: false,
-                sharingType: 'public',
-                listeners: [
-                    {
-                        block: true,
-                        callInfo: {
-                            data: 'http://switchboard.powerhouse.xyz/1',
-                            name: 'switchboard-push',
-                            transmitterType: 'SwitchboardPush'
-                        },
-                        filter: {
-                            branch: ['main'],
-                            documentId: ['*'],
-                            documentType: ['*'],
-                            scope: ['global', 'local']
-                        },
-                        label: 'Switchboard Sync',
-                        listenerId: '1',
-                        system: true
-                    }
-                ]
+        await server.addRemoteDrive('http://switchboard.powerhouse.xyz/1', {
+            listeners: [
+                {
+                    block: true,
+                    callInfo: {
+                        data: 'http://switchboard.powerhouse.xyz/1',
+                        name: 'switchboard-push',
+                        transmitterType: 'SwitchboardPush'
+                    },
+                    filter: {
+                        branch: ['main'],
+                        documentId: ['*'],
+                        documentType: ['*'],
+                        scope: ['global', 'local']
+                    },
+                    label: 'Switchboard Sync',
+                    listenerId: '1',
+                    system: true
+                }
+            ],
+            triggers: [],
+            availableOffline: true,
+            sharingType: 'PUBLIC',
+            pullFilter: {
+                branch: ['main'],
+                documentId: ['*'],
+                documentType: ['*'],
+                scope: ['global', 'local']
             }
         });
         let drive = await server.getDrive('1');
@@ -224,7 +276,7 @@ describe('Document Drive Server with %s', () => {
                             driveId: '1',
                             operations: [
                                 {
-                                    hash: 'ReImxJnUT6Gt2yRRq0q3PzPY2s4=',
+                                    hash: 'nQBsTlP2MNb+FDBAzOw3svwyHvg=',
                                     index: 0,
                                     input: '{"id":"1.1","name":"document 1","scopes":["global","local"],"documentType":"powerhouse/document-model"}',
                                     skip: 0,
@@ -317,35 +369,16 @@ describe('Document Drive Server with %s', () => {
 
         const server = new DocumentDriveServer(documentModels, storageLayer);
         await server.initialize();
-        await server.addDrive({
-            global: {
-                id: '1',
-                name: 'name',
-                icon: 'icon',
-                remoteUrl: 'http://switchboard.powerhouse.xyz'
-            },
-            local: {
-                availableOffline: true,
-                sharingType: 'public',
-                listeners: [
-                    {
-                        block: true,
-                        callInfo: {
-                            data: 'http://switchboard.powerhouse.xyz/1',
-                            name: 'switchboard-push',
-                            transmitterType: 'SwitchboardPush'
-                        },
-                        filter: {
-                            branch: ['main'],
-                            documentId: ['*'],
-                            documentType: ['*'],
-                            scope: ['global']
-                        },
-                        label: 'Switchboard Sync',
-                        listenerId: '1',
-                        system: true
-                    }
-                ]
+        await server.addRemoteDrive('http://switchboard.powerhouse.xyz/1', {
+            availableOffline: true,
+            sharingType: 'PUBLIC',
+            triggers: [],
+            listeners: [],
+            pullFilter: {
+                branch: ['main'],
+                documentId: ['*'],
+                documentType: ['*'],
+                scope: ['global', 'local']
             }
         });
 
@@ -368,7 +401,7 @@ describe('Document Drive Server with %s', () => {
             skip: 0,
             type: 'ADD_FILE',
             scope: 'global',
-            hash: 'ReImxJnUT6Gt2yRRq0q3PzPY2s4=',
+            hash: 'nQBsTlP2MNb+FDBAzOw3svwyHvg=',
             timestamp: '2024-01-24T18:57:33.899Z',
             input: {
                 id: '1.1',
@@ -384,7 +417,7 @@ describe('Document Drive Server with %s', () => {
                 operationName: 'acknowledge',
                 query: expect.stringContaining('mutation acknowledge'),
                 variables: {
-                    listenerId: '1',
+                    listenerId: 'listener-1',
                     revisions: [
                         {
                             branch: 'main',

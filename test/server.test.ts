@@ -62,12 +62,13 @@ describe.each(storageLayers)(
                     id: '1',
                     name: 'name',
                     icon: 'icon',
-                    remoteUrl: null
+                    slug: null
                 },
                 local: {
                     availableOffline: false,
-                    sharingType: 'public',
-                    listeners: []
+                    sharingType: 'PUBLIC',
+                    listeners: [],
+                    triggers: []
                 }
             });
             const drive = await server.getDrive('1');
@@ -76,12 +77,14 @@ describe.each(storageLayers)(
                     global: {
                         id: '1',
                         name: 'name',
-                        icon: 'icon'
+                        icon: 'icon',
+                        slug: null
                     },
                     local: {
                         availableOffline: false,
-                        sharingType: 'public',
-                        listeners: []
+                        sharingType: 'PUBLIC',
+                        listeners: [],
+                        triggers: []
                     }
                 })
             );
@@ -100,12 +103,13 @@ describe.each(storageLayers)(
                     id: '1',
                     name: 'name',
                     icon: 'icon',
-                    remoteUrl: null
+                    slug: 'slug'
                 },
                 local: {
                     availableOffline: false,
                     sharingType: 'public',
-                    listeners: []
+                    listeners: [],
+                    triggers: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -166,12 +170,13 @@ describe.each(storageLayers)(
                     id: '1',
                     name: 'name',
                     icon: 'icon',
-                    remoteUrl: null
+                    slug: 'slug'
                 },
                 local: {
                     availableOffline: false,
                     sharingType: 'public',
-                    listeners: []
+                    listeners: [],
+                    triggers: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -209,12 +214,13 @@ describe.each(storageLayers)(
                     id: '1',
                     name: 'name',
                     icon: 'icon',
-                    remoteUrl: null
+                    slug: 'slug'
                 },
                 local: {
                     availableOffline: false,
                     sharingType: 'public',
-                    listeners: []
+                    listeners: [],
+                    triggers: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -264,12 +270,13 @@ describe.each(storageLayers)(
                     id: '1',
                     name: 'name',
                     icon: 'icon',
-                    remoteUrl: null
+                    slug: 'slug'
                 },
                 local: {
                     availableOffline: false,
                     sharingType: 'public',
-                    listeners: []
+                    listeners: [],
+                    triggers: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -315,12 +322,13 @@ describe.each(storageLayers)(
                     id: '1',
                     name: 'name',
                     icon: 'icon',
-                    remoteUrl: null
+                    slug: 'slug'
                 },
                 local: {
                     availableOffline: false,
                     sharingType: 'public',
-                    listeners: []
+                    listeners: [],
+                    triggers: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -373,12 +381,13 @@ describe.each(storageLayers)(
                     id: '1',
                     name: 'name',
                     icon: 'icon',
-                    remoteUrl: null
+                    slug: 'slug'
                 },
                 local: {
                     availableOffline: false,
                     sharingType: 'public',
-                    listeners: []
+                    listeners: [],
+                    triggers: []
                 }
             });
 
@@ -400,12 +409,13 @@ describe.each(storageLayers)(
                     id: '1',
                     name: 'name',
                     icon: 'icon',
-                    remoteUrl: null
+                    slug: 'slug'
                 },
                 local: {
                     availableOffline: false,
                     sharingType: 'public',
-                    listeners: []
+                    listeners: [],
+                    triggers: []
                 }
             });
 
@@ -442,12 +452,13 @@ describe.each(storageLayers)(
                     id: '1',
                     name: 'name',
                     icon: 'icon',
-                    remoteUrl: null
+                    slug: 'slug'
                 },
                 local: {
                     availableOffline: false,
                     sharingType: 'public',
-                    listeners: []
+                    listeners: [],
+                    triggers: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -478,12 +489,13 @@ describe.each(storageLayers)(
                     id: '1',
                     name: 'name',
                     icon: 'icon',
-                    remoteUrl: null
+                    slug: 'slug'
                 },
                 local: {
                     availableOffline: false,
                     sharingType: 'public',
-                    listeners: []
+                    listeners: [],
+                    triggers: []
                 }
             });
             let drive = await server.getDrive('1');
@@ -524,6 +536,7 @@ describe.each(storageLayers)(
                 '1',
                 drive.operations.global
             );
+            console.error(result.error);
             expect(result.success).toBe(true);
 
             drive = await server.getDrive('1');
@@ -542,12 +555,13 @@ describe.each(storageLayers)(
                     id: '1',
                     name: 'name',
                     icon: 'icon',
-                    remoteUrl: null
+                    slug: 'slug'
                 },
                 local: {
                     availableOffline: false,
                     sharingType: 'public',
-                    listeners: []
+                    listeners: [],
+                    triggers: []
                 }
             });
             let drive = await server.getDrive('1');

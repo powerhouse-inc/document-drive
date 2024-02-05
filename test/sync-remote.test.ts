@@ -1,4 +1,3 @@
-import { PrismaClient } from '@prisma/client';
 import { actions, reducer } from 'document-model-libs/document-drive';
 import * as DocumentModelsLibs from 'document-model-libs/document-models';
 import { DocumentModel } from 'document-model/document';
@@ -8,7 +7,7 @@ import {
     module as DocumentModelLib
 } from 'document-model/document-model';
 import { afterEach, beforeEach, describe, it, vi } from 'vitest';
-import { DocumentDriveServer, PullResponderTransmitter } from '../src/server';
+import { DocumentDriveServer } from '../src/server';
 import { MemoryStorage } from '../src/storage/memory';
 
 describe('Document Drive Server with %s', () => {
@@ -17,13 +16,9 @@ describe('Document Drive Server with %s', () => {
         ...Object.values(DocumentModelsLibs)
     ] as DocumentModel[];
 
-    const prismaClient = new PrismaClient();
     const storageLayer = new MemoryStorage();
 
     beforeEach(async () => {
-        await prismaClient.$executeRawUnsafe('DELETE FROM "Attachment";');
-        await prismaClient.$executeRawUnsafe('DELETE FROM "Operation";');
-        await prismaClient.$executeRawUnsafe('DELETE FROM "Document";');
         vi.useFakeTimers().setSystemTime(new Date('2024-01-01'));
     });
 
@@ -31,42 +26,7 @@ describe('Document Drive Server with %s', () => {
         vi.useRealTimers();
     });
 
-    it.only('should add pull listeners', async ({ expect }) => {
-        const server = new DocumentDriveServer(documentModels, storageLayer);
-        await server.initialize();
-        await server.addDrive({
-            global: {
-                id: '1',
-                name: 'name',
-                icon: 'icon',
-                remoteUrl: null
-            },
-            local: {
-                availableOffline: false,
-                sharingType: 'public',
-                listeners: []
-            }
-        });
-        let drive = await server.getDrive("1");
-        drive = reducer(drive, actions.addListener({listener: {
-
-        }})) 
-        await PullResponderTransmitter.registerPullResponder(
-            '1',
-            remoteUrl,
-            filter ?? {
-                documentId: ['*'],
-                documentType: ['*'],
-                branch: ['*'],
-                scope: ['*']
-            }
-        );
-
-
-        const listenerId = await server.addDriveOperation("1"
-    });
-
-    it.only('should push to switchboard if remoteDriveUrl is set', async ({
+    it.skip('should push to remote switchboard if remoteDriveUrl is set', async ({
         expect
     }) => {
         const server = new DocumentDriveServer(documentModels, storageLayer);
@@ -76,11 +36,12 @@ describe('Document Drive Server with %s', () => {
                 id: '1',
                 name: 'name',
                 icon: 'icon',
-                remoteUrl: 'http://localhost:3001/graphql/'
+                slug: '1'
             },
             local: {
                 availableOffline: false,
                 sharingType: 'public',
+                triggers: [],
                 listeners: [
                     {
                         block: true,
@@ -136,7 +97,7 @@ describe('Document Drive Server with %s', () => {
         expect(result.success).toBe(true);
     });
 
-    it.only('should pull from switchboard if remoteDriveUrl is set', async ({
+    it.skip('should pull from remote switchboard if remoteDriveUrl is set', async ({
         expect
     }) => {
         // Connect document drive server
@@ -147,12 +108,13 @@ describe('Document Drive Server with %s', () => {
                 id: '1',
                 name: 'name',
                 icon: 'icon',
-                remoteUrl: 'http://localhost:3001/graphql/'
+                slug: '1'
             },
             local: {
                 availableOffline: true,
                 sharingType: 'public',
-                listeners: []
+                listeners: [],
+                triggers: []
             }
         });
 
