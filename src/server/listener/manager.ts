@@ -1,9 +1,11 @@
-import { ListenerCallInfo } from 'document-model-libs/document-drive';
+import {
+    ListenerCallInfo,
+    ListenerFilter
+} from 'document-model-libs/document-drive';
 import { OperationScope } from 'document-model/document';
 import {
     BaseListenerManager,
     Listener,
-    ListenerFilter,
     ListenerState,
     ListenerStatus,
     StrandUpdate,
