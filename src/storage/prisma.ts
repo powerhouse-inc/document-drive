@@ -194,7 +194,7 @@ export class PrismaStorage implements IDriveStorage {
             lastModified: dbDoc.lastModified.toISOString(),
             operations: {
                 global: dbDoc.operations
-                    .filter(op => op.scope === 'global')
+                    .filter(op => op.scope === 'global' && !op.clipboard)
                     .map(op => ({
                         skip: op.skip,
                         hash: op.hash,
@@ -206,7 +206,7 @@ export class PrismaStorage implements IDriveStorage {
                         // attachments: fileRegistry
                     })),
                 local: dbDoc.operations
-                    .filter(op => op.scope === 'local')
+                    .filter(op => op.scope === 'local' && !op.clipboard)
                     .map(op => ({
                         skip: op.skip,
                         hash: op.hash,
@@ -218,6 +218,18 @@ export class PrismaStorage implements IDriveStorage {
                         // attachments: fileRegistry
                     }))
             },
+            clipboard: dbDoc.operations
+                .filter(op => op.clipboard)
+                .map(op => ({
+                    skip: op.skip,
+                    hash: op.hash,
+                    index: op.index,
+                    timestamp: new Date(op.timestamp).toISOString(),
+                    input: op.input,
+                    type: op.type,
+                    scope: op.scope as OperationScope
+                    // attachments: fileRegistry
+                })),
             revision: dbDoc.revision as Record<OperationScope, number>
         };
 
