@@ -199,7 +199,7 @@ export class PullResponderTransmitter implements ITransmitter {
         onStrandUpdate: (strand: StrandUpdate) => Promise<IOperationResult>,
         onError: (error: Error) => void,
         onAcknowledge?: (success: boolean) => void
-    ): Promise<NodeJS.Timeout> {
+    ): Promise<number> {
         const { url, listenerId, interval } = trigger.data;
         let loopInterval = PULL_DRIVE_INTERVAL;
         if (interval) {
@@ -213,7 +213,7 @@ export class PullResponderTransmitter implements ITransmitter {
             }
         }
 
-        return setInterval(async () => {
+        const timeout = setInterval(async () => {
             try {
                 const strands = await PullResponderTransmitter.pullStrands(
                     driveId,
@@ -247,7 +247,7 @@ export class PullResponderTransmitter implements ITransmitter {
                         }
                     } catch (e) {
                         error = e as Error;
-                        console.error('Sync error', e);
+                        onError?.(error);
                     }
 
                     listenerRevisions.push({
@@ -260,17 +260,19 @@ export class PullResponderTransmitter implements ITransmitter {
                     });
                 }
 
-                const ackRequest = PullResponderTransmitter.acknowledgeStrands(
-                    driveId,
-                    url,
-                    listenerId,
-                    listenerRevisions
-                );
-                ackRequest.then(onAcknowledge);
+                const ackRequest =
+                    await PullResponderTransmitter.acknowledgeStrands(
+                        driveId,
+                        url,
+                        listenerId,
+                        listenerRevisions
+                    );
+                onAcknowledge?.(ackRequest);
             } catch (error) {
                 onError(error as Error);
             }
         }, loopInterval);
+        return timeout as unknown as number;
     }
 
     static isPullResponderTrigger(

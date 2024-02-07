@@ -191,7 +191,7 @@ export class PrismaStorage implements IDriveStorage {
                 DocumentDriveState,
                 DocumentDriveLocalState
             >,
-            lastModified: dbDoc.lastModified.toISOString(),
+            lastModified: new Date(dbDoc.lastModified).toISOString(),
             operations: {
                 global: dbDoc.operations
                     .filter(op => op.scope === 'global' && !op.clipboard)

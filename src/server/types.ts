@@ -115,6 +115,8 @@ export type StrandUpdate = {
     operations: OperationUpdate[];
 };
 
+export type SyncStatus = 'SYNCING' | 'SUCCESS' | 'ERROR';
+
 export abstract class BaseDocumentDriveServer {
     /** Public methods **/
     abstract getDrives(): Promise<string[]>;
@@ -148,6 +150,8 @@ export abstract class BaseDocumentDriveServer {
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[]
     ): Promise<IOperationResult<DocumentDriveDocument>>;
+
+    abstract getSyncStatus(drive: string): SyncStatus;
 
     /** Synchronization methods */
     abstract getSynchronizationUnits(

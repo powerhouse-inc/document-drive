@@ -39,7 +39,7 @@ model Operation {
   type        String
   attachments Attachment[]
   syncId      String?
-  clipboard   Boolean?     @default(true)
+  clipboard   Boolean?     @default(false)
 
   SyncronizationUnit SyncronizationUnit? @relation(fields: [syncId, driveId], references: [id, driveId])
 

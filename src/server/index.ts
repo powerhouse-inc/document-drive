@@ -27,6 +27,7 @@ import {
     BaseDocumentDriveServer,
     RemoteDriveOptions,
     StrandUpdate,
+    SyncStatus,
     type CreateDocumentInput,
     type DriveInput,
     type OperationUpdate,
@@ -45,8 +46,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     private listenerStateManager: ListenerManager;
     private triggerMap: Map<
         DocumentDriveState['id'],
-        Map<Trigger['id'], NodeJS.Timeout>
+        Map<Trigger['id'], number>
     > = new Map();
+    private syncStatus: Map<DocumentDriveState['id'], SyncStatus> = new Map();
 
     constructor(
         documentModels: DocumentModel[],
@@ -102,6 +104,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
             if (!driveTriggers) {
                 driveTriggers = new Map();
+                this.syncStatus.set(driveId, 'SYNCING');
             }
 
             if (PullResponderTransmitter.isPullResponderTrigger(trigger)) {
@@ -109,7 +112,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     driveId,
                     trigger,
                     this.saveStrand.bind(this),
-                    error => console.error(error),
+                    error => {
+                        this.syncStatus.set(driveId, 'ERROR');
+                        console.error(error);
+                    },
                     acknowledgeSuccess => console.log('ack', acknowledgeSuccess)
                 );
                 driveTriggers.set(trigger.id, intervalId);
@@ -627,12 +633,25 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         // retrieves document from storage
         const documentStorage = await this.storage.getDrive(drive);
 
-        // TODO check if existing operations hash is the same
-        operations = operations.filter(
-            op => op.index >= documentStorage.operations[op.scope].length
-        );
-
         try {
+            const operationsToApply: Operation<
+                DocumentDriveAction | BaseAction
+            >[] = [];
+            for (const op of operations) {
+                const scopeOperations = documentStorage.operations[op.scope];
+                if (op.index >= scopeOperations.length) {
+                    operationsToApply.push(op);
+                }
+
+                const existingOperation = scopeOperations[op.index];
+                if (existingOperation && existingOperation.hash !== op.hash) {
+                    throw new Error(
+                        `Confliction operation on index ${op.index}`,
+                        { cause: op }
+                    );
+                }
+            }
+
             // retrieves the document's document model and
             // applies the operations using its reducer
             const { document, signals } = await this._performOperations(
@@ -692,5 +711,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         listenerId: string
     ): Promise<ITransmitter | undefined> {
         return this.listenerStateManager.getTransmitter(driveId, listenerId);
+    }
+
+    getSyncStatus(drive: string): SyncStatus {
+        const status = this.syncStatus.get(drive);
+        if (!status) {
+            throw new Error(`Sync status not found for drive ${drive}`);
+        }
+        return status;
     }
 }

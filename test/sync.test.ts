@@ -1,7 +1,11 @@
 import { PrismaClient } from '@prisma/client';
-import { actions, reducer } from 'document-model-libs/document-drive';
+import {
+    DocumentDriveAction,
+    actions,
+    reducer
+} from 'document-model-libs/document-drive';
 import * as DocumentModelsLibs from 'document-model-libs/document-models';
-import { DocumentModel } from 'document-model/document';
+import { DocumentModel, Operation } from 'document-model/document';
 import {
     actions as DocumentModelActions,
     DocumentModelDocument,
@@ -146,7 +150,7 @@ describe('Document Drive Server with %s', () => {
 
     afterAll(() => mswServer.close());
 
-    it.only('should add pull trigger from remote drive', async ({ expect }) => {
+    it('should add pull trigger from remote drive', async ({ expect }) => {
         const server = new DocumentDriveServer(documentModels, storageLayer);
         await server.initialize();
         await server.addRemoteDrive('http://switchboard.powerhouse.xyz/1', {
@@ -190,7 +194,7 @@ describe('Document Drive Server with %s', () => {
         });
     });
 
-    it.only('should push to switchboard if remoteDriveUrl is set', async ({
+    it('should push to switchboard if remoteDriveUrl is set', async ({
         expect
     }) => {
         mswServer.use(
@@ -354,7 +358,7 @@ describe('Document Drive Server with %s', () => {
         );
     });
 
-    it.only('should pull from switchboard if remoteDriveUrl is set', async ({
+    it('should pull from switchboard if remoteDriveUrl is set', async ({
         expect
     }) => {
         const ackRequestPromise: Promise<JSON> = new Promise(resolve => {
@@ -439,5 +443,125 @@ describe('Document Drive Server with %s', () => {
                 }
             })
         );
+    });
+
+    it('should detect conflict when adding operation with existing index', async ({
+        expect
+    }) => {
+        const server = new DocumentDriveServer(documentModels);
+        await server.initialize();
+        await server.addRemoteDrive('http://switchboard.powerhouse.xyz/1', {
+            availableOffline: true,
+            sharingType: 'PUBLIC',
+            triggers: [],
+            listeners: [],
+            pullFilter: {
+                branch: ['main'],
+                documentId: ['*'],
+                documentType: ['*'],
+                scope: ['global', 'local']
+            }
+        });
+
+        vi.advanceTimersToNextTimer();
+
+        await vi.waitFor(
+            async () => {
+                const drive = await server.getDrive('1');
+                if (!drive.operations.global.length) {
+                    throw new Error('No operations');
+                }
+                return drive;
+            },
+            {
+                timeout: 500,
+                interval: 20
+            }
+        );
+
+        const operation: Operation<DocumentDriveAction> = {
+            index: 0,
+            skip: 0,
+            type: 'ADD_FILE',
+            scope: 'global',
+            hash: 'nf7WF7HnxrfpF6il8qQRAH9URgM=',
+            timestamp: '2024-01-01T00:00:00.000Z',
+            input: {
+                id: '1.1',
+                name: 'local document 1',
+                documentType: 'powerhouse/document-model',
+                scopes: ['global', 'local']
+            }
+        };
+
+        const result = await server.addDriveOperation('1', operation);
+        expect(result.success).toBe(false);
+        expect(result.error?.message).toBe('Confliction operation on index 0');
+        expect(result.error?.cause).toStrictEqual(operation);
+    });
+
+    it('should detect conflict when pulling operation with existing index', async ({
+        expect
+    }) => {
+        graphql.query('strands', () => {
+            return HttpResponse.json({
+                data: { strands: [] }
+            });
+        });
+
+        const server = new DocumentDriveServer(documentModels);
+        await server.initialize();
+        await server.addRemoteDrive('http://switchboard.powerhouse.xyz/1', {
+            availableOffline: true,
+            sharingType: 'PUBLIC',
+            triggers: [],
+            listeners: [],
+            pullFilter: {
+                branch: ['main'],
+                documentId: ['*'],
+                documentType: ['*'],
+                scope: ['global', 'local']
+            }
+        });
+
+        const operation: Operation<DocumentDriveAction> = {
+            index: 0,
+            skip: 0,
+            type: 'ADD_FILE',
+            scope: 'global',
+            hash: 'nf7WF7HnxrfpF6il8qQRAH9URgM=',
+            timestamp: '2024-01-01T00:00:00.000Z',
+            input: {
+                id: '1.1',
+                name: 'local document 1',
+                documentType: 'powerhouse/document-model',
+                scopes: ['global', 'local']
+            }
+        };
+
+        const result = await server.addDriveOperation('1', operation);
+        expect(result.success).toBe(true);
+
+        graphql.query('strands', () => {
+            return HttpResponse.json({
+                data: { strands }
+            });
+        });
+
+        vi.advanceTimersToNextTimer();
+
+        const status = await vi.waitFor(
+            async () => {
+                const status = server.getSyncStatus('1');
+                expect(status).toBe('ERROR');
+                return status;
+            },
+            {
+                timeout: 500,
+                interval: 20
+            }
+        );
+
+        expect(status).toBe('ERROR');
     });
 });
