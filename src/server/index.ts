@@ -459,10 +459,54 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         return this.storage.deleteDocument(driveId, id);
     }
 
-    private async _performOperations(
+    private _preprocessOperations(
+        operations: Operation[],
+        documentStorage: DocumentStorage
+    ) {
+        const operationsToApply: Operation[] = [];
+        let error: OperationError | undefined;
+
+        // sort operations so from smaller index to biggest
+        operations = operations.sort((a, b) => a.index - b.index);
+
+        for (let i = 0; i < operations.length; i++) {
+            const op = operations[i]!;
+            const pastOperations = operationsToApply.slice(0, i);
+            const scopeOperations = documentStorage.operations[op.scope];
+
+            const nextIndex =
+                scopeOperations.length +
+                pastOperations.filter(pastOp => pastOp.scope === op.scope)
+                    .length;
+            if (op.index > nextIndex) {
+                error = new OperationError(
+                    'MISSING',
+                    op,
+                    `Missing operation on index ${nextIndex}`
+                );
+                continue;
+            } else if (op.index < nextIndex) {
+                const existingOperation = scopeOperations[op.index];
+                if (existingOperation && existingOperation.hash !== op.hash) {
+                    error = new OperationError(
+                        'CONFLICT',
+                        op,
+                        `Conflicting operation on index ${op.index}`
+                    );
+                    continue;
+                }
+            } else {
+                operationsToApply.push(op);
+            }
+        }
+
+        return [operationsToApply, error] as const;
+    }
+
+    private async _performOperation(
         drive: string,
         documentStorage: DocumentStorage,
-        operations: Operation[]
+        operation: Operation
     ) {
         const documentModel = this._getDocumentModel(
             documentStorage.documentType
@@ -477,28 +521,21 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
         const signalResults: SignalResult[] = [];
         let newDocument = document;
-        for (const operation of operations) {
-            const operationSignals: Promise<SignalResult>[] = [];
-            newDocument = documentModel.reducer(
-                newDocument,
-                operation,
-                signal => {
-                    let handler: Promise<unknown> | undefined = undefined;
-                    switch (signal.type) {
-                        case 'CREATE_CHILD_DOCUMENT':
-                            handler = this.createDocument(drive, signal.input);
-                            break;
-                        case 'DELETE_CHILD_DOCUMENT':
-                            handler = this.deleteDocument(
-                                drive,
-                                signal.input.id
-                            );
-                            break;
-                        case 'COPY_CHILD_DOCUMENT':
-                            handler = this.getDocument(
-                                drive,
-                                signal.input.id
-                            ).then(documentToCopy =>
+
+        const operationSignals: (() => Promise<SignalResult>)[] = [];
+        newDocument = documentModel.reducer(newDocument, operation, signal => {
+            let handler: (() => Promise<unknown>) | undefined = undefined;
+            switch (signal.type) {
+                case 'CREATE_CHILD_DOCUMENT':
+                    handler = () => this.createDocument(drive, signal.input);
+                    break;
+                case 'DELETE_CHILD_DOCUMENT':
+                    handler = () => this.deleteDocument(drive, signal.input.id);
+                    break;
+                case 'COPY_CHILD_DOCUMENT':
+                    handler = () =>
+                        this.getDocument(drive, signal.input.id).then(
+                            documentToCopy =>
                                 this.createDocument(drive, {
                                     id: signal.input.newId,
                                     documentType: documentToCopy.documentType,
@@ -506,52 +543,36 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                                     synchronizationUnits:
                                         signal.input.synchronizationUnits
                                 })
-                            );
-                            break;
-                    }
-                    if (handler) {
-                        operationSignals.push(
-                            handler.then(result => ({ signal, result }))
                         );
-                    }
-                }
-            );
-            const results = await Promise.all(operationSignals);
-            signalResults.push(...results);
-
-            if (isDocumentDrive(document)) {
-                if (operation.type === 'ADD_LISTENER') {
-                    const { listener } = operation.input as AddListenerInput;
-                    await this.listenerStateManager.addListener({
-                        ...listener,
-                        driveId: drive,
-                        label: listener.label ?? '',
-                        system: listener.system ?? false,
-                        filter: {
-                            branch: listener.filter.branch ?? [],
-                            documentId: listener.filter.documentId ?? [],
-                            documentType: listener.filter.documentType ?? [],
-                            scope: listener.filter.scope ?? []
-                        },
-                        callInfo: {
-                            data: listener.callInfo?.data ?? '',
-                            name: listener.callInfo?.name ?? 'PullResponder',
-                            transmitterType:
-                                listener.callInfo?.transmitterType ??
-                                'PullResponder'
-                        }
-                    });
-                } else if (operation.type === 'REMOVE_LISTENER') {
-                    const { listenerId } =
-                        operation.input as RemoveListenerInput;
-                    await this.listenerStateManager.removeListener(
-                        drive,
-                        listenerId
-                    );
-                }
+                    break;
             }
+            if (handler) {
+                operationSignals.push(() =>
+                    handler().then(result => ({ signal, result }))
+                );
+            }
+        });
+
+        const appliedOperation =
+            newDocument.operations[operation.scope][operation.index];
+        if (!appliedOperation || appliedOperation.hash !== operation.hash) {
+            throw new OperationError(
+                'CONFLICT',
+                operation,
+                `Operation with index ${operation.index} had different result`
+            );
         }
-        return { document: newDocument, signals: signalResults };
+
+        const results = await Promise.all(
+            operationSignals.map(handler => handler())
+        );
+        signalResults.push(...results);
+
+        return {
+            document: newDocument,
+            signals: signalResults,
+            operation: appliedOperation
+        };
     }
 
     addOperation(drive: string, id: string, operation: Operation) {
@@ -651,45 +672,97 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         // retrieves document from storage
         const documentStorage = await this.storage.getDrive(drive);
 
-        try {
-            const operationsToApply: Operation<
-                DocumentDriveAction | BaseAction
-            >[] = [];
-            for (const op of operations) {
-                const scopeOperations = documentStorage.operations[op.scope];
-                if (op.index >= scopeOperations.length) {
-                    operationsToApply.push(op);
-                }
+        const operationsApplied: Operation[] = [];
+        let document: DocumentDriveDocument | undefined;
+        const signals: SignalResult[] = [];
 
-                const existingOperation = scopeOperations[op.index];
-                if (existingOperation && existingOperation.hash !== op.hash) {
-                    throw new OperationError(
-                        'CONFLICT',
-                        op,
-                        `Conflicting operation on index ${op.index}`
-                    );
-                }
-            }
+        try {
+            // eslint-disable-next-line prefer-const
+            let [operationsToApply, error] = this._preprocessOperations(
+                operations,
+                documentStorage
+            );
 
             // retrieves the document's document model and
             // applies the operations using its reducer
-            const { document, signals } = await this._performOperations(
-                drive,
-                documentStorage,
-                operations
-            );
+            for (const operation of operationsToApply) {
+                try {
+                    const {
+                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                        document: newDocument,
+                        signals,
+                        operation: appliedOperation
+                    } = await this._performOperation(
+                        drive,
+                        document ?? documentStorage,
+                        operation
+                    );
+                    document = newDocument as DocumentDriveDocument;
+                    operationsApplied.push(appliedOperation);
+                    signals.push(...signals);
+                } catch (e) {
+                    error =
+                        e instanceof OperationError
+                            ? e
+                            : new OperationError(
+                                  'ERROR',
+                                  operation,
+                                  (e as Error).message,
+                                  (e as Error).cause
+                              );
+                    break;
+                }
+            }
 
-            if (isDocumentDrive(document)) {
+            if (document && isDocumentDrive(document)) {
                 await this.storage.addDriveOperations(
                     drive,
-                    operations as Operation<DocumentDriveAction | BaseAction>[], // TODO check?
+                    operationsApplied as Operation<
+                        BaseAction | DocumentDriveAction
+                    >[],
                     document
                 );
 
-                const lastOperation = document.operations['global']
+                for (const operation of operationsApplied) {
+                    if (operation.type === 'ADD_LISTENER') {
+                        const { listener } =
+                            operation.input as AddListenerInput;
+                        await this.listenerStateManager.addListener({
+                            ...listener,
+                            driveId: drive,
+                            label: listener.label ?? '',
+                            system: listener.system ?? false,
+                            filter: {
+                                branch: listener.filter.branch ?? [],
+                                documentId: listener.filter.documentId ?? [],
+                                documentType:
+                                    listener.filter.documentType ?? [],
+                                scope: listener.filter.scope ?? []
+                            },
+                            callInfo: {
+                                data: listener.callInfo?.data ?? '',
+                                name:
+                                    listener.callInfo?.name ?? 'PullResponder',
+                                transmitterType:
+                                    listener.callInfo?.transmitterType ??
+                                    'PullResponder'
+                            }
+                        });
+                    } else if (operation.type === 'REMOVE_LISTENER') {
+                        const { listenerId } =
+                            operation.input as RemoveListenerInput;
+                        await this.listenerStateManager.removeListener(
+                            drive,
+                            listenerId
+                        );
+                    }
+                }
+
+                // update listener cache
+                const lastOperation = operationsApplied
+                    .filter(op => op.scope === 'global')
                     .slice()
                     .pop();
-                // update listener cache
                 if (lastOperation) {
                     await this.listenerStateManager.updateSynchronizationRevision(
                         drive,
@@ -705,13 +778,21 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     this.stopSyncRemoteDrive(document.state.global.id);
                 }
             } else {
-                throw new Error('Invalid Document Drive document');
+                throw error ?? new Error('Invalid Document Drive document');
             }
+
+            // after applying all the valid operations,throws
+            // an error if there was an invalid operation
+            if (error) {
+                throw error;
+            }
+
             this.syncStatus.set(drive, 'SUCCESS');
+
             return {
                 status: 'SUCCESS',
                 document,
-                operations,
+                operations: operationsApplied,
                 signals
             } satisfies IOperationResult;
         } catch (error) {
@@ -724,13 +805,15 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                           (error as Error).message,
                           (error as Error).cause
                       );
+
             this.syncStatus.set(drive, operationError.status);
+
             return {
                 status: operationError.status,
                 error: operationError,
                 document: undefined,
-                operations,
-                signals: []
+                operations: operationsApplied,
+                signals
             } satisfies IOperationResult;
         }
     }
