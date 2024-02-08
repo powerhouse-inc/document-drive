@@ -1,3 +1,4 @@
+import stringify from 'json-stringify-deterministic';
 import { gql, requestGraphql } from '../../../utils/graphql';
 import {
     BaseDocumentDriveServer,
@@ -42,7 +43,7 @@ export class SwitchboardPushTransmitter implements ITransmitter {
                         ...strand,
                         operations: strand.operations.map(op => ({
                             ...op,
-                            input: JSON.stringify(op.input)
+                            input: stringify(op.input)
                         }))
                     }))
                 }

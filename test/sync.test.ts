@@ -23,6 +23,7 @@ import {
     vi
 } from 'vitest';
 
+import stringify from 'json-stringify-deterministic';
 import {
     DocumentDriveServer,
     ListenerRevision,
@@ -52,7 +53,7 @@ describe('Document Drive Server with %s', () => {
                     index: 0,
                     skip: 0,
                     type: 'ADD_FILE',
-                    input: JSON.stringify({
+                    input: stringify({
                         id: '1.1',
                         name: 'document 1',
                         documentType: 'powerhouse/document-model',
@@ -73,7 +74,7 @@ describe('Document Drive Server with %s', () => {
                     index: 0,
                     skip: 0,
                     type: 'SET_NAME',
-                    input: JSON.stringify('test'),
+                    input: stringify('test'),
                     hash: 'Fd20qtObIUDJwJHse6VqFK8ObWY='
                 }
             ]
@@ -282,7 +283,7 @@ describe('Document Drive Server with %s', () => {
                                 {
                                     hash: 'nQBsTlP2MNb+FDBAzOw3svwyHvg=',
                                     index: 0,
-                                    input: '{"id":"1.1","name":"document 1","scopes":["global","local"],"documentType":"powerhouse/document-model"}',
+                                    input: '{"documentType":"powerhouse/document-model","id":"1.1","name":"document 1","scopes":["global","local"]}',
                                     skip: 0,
                                     timestamp: '2024-01-01T00:00:00.000Z',
                                     type: 'ADD_FILE'
@@ -327,7 +328,7 @@ describe('Document Drive Server with %s', () => {
 
         const operation = document.operations.global[0]!;
         const result = await server.addOperation('1', '1.1', operation);
-        expect(result.success).toBe(true);
+        expect(result.status).toBe('SUCCESS');
 
         const setNameBody = await (await setNameRequest).json();
         expect(setNameBody).toEqual(
@@ -495,19 +496,21 @@ describe('Document Drive Server with %s', () => {
         };
 
         const result = await server.addDriveOperation('1', operation);
-        expect(result.success).toBe(false);
-        expect(result.error?.message).toBe('Confliction operation on index 0');
+        expect(result.status).toBe('CONFLICT');
+        expect(result.error?.message).toBe('Conflicting operation on index 0');
         expect(result.error?.cause).toStrictEqual(operation);
     });
 
     it('should detect conflict when pulling operation with existing index', async ({
         expect
     }) => {
-        graphql.query('strands', () => {
-            return HttpResponse.json({
-                data: { strands: [] }
-            });
-        });
+        mswServer.use(
+            graphql.query('strands', () => {
+                return HttpResponse.json({
+                    data: { strands: [] }
+                });
+            })
+        );
 
         const server = new DocumentDriveServer(documentModels);
         await server.initialize();
@@ -540,20 +543,25 @@ describe('Document Drive Server with %s', () => {
         };
 
         const result = await server.addDriveOperation('1', operation);
-        expect(result.success).toBe(true);
+        expect(result.status).toBe('SUCCESS');
+        expect(server.getSyncStatus('1')).toBe('SUCCESS');
 
-        graphql.query('strands', () => {
-            return HttpResponse.json({
-                data: { strands }
-            });
-        });
+        mswServer.use(
+            graphql.query('strands', () => {
+                return HttpResponse.json({
+                    data: { strands }
+                });
+            })
+        );
 
         vi.advanceTimersToNextTimer();
 
         const status = await vi.waitFor(
             async () => {
                 const status = server.getSyncStatus('1');
-                expect(status).toBe('ERROR');
+                if (status !== 'CONFLICT') {
+                    throw new Error('Syncing');
+                }
                 return status;
             },
             {
@@ -562,6 +570,87 @@ describe('Document Drive Server with %s', () => {
             }
         );
 
-        expect(status).toBe('ERROR');
+        expect(status).toBe('CONFLICT');
+    });
+
+    it('should detect conflict when pushing operation with existing index', async ({
+        expect
+    }) => {
+        mswServer.use(
+            graphql.query('strands', () => {
+                return HttpResponse.json({
+                    data: { strands: [] }
+                });
+            }),
+            graphql.mutation('pushUpdates', () => {
+                return HttpResponse.json({
+                    data: {
+                        pushUpdates: [
+                            {
+                                branch: 'main',
+                                documentId: '',
+                                driveId: '1',
+                                revision: 0,
+                                scope: 'global',
+                                status: 'CONFLICT'
+                            }
+                        ]
+                    }
+                });
+            })
+        );
+
+        const server = new DocumentDriveServer(documentModels);
+        await server.initialize();
+        await server.addRemoteDrive('http://switchboard.powerhouse.xyz/1', {
+            availableOffline: true,
+            sharingType: 'PUBLIC',
+            triggers: [],
+            listeners: [
+                {
+                    block: true,
+                    callInfo: {
+                        data: 'http://switchboard.powerhouse.xyz/1',
+                        name: 'switchboard-push',
+                        transmitterType: 'SwitchboardPush'
+                    },
+                    filter: {
+                        branch: ['main'],
+                        documentId: ['*'],
+                        documentType: ['*'],
+                        scope: ['global', 'local']
+                    },
+                    label: 'Switchboard Sync',
+                    listenerId: '1',
+                    system: true
+                }
+            ],
+
+            pullFilter: {
+                branch: ['main'],
+                documentId: ['*'],
+                documentType: ['*'],
+                scope: ['global', 'local']
+            }
+        });
+
+        const operation: Operation<DocumentDriveAction> = {
+            index: 0,
+            skip: 0,
+            type: 'ADD_FILE',
+            scope: 'global',
+            hash: 'nf7WF7HnxrfpF6il8qQRAH9URgM=',
+            timestamp: '2024-01-01T00:00:00.000Z',
+            input: {
+                id: '1.1',
+                name: 'local document 1',
+                documentType: 'powerhouse/document-model',
+                scopes: ['global', 'local']
+            }
+        };
+
+        const result = await server.addDriveOperation('1', operation);
+        expect(result.status).toBe('CONFLICT');
+        expect(server.getSyncStatus('1')).toBe('CONFLICT');
     });
 });

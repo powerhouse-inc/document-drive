@@ -2,14 +2,14 @@ import { ListenerFilter, Trigger, z } from 'document-model-libs/document-drive';
 import { Operation, OperationScope } from 'document-model/document';
 import { PULL_DRIVE_INTERVAL } from '../..';
 import { gql, requestGraphql } from '../../../utils/graphql';
+import { OperationError } from '../../error';
 import {
     BaseDocumentDriveServer,
     IOperationResult,
     Listener,
     ListenerRevision,
     OperationUpdate,
-    StrandUpdate,
-    UpdateStatus
+    StrandUpdate
 } from '../../types';
 import { ListenerManager } from '../manager';
 import { ITransmitter, PullResponderTrigger } from './types';
@@ -256,8 +256,17 @@ export class PullResponderTransmitter implements ITransmitter {
                         driveId: strand.driveId,
                         revision: operations.pop()?.index ?? -1,
                         scope: strand.scope as OperationScope,
-                        status: (error ? 'ERROR' : 'SUCCESS') as UpdateStatus
+                        status: error
+                            ? error instanceof OperationError
+                                ? error.status
+                                : 'ERROR'
+                            : 'SUCCESS'
                     });
+
+                    // TODO: Should try to parse remaining strands?
+                    if (error) {
+                        break;
+                    }
                 }
 
                 const ackRequest =

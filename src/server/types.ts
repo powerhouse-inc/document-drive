@@ -15,6 +15,7 @@ import type {
     Signal,
     State
 } from 'document-model/document';
+import { OperationError } from './error';
 import { ITransmitter } from './listener/transmitter/types';
 
 export type DriveInput = State<
@@ -36,8 +37,8 @@ export type SignalResult = {
 };
 
 export type IOperationResult<T extends Document = Document> = {
-    success: boolean;
-    error?: Error;
+    status: UpdateStatus;
+    error?: OperationError;
     operations: Operation[];
     document: T | undefined;
     signals: SignalResult[];
@@ -91,12 +92,8 @@ export type ListenerRevision = {
     revision: number;
 };
 
-export enum UpdateStatus {
-    SUCCESS = 'SUCCESS',
-    MISSING = 'MISSING',
-    CONFLICT = 'CONFLICT',
-    ERROR = 'ERROR'
-}
+export type UpdateStatus = 'SUCCESS' | 'CONFLICT' | 'MISSING' | 'ERROR';
+export type ErrorStatus = Exclude<UpdateStatus, 'SUCCESS'>;
 
 export type OperationUpdate = {
     timestamp: string;
@@ -115,7 +112,7 @@ export type StrandUpdate = {
     operations: OperationUpdate[];
 };
 
-export type SyncStatus = 'SYNCING' | 'SUCCESS' | 'ERROR';
+export type SyncStatus = 'SYNCING' | UpdateStatus;
 
 export abstract class BaseDocumentDriveServer {
     /** Public methods **/
@@ -235,14 +232,13 @@ export type IDocumentDriveServer = Pick<
     keyof BaseDocumentDriveServer
 >;
 
-export enum ListenerStatus {
-    CREATED,
-    PENDING,
-    SUCCESS,
-    MISSING,
-    CONFLICT,
-    ERROR
-}
+export type ListenerStatus =
+    | 'CREATED'
+    | 'PENDING'
+    | 'SUCCESS'
+    | 'MISSING'
+    | 'CONFLICT'
+    | 'ERROR';
 
 export interface ListenerState {
     driveId: string;

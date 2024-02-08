@@ -9,6 +9,7 @@ import {
     writeFileSync
 } from 'fs';
 import fs from 'fs/promises';
+import stringify from 'json-stringify-deterministic';
 import path from 'path';
 import sanitize from 'sanitize-filename';
 import { mergeOperations } from '..';
@@ -90,7 +91,7 @@ export class FilesystemStorage implements IDriveStorage {
     async createDocument(drive: string, id: string, document: DocumentStorage) {
         const documentPath = this._buildDocumentPath(drive, id);
         await ensureDir(path.dirname(documentPath));
-        await writeFileSync(documentPath, JSON.stringify(document), {
+        await writeFileSync(documentPath, stringify(document), {
             encoding: 'utf-8'
         });
     }

@@ -3,11 +3,12 @@ import {
     ListenerFilter
 } from 'document-model-libs/document-drive';
 import { OperationScope } from 'document-model/document';
+import { OperationError } from '../error';
 import {
     BaseListenerManager,
+    ErrorStatus,
     Listener,
     ListenerState,
-    ListenerStatus,
     StrandUpdate,
     SynchronizationUnit
 } from '../types';
@@ -51,7 +52,7 @@ export class ListenerManager extends BaseListenerManager {
             driveId: listener.driveId,
             pendingTimeout: '0',
             listener,
-            listenerStatus: ListenerStatus.CREATED,
+            listenerStatus: 'CREATED',
             syncUnits: [
                 {
                     syncId: '0',
@@ -188,7 +189,7 @@ export class ListenerManager extends BaseListenerManager {
                     driveId: listener.driveId,
                     pendingTimeout: '0',
                     listener,
-                    listenerStatus: ListenerStatus.CREATED,
+                    listenerStatus: 'CREATED',
                     syncUnits: listenerState.syncUnits.concat(
                         filteredSyncUnits.map(e => ({
                             ...e,
@@ -275,11 +276,7 @@ export class ListenerManager extends BaseListenerManager {
                 listener.pendingTimeout = new Date(
                     new Date().getTime() / 1000 + 300
                 ).toISOString();
-
-                listener.listenerStatus = ListenerStatus.PENDING;
-                listener.pendingTimeout = new Date(
-                    new Date().getTime() / 1000 + 300
-                ).toISOString();
+                listener.listenerStatus = 'PENDING';
 
                 // TODO update listeners in parallel, blocking for listeners with block=true
                 try {
@@ -287,7 +284,7 @@ export class ListenerManager extends BaseListenerManager {
                         await transmitter?.transmit(strandUpdates);
 
                     listener.pendingTimeout = '0';
-                    listener.listenerStatus = ListenerStatus.PENDING;
+                    listener.listenerStatus = 'PENDING';
 
                     for (const unit of listener.syncUnits) {
                         const revision = listenerRevisions.find(
@@ -296,15 +293,23 @@ export class ListenerManager extends BaseListenerManager {
                                 e.scope === unit.scope &&
                                 e.branch === unit.branch
                         );
-                        if (!revision) {
-                            continue;
+                        if (revision?.status === 'SUCCESS') {
+                            unit.listenerRev = revision.revision;
                         }
-
-                        unit.listenerRev = revision.revision;
                     }
-                    listener.listenerStatus = ListenerStatus.SUCCESS;
+                    const revisionError = listenerRevisions.find(
+                        l => l.status !== 'SUCCESS'
+                    );
+                    if (revisionError) {
+                        throw new OperationError(
+                            revisionError.status as ErrorStatus,
+                            undefined
+                        );
+                    }
+                    listener.listenerStatus = 'SUCCESS';
                 } catch (e) {
-                    listener.listenerStatus = ListenerStatus.ERROR;
+                    listener.listenerStatus =
+                        e instanceof OperationError ? e.status : 'ERROR';
                     throw e;
                 }
             }

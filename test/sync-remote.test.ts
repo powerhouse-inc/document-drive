@@ -96,7 +96,7 @@ describe.sequential('Document Drive Server with %s', async () => {
                 drive.operations.global[0]!
             );
             expect(addFileResult.error).toBeUndefined();
-            expect(addFileResult.success).toBe(true);
+            expect(addFileResult.status).toBe('SUCCESS');
 
             let document = (await server.getDocument(
                 '1',
@@ -110,7 +110,7 @@ describe.sequential('Document Drive Server with %s', async () => {
             const operation = document.operations.global[0]!;
             const result = await server.addOperation('1', '1.1', operation);
             expect(result.error).toBeUndefined();
-            expect(result.success).toBe(true);
+            expect(result.status).toBe('SUCCESS');
         }
     );
 

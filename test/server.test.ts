@@ -131,7 +131,7 @@ describe.each(storageLayers)(
                 '1',
                 operation
             );
-            expect(operationResult.success).toBe(true);
+            expect(operationResult.status).toBe('SUCCESS');
 
             drive = await server.getDrive('1');
             expect(drive.state).toStrictEqual(operationResult.document?.state);
@@ -192,7 +192,7 @@ describe.each(storageLayers)(
             const operation = drive.operations.global[0]!;
 
             const result = await server.addDriveOperation('1', operation);
-            expect(result.success).toBe(true);
+            expect(result.status).toBe('SUCCESS');
 
             const document = await server.getDocument('1', '1.1');
             expect(document.documentType).toBe('powerhouse/document-model');
@@ -239,7 +239,7 @@ describe.each(storageLayers)(
                 '1',
                 drive.operations.global[0]!
             );
-            expect(result.success).toBe(true);
+            expect(result.status).toBe('SUCCESS');
 
             // removes file
             drive = reducer(
@@ -252,7 +252,7 @@ describe.each(storageLayers)(
                 '1',
                 drive.operations.global[1]!
             );
-            expect(result.success).toBe(true);
+            expect(result.status).toBe('SUCCESS');
 
             const serverDrive = await server.getDrive('1');
             expect(serverDrive.state.global.nodes).toStrictEqual([]);
@@ -300,7 +300,7 @@ describe.each(storageLayers)(
                 '1',
                 drive.operations.global
             );
-            expect(result.success).toBe(true);
+            expect(result.status).toBe('SUCCESS');
 
             const documents = await server.getDocuments('1');
             expect(documents).toStrictEqual([]);
@@ -361,7 +361,7 @@ describe.each(storageLayers)(
                 '1',
                 drive.operations.global
             );
-            expect(result.success).toBe(true);
+            expect(result.status).toBe('SUCCESS');
 
             const documents = await server.getDocuments('1');
             expect(documents).toStrictEqual([]);
@@ -434,7 +434,7 @@ describe.each(storageLayers)(
                 '1',
                 drive.operations.global[0]!
             );
-            expect(result.success).toBe(true);
+            expect(result.status).toBe('SUCCESS');
 
             await server.deleteDrive('1');
 
@@ -473,7 +473,7 @@ describe.each(storageLayers)(
                 '1',
                 drive.operations.global[0]!
             );
-            expect(result.success).toBe(true);
+            expect(result.status).toBe('SUCCESS');
 
             drive = await server.getDrive('1');
             expect(drive.state.global.name).toBe('new name');
@@ -536,8 +536,8 @@ describe.each(storageLayers)(
                 '1',
                 drive.operations.global
             );
-            console.error(result.error);
-            expect(result.success).toBe(true);
+
+            expect(result.status).toBe('SUCCESS');
 
             drive = await server.getDrive('1');
             const document = await server.getDocument('1', '1.1');
@@ -588,7 +588,7 @@ describe.each(storageLayers)(
             );
             const operation = document.operations.global[0]!;
             const result = await server.addOperation('1', '1.1', operation);
-            expect(result.success).toBe(true);
+            expect(result.status).toBe('SUCCESS');
             expect(result.operations[0]).toStrictEqual(operation);
 
             const storedDocument = await server.getDocument('1', '1.1');

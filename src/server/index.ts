@@ -20,11 +20,13 @@ import { MemoryStorage } from '../storage/memory';
 import type { DocumentStorage, IDriveStorage } from '../storage/types';
 import { generateUUID, isDocumentDrive } from '../utils';
 import { requestPublicDrive } from '../utils/graphql';
+import { OperationError } from './error';
 import { ListenerManager } from './listener/manager';
 import { PullResponderTransmitter } from './listener/transmitter';
 import type { ITransmitter } from './listener/transmitter/types';
 import {
     BaseDocumentDriveServer,
+    IOperationResult,
     RemoteDriveOptions,
     StrandUpdate,
     SyncStatus,
@@ -74,16 +76,18 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             })
         );
 
-        return !strand.documentId
-            ? await this.addDriveOperations(
+        const result = await (!strand.documentId
+            ? this.addDriveOperations(
                   strand.driveId,
                   operations as Operation<DocumentDriveAction | BaseAction>[]
               )
-            : await this.addOperations(
+            : this.addOperations(
                   strand.driveId,
                   strand.documentId,
                   operations
-              );
+              ));
+        this.syncStatus.set(strand.driveId, result.status);
+        return result;
     }
 
     private shouldSyncRemoteDrive(drive: DocumentDriveDocument) {
@@ -113,10 +117,14 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     trigger,
                     this.saveStrand.bind(this),
                     error => {
-                        this.syncStatus.set(driveId, 'ERROR');
-                        console.error(error);
+                        this.syncStatus.set(
+                            driveId,
+                            error instanceof OperationError
+                                ? error.status
+                                : 'ERROR'
+                        );
                     },
-                    acknowledgeSuccess => console.log('ack', acknowledgeSuccess)
+                    acknowledgeSuccess => {}
                 );
                 driveTriggers.set(trigger.id, intervalId);
                 this.triggerMap.set(trigger.id, driveTriggers);
@@ -601,21 +609,31 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     syncUnit.lastUpdated
                 );
             }
-
+            this.syncStatus.set(drive, 'SUCCESS');
             return {
-                success: true,
+                status: 'SUCCESS',
                 document,
                 operations,
                 signals
-            };
+            } satisfies IOperationResult;
         } catch (error) {
+            const operationError =
+                error instanceof OperationError
+                    ? error
+                    : new OperationError(
+                          'ERROR',
+                          undefined,
+                          (error as Error).message,
+                          (error as Error).cause
+                      );
+            this.syncStatus.set(drive, operationError.status);
             return {
-                success: false,
-                error: error as Error,
+                status: operationError.status,
+                error: operationError,
                 document: undefined,
                 operations,
                 signals: []
-            };
+            } satisfies IOperationResult;
         }
     }
 
@@ -645,9 +663,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
                 const existingOperation = scopeOperations[op.index];
                 if (existingOperation && existingOperation.hash !== op.hash) {
-                    throw new Error(
-                        `Confliction operation on index ${op.index}`,
-                        { cause: op }
+                    throw new OperationError(
+                        'CONFLICT',
+                        op,
+                        `Conflicting operation on index ${op.index}`
                     );
                 }
             }
@@ -688,21 +707,31 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             } else {
                 throw new Error('Invalid Document Drive document');
             }
-
+            this.syncStatus.set(drive, 'SUCCESS');
             return {
-                success: true,
+                status: 'SUCCESS',
                 document,
                 operations,
                 signals
-            };
+            } satisfies IOperationResult;
         } catch (error) {
+            const operationError =
+                error instanceof OperationError
+                    ? error
+                    : new OperationError(
+                          'ERROR',
+                          undefined,
+                          (error as Error).message,
+                          (error as Error).cause
+                      );
+            this.syncStatus.set(drive, operationError.status);
             return {
-                success: false,
-                error: error as Error,
+                status: operationError.status,
+                error: operationError,
                 document: undefined,
                 operations,
                 signals: []
-            };
+            } satisfies IOperationResult;
         }
     }
 

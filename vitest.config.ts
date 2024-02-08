@@ -7,6 +7,11 @@ export default defineConfig({
                 inline: ['document-model-libs']
             }
         },
-        setupFiles: './test/vitest-setup.ts'
+        setupFiles: './test/vitest-setup.ts',
+        poolOptions: {
+            threads: {
+                singleThread: true
+            }
+        }
     }
 });
