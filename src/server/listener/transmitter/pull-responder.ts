@@ -145,18 +145,22 @@ export class PullResponderTransmitter implements ITransmitter {
             url,
             gql`
                 query strands($listenerId: ID!) {
-                    strands(listenerId: $listenerId) {
-                        driveId
-                        documentId
-                        scope
-                        branch
-                        operations {
-                            timestamp
-                            skip
-                            type
-                            input
-                            hash
-                            index
+                    system {
+                        sync {
+                            strands(listenerId: $listenerId) {
+                                driveId
+                                documentId
+                                scope
+                                branch
+                                operations {
+                                    timestamp
+                                    skip
+                                    type
+                                    input
+                                    hash
+                                    index
+                                }
+                            }
                         }
                     }
                 }
