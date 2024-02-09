@@ -10,7 +10,9 @@ import {
     utils
 } from 'document-model-libs/document-drive';
 import {
+    Action,
     BaseAction,
+    Document,
     DocumentModel,
     Operation,
     OperationScope,
@@ -459,11 +461,60 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         return this.storage.deleteDocument(driveId, id);
     }
 
-    private _preprocessOperations(
-        operations: Operation[],
-        documentStorage: DocumentStorage
+    async _processOperations<T extends Document, A extends Action>(
+        drive: string,
+        documentStorage: DocumentStorage<T>,
+        operations: Operation<A | BaseAction>[]
     ) {
-        const operationsToApply: Operation[] = [];
+        const operationsApplied: Operation<A | BaseAction>[] = [];
+        let document: T | undefined;
+        const signals: SignalResult[] = [];
+
+        // eslint-disable-next-line prefer-const
+        let [operationsToApply, error] = this._validateOperations(
+            operations,
+            documentStorage
+        );
+
+        // retrieves the document's document model and
+        // applies the operations using its reducer
+        for (const operation of operationsToApply) {
+            try {
+                const {
+                    document: newDocument,
+                    signals,
+                    operation: appliedOperation
+                } = await this._performOperation(
+                    drive,
+                    document ?? documentStorage,
+                    operation
+                );
+                document = newDocument;
+                operationsApplied.push(appliedOperation);
+                signals.push(...signals);
+            } catch (e) {
+                if (!error) {
+                    error =
+                        e instanceof OperationError
+                            ? e
+                            : new OperationError(
+                                  'ERROR',
+                                  operation,
+                                  (e as Error).message,
+                                  (e as Error).cause
+                              );
+                }
+                break;
+            }
+        }
+        return { document, operationsApplied, signals, error } as const;
+    }
+
+    private _validateOperations<T extends Document, A extends Action>(
+        operations: Operation<A | BaseAction>[],
+        documentStorage: DocumentStorage<T>
+    ) {
+        const operationsToApply: Operation<A | BaseAction>[] = [];
         let error: OperationError | undefined;
 
         // sort operations so from smaller index to biggest
@@ -503,10 +554,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         return [operationsToApply, error] as const;
     }
 
-    private async _performOperation(
+    private async _performOperation<T extends Document, A extends Action>(
         drive: string,
-        documentStorage: DocumentStorage,
-        operation: Operation
+        documentStorage: DocumentStorage<T>,
+        operation: Operation<A | BaseAction>
     ) {
         const documentModel = this._getDocumentModel(
             documentStorage.documentType
@@ -517,7 +568,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             documentModel.reducer,
             undefined,
             documentStorage
-        );
+        ) as T;
 
         const signalResults: SignalResult[] = [];
         let newDocument = document;
@@ -551,7 +602,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     handler().then(result => ({ signal, result }))
                 );
             }
-        });
+        }) as T;
 
         const appliedOperation =
             newDocument.operations[operation.scope][operation.index];
@@ -583,29 +634,39 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         // retrieves document from storage
         const documentStorage = await this.storage.getDocument(drive, id);
 
-        // TODO check if existing operations hash is the same
-        operations = operations.filter(
-            op => op.index >= documentStorage.operations[op.scope].length
-        );
+        let document: Document | undefined;
+        const operationsApplied: Operation[] = [];
+        const signals: SignalResult[] = [];
+        let error: Error | undefined;
+
         try {
             // retrieves the document's document model and
             // applies the operations using its reducer
-            const { document, signals } = await this._performOperations(
+            const result = await this._processOperations(
                 drive,
                 documentStorage,
                 operations
             );
 
-            // saves the updated state of the document and returns it
+            document = result.document;
+            operationsApplied.push(...result.operationsApplied);
+            signals.push(...result.signals);
+            error = result.error;
+
+            if (!document) {
+                throw error ?? new Error('Invalid document');
+            }
+
+            // saves the applied operations to storage
             await this.storage.addDocumentOperations(
                 drive,
                 id,
-                operations,
+                operationsApplied,
                 document
             );
 
             // gets all the different scopes and branches combinations from the operations
-            const { scopes, branches } = operations.reduce(
+            const { scopes, branches } = operationsApplied.reduce(
                 (acc, operation) => {
                     if (!acc.scopes.includes(operation.scope)) {
                         acc.scopes.push(operation.scope);
@@ -630,11 +691,18 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     syncUnit.lastUpdated
                 );
             }
+
+            // after applying all the valid operations,throws
+            // an error if there was an invalid operation
+            if (error) {
+                throw error;
+            }
+
             this.syncStatus.set(drive, 'SUCCESS');
             return {
                 status: 'SUCCESS',
                 document,
-                operations,
+                operations: operationsApplied,
                 signals
             } satisfies IOperationResult;
         } catch (error) {
@@ -651,9 +719,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             return {
                 status: operationError.status,
                 error: operationError,
-                document: undefined,
-                operations,
-                signals: []
+                document,
+                operations: operationsApplied,
+                signals
             } satisfies IOperationResult;
         }
     }
@@ -672,113 +740,84 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         // retrieves document from storage
         const documentStorage = await this.storage.getDrive(drive);
 
-        const operationsApplied: Operation[] = [];
         let document: DocumentDriveDocument | undefined;
+        const operationsApplied: Operation<DocumentDriveAction | BaseAction>[] =
+            [];
         const signals: SignalResult[] = [];
+        let error: Error | undefined;
 
         try {
-            // eslint-disable-next-line prefer-const
-            let [operationsToApply, error] = this._preprocessOperations(
-                operations,
-                documentStorage
+            const result = await this._processOperations<
+                DocumentDriveDocument,
+                DocumentDriveAction
+            >(drive, documentStorage, operations);
+
+            document = result.document;
+            operationsApplied.push(...result.operationsApplied);
+            signals.push(...result.signals);
+            error = result.error;
+
+            if (!document || !isDocumentDrive(document)) {
+                throw error ?? new Error('Invalid Document Drive document');
+            }
+
+            // saves the applied operations to storage
+            await this.storage.addDriveOperations(
+                drive,
+                operationsApplied,
+                document
             );
 
-            // retrieves the document's document model and
-            // applies the operations using its reducer
-            for (const operation of operationsToApply) {
-                try {
-                    const {
-                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                        document: newDocument,
-                        signals,
-                        operation: appliedOperation
-                    } = await this._performOperation(
+            for (const operation of operationsApplied) {
+                if (operation.type === 'ADD_LISTENER') {
+                    const { listener } = operation.input as AddListenerInput;
+                    await this.listenerStateManager.addListener({
+                        ...listener,
+                        driveId: drive,
+                        label: listener.label ?? '',
+                        system: listener.system ?? false,
+                        filter: {
+                            branch: listener.filter.branch ?? [],
+                            documentId: listener.filter.documentId ?? [],
+                            documentType: listener.filter.documentType ?? [],
+                            scope: listener.filter.scope ?? []
+                        },
+                        callInfo: {
+                            data: listener.callInfo?.data ?? '',
+                            name: listener.callInfo?.name ?? 'PullResponder',
+                            transmitterType:
+                                listener.callInfo?.transmitterType ??
+                                'PullResponder'
+                        }
+                    });
+                } else if (operation.type === 'REMOVE_LISTENER') {
+                    const { listenerId } =
+                        operation.input as RemoveListenerInput;
+                    await this.listenerStateManager.removeListener(
                         drive,
-                        document ?? documentStorage,
-                        operation
+                        listenerId
                     );
-                    document = newDocument as DocumentDriveDocument;
-                    operationsApplied.push(appliedOperation);
-                    signals.push(...signals);
-                } catch (e) {
-                    error =
-                        e instanceof OperationError
-                            ? e
-                            : new OperationError(
-                                  'ERROR',
-                                  operation,
-                                  (e as Error).message,
-                                  (e as Error).cause
-                              );
-                    break;
                 }
             }
 
-            if (document && isDocumentDrive(document)) {
-                await this.storage.addDriveOperations(
+            // update listener cache
+            const lastOperation = operationsApplied
+                .filter(op => op.scope === 'global')
+                .slice()
+                .pop();
+            if (lastOperation) {
+                await this.listenerStateManager.updateSynchronizationRevision(
                     drive,
-                    operationsApplied as Operation<
-                        BaseAction | DocumentDriveAction
-                    >[],
-                    document
+                    '0',
+                    lastOperation.index,
+                    lastOperation.timestamp
                 );
+            }
 
-                for (const operation of operationsApplied) {
-                    if (operation.type === 'ADD_LISTENER') {
-                        const { listener } =
-                            operation.input as AddListenerInput;
-                        await this.listenerStateManager.addListener({
-                            ...listener,
-                            driveId: drive,
-                            label: listener.label ?? '',
-                            system: listener.system ?? false,
-                            filter: {
-                                branch: listener.filter.branch ?? [],
-                                documentId: listener.filter.documentId ?? [],
-                                documentType:
-                                    listener.filter.documentType ?? [],
-                                scope: listener.filter.scope ?? []
-                            },
-                            callInfo: {
-                                data: listener.callInfo?.data ?? '',
-                                name:
-                                    listener.callInfo?.name ?? 'PullResponder',
-                                transmitterType:
-                                    listener.callInfo?.transmitterType ??
-                                    'PullResponder'
-                            }
-                        });
-                    } else if (operation.type === 'REMOVE_LISTENER') {
-                        const { listenerId } =
-                            operation.input as RemoveListenerInput;
-                        await this.listenerStateManager.removeListener(
-                            drive,
-                            listenerId
-                        );
-                    }
-                }
-
-                // update listener cache
-                const lastOperation = operationsApplied
-                    .filter(op => op.scope === 'global')
-                    .slice()
-                    .pop();
-                if (lastOperation) {
-                    await this.listenerStateManager.updateSynchronizationRevision(
-                        drive,
-                        '0',
-                        lastOperation.index,
-                        lastOperation.timestamp
-                    );
-                }
-
-                if (this.shouldSyncRemoteDrive(document)) {
-                    this.startSyncRemoteDrive(document.state.global.id);
-                } else {
-                    this.stopSyncRemoteDrive(document.state.global.id);
-                }
+            if (this.shouldSyncRemoteDrive(document)) {
+                this.startSyncRemoteDrive(document.state.global.id);
             } else {
-                throw error ?? new Error('Invalid Document Drive document');
+                this.stopSyncRemoteDrive(document.state.global.id);
             }
 
             // after applying all the valid operations,throws
@@ -811,7 +850,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             return {
                 status: operationError.status,
                 error: operationError,
-                document: undefined,
+                document,
                 operations: operationsApplied,
                 signals
             } satisfies IOperationResult;
