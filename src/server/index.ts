@@ -471,13 +471,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
         for (let i = 0; i < operations.length; i++) {
             const op = operations[i]!;
-            const pastOperations = operationsToApply.slice(0, i);
+            const pastOperations = operationsToApply
+                .filter(appliedOperation => appliedOperation.scope === op.scope)
+                .slice(0, i);
             const scopeOperations = documentStorage.operations[op.scope];
 
-            const nextIndex =
-                scopeOperations.length +
-                pastOperations.filter(pastOp => pastOp.scope === op.scope)
-                    .length;
+            const nextIndex = scopeOperations.length + pastOperations.length;
             if (op.index > nextIndex) {
                 error = new OperationError(
                     'MISSING',
@@ -486,7 +485,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 );
                 continue;
             } else if (op.index < nextIndex) {
-                const existingOperation = scopeOperations[op.index];
+                const existingOperation =
+                    scopeOperations.concat(pastOperations)[op.index];
                 if (existingOperation && existingOperation.hash !== op.hash) {
                     error = new OperationError(
                         'CONFLICT',
