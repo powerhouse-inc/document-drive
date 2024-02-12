@@ -14,7 +14,7 @@ import {
 } from 'document-model/document-model';
 import fs from 'fs/promises';
 import path from 'path';
-import { afterEach, describe, it } from 'vitest';
+import { afterEach, beforeEach, describe, it, vi } from 'vitest';
 import { DocumentDriveServer } from '../src/server';
 import { BrowserStorage } from '../src/storage/browser';
 import { FilesystemStorage } from '../src/storage/filesystem';
@@ -51,7 +51,13 @@ const storageLayers = [
 describe.each(storageLayers)(
     'Document Drive Server with %s',
     (storageName, buildStorage) => {
+        beforeEach(() => {
+            vi.useFakeTimers().setSystemTime(new Date('2024-01-01'));
+        });
+
         afterEach(async () => {
+            vi.useRealTimers();
+
             if (storageName === 'FilesystemStorage') {
                 return fs.rm(FileStorageDir, { recursive: true, force: true });
             } else if (storageName === 'PrismaStorage') {
@@ -561,7 +567,7 @@ describe.each(storageLayers)(
         it('adds document operation', async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
-                buildStorage()
+                await buildStorage()
             );
             await server.addDrive({
                 global: {

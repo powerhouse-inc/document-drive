@@ -181,7 +181,7 @@ export class PullResponderTransmitter implements ITransmitter {
             ...s,
             operations: s.operations.map(o => ({
                 ...o,
-                input: JSON.parse(o.input)
+                input: JSON.parse(o.input) as object
             }))
         }));
     }
@@ -192,7 +192,7 @@ export class PullResponderTransmitter implements ITransmitter {
         listenerId: string,
         revisions: ListenerRevision[]
     ): Promise<boolean> {
-        const result = await requestGraphql<boolean>(
+        const result = await requestGraphql<{ acknowledge: boolean }>(
             url,
             gql`
                 mutation acknowledge(
@@ -204,16 +204,16 @@ export class PullResponderTransmitter implements ITransmitter {
             `,
             { listenerId, revisions }
         );
-        return result;
+        return result.acknowledge;
     }
 
-    static async setupPull(
+    static setupPull(
         driveId: string,
         trigger: PullResponderTrigger,
         onStrandUpdate: (strand: StrandUpdate) => Promise<IOperationResult>,
         onError: (error: Error) => void,
         onAcknowledge?: (success: boolean) => void
-    ): Promise<number> {
+    ): number {
         const { url, listenerId, interval } = trigger.data;
         let loopInterval = PULL_DRIVE_INTERVAL;
         if (interval) {
@@ -282,14 +282,14 @@ export class PullResponderTransmitter implements ITransmitter {
                     }
                 }
 
-                const ackRequest =
-                    await PullResponderTransmitter.acknowledgeStrands(
-                        driveId,
-                        url,
-                        listenerId,
-                        listenerRevisions
-                    );
-                onAcknowledge?.(ackRequest);
+                await PullResponderTransmitter.acknowledgeStrands(
+                    driveId,
+                    url,
+                    listenerId,
+                    listenerRevisions
+                )
+                    .then(result => onAcknowledge?.(result))
+                    .catch(error => console.error('ACK error', error));
             } catch (error) {
                 onError(error as Error);
             }

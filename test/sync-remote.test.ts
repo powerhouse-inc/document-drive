@@ -117,75 +117,71 @@ describe('Document Drive Server with remote switchboard instance', async () => {
         }
     );
 
-    itAvailable(
-        'should pull from remote switchboard if remoteDriveUrl is set',
-        async ({ expect }) => {
-            // Connect document drive server
-            const server = new DocumentDriveServer(
-                documentModels,
-                storageLayer
-            );
-            await server.initialize();
-            try {
-                await server.addRemoteDrive(buildSwitchboardUrl('d/1'), {
-                    availableOffline: true,
-                    sharingType: 'public',
-                    listeners: [],
-                    triggers: []
-                });
-            } catch (e) {
-                console.error(e);
-            }
-
-            vi.advanceTimersToNextTimer();
-            vi.advanceTimersToNextTimer();
-
-            const drive = await vi.waitFor(
-                async () => {
-                    const drive = await server.getDrive('1');
-                    expect(drive.operations.global.length).toBeTruthy();
-                    return drive;
-                },
-                {
-                    timeout: 1500,
-                    interval: 20
-                }
-            );
-
-            expect(drive.operations.global[0]).toMatchObject({
-                index: 0,
-                skip: 0,
-                type: 'ADD_FILE',
-                scope: 'global',
-                branch: 'main',
-                hash: '+oWJspzrQnYtIYN+ceBaV+pgy0g=',
-                timestamp: expect.stringMatching(
-                    /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z)/
-                ),
-                input: {
-                    id: '1.1',
-                    name: 'document 1',
-                    documentType: 'powerhouse/document-model',
-                    scopes: ['global', 'local']
-                }
+    it('should pull from remote switchboard if remoteDriveUrl is set', async ({
+        expect
+    }) => {
+        // Connect document drive server
+        const server = new DocumentDriveServer(documentModels, storageLayer);
+        await server.initialize();
+        try {
+            await server.addRemoteDrive(buildSwitchboardUrl('d/1'), {
+                availableOffline: true,
+                sharingType: 'public',
+                listeners: [],
+                triggers: []
             });
-
-            const document = await vi.waitFor(
-                async () => {
-                    const document = (await server.getDocument(
-                        '1',
-                        '1.1'
-                    )) as DocumentModelDocument;
-                    expect(document.operations.global.length).toBeTruthy();
-                    return document;
-                },
-                {
-                    timeout: 500,
-                    interval: 20
-                }
-            );
-
-            expect(document.state.global.author.name).toBe('test');
+        } catch (e) {
+            console.error(e);
         }
-    );
+
+        vi.advanceTimersToNextTimer();
+        vi.advanceTimersToNextTimer();
+
+        const drive = await vi.waitFor(
+            async () => {
+                const drive = await server.getDrive('1');
+                expect(drive.operations.global.length).toBeTruthy();
+                return drive;
+            },
+            {
+                timeout: 1500,
+                interval: 20
+            }
+        );
+
+        expect(drive.operations.global[0]).toMatchObject({
+            index: 0,
+            skip: 0,
+            type: 'ADD_FILE',
+            scope: 'global',
+            branch: 'main',
+            hash: '+oWJspzrQnYtIYN+ceBaV+pgy0g=',
+            timestamp: expect.stringMatching(
+                /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z)/
+            ),
+            input: {
+                id: '1.1',
+                name: 'document 1',
+                documentType: 'powerhouse/document-model',
+                scopes: ['global', 'local']
+            }
+        });
+
+        const document = await vi.waitFor(
+            async () => {
+                const document = (await server.getDocument(
+                    '1',
+                    '1.1'
+                )) as DocumentModelDocument;
+                expect(document.operations.global.length).toBeTruthy();
+                return document;
+            },
+            {
+                timeout: 500,
+                interval: 20
+            }
+        );
+
+        expect(document.state.global.author.name).toBe('test');
+    });
 });

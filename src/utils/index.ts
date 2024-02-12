@@ -31,8 +31,10 @@ export function mergeOperations<A extends Action = Action>(
     }, currentOperations);
 }
 
-export function generateUUID() {
+export function generateUUID(): string {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const crypto =
         typeof window !== 'undefined' ? window.crypto : require('crypto');
-    return crypto.randomUUID();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    return crypto.randomUUID() as string;
 }

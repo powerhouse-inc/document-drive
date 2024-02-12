@@ -21,6 +21,7 @@ export class PrismaStorage implements IDriveStorage {
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
         await this.createDocument('drives', id, drive as DocumentStorage);
     }
+
     async addDriveOperations(
         id: string,
         operations: Operation[],
@@ -247,8 +248,10 @@ export class PrismaStorage implements IDriveStorage {
 
         await this.db.document.delete({
             where: {
-                driveId: drive,
-                id: id
+                id_driveId: {
+                    driveId: drive,
+                    id: id
+                }
             }
         });
 

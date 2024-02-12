@@ -121,7 +121,7 @@ describe('Document Drive Server with %s', () => {
         }),
         graphql.query('strands', () => {
             return HttpResponse.json({
-                data: { strands }
+                data: { system: { sync: { strands } } }
             });
         }),
         graphql.mutation('acknowledge', () => {
@@ -362,9 +362,9 @@ describe('Document Drive Server with %s', () => {
     it('should pull from switchboard if remoteDriveUrl is set', async ({
         expect
     }) => {
-        const ackRequestPromise: Promise<JSON> = new Promise(resolve => {
+        const ackRequestPromise = new Promise<JSON>(resolve => {
             mswServer.events.on('request:end', async ({ request }) => {
-                request.json().then(body => {
+                void request.json().then(body => {
                     if (body.operationName === 'acknowledge') {
                         resolve(body);
                     }
@@ -509,7 +509,7 @@ describe('Document Drive Server with %s', () => {
         mswServer.use(
             graphql.query('strands', () => {
                 return HttpResponse.json({
-                    data: { strands: [] }
+                    data: { system: { sync: { strands: [] } } }
                 });
             })
         );
@@ -551,7 +551,7 @@ describe('Document Drive Server with %s', () => {
         mswServer.use(
             graphql.query('strands', () => {
                 return HttpResponse.json({
-                    data: { strands }
+                    data: { system: { sync: { strands } } }
                 });
             })
         );
@@ -581,7 +581,7 @@ describe('Document Drive Server with %s', () => {
         mswServer.use(
             graphql.query('strands', () => {
                 return HttpResponse.json({
-                    data: { strands: [] }
+                    data: { system: { sync: { strands: [] } } }
                 });
             }),
             graphql.mutation('pushUpdates', () => {

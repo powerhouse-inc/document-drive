@@ -1,10 +1,8 @@
 import {
-    AddListenerInput,
     DocumentDriveAction,
     DocumentDriveDocument,
     DocumentDriveState,
     FileNode,
-    RemoveListenerInput,
     Trigger,
     isFileNode,
     utils
@@ -48,11 +46,11 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     private documentModels: DocumentModel[];
     private storage: IDriveStorage;
     private listenerStateManager: ListenerManager;
-    private triggerMap: Map<
+    private triggerMap = new Map<
         DocumentDriveState['id'],
         Map<Trigger['id'], number>
-    > = new Map();
-    private syncStatus: Map<DocumentDriveState['id'], SyncStatus> = new Map();
+    >();
+    private syncStatus = new Map<DocumentDriveState['id'], SyncStatus>();
 
     constructor(
         documentModels: DocumentModel[],
@@ -104,7 +102,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         let driveTriggers = this.triggerMap.get(driveId);
 
         for (const trigger of drive.state.local.triggers) {
-            if (driveTriggers && driveTriggers.get(trigger.id)) {
+            if (driveTriggers?.get(trigger.id)) {
                 continue;
             }
 
@@ -114,7 +112,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             }
 
             if (PullResponderTransmitter.isPullResponderTrigger(trigger)) {
-                const intervalId = await PullResponderTransmitter.setupPull(
+                const intervalId = PullResponderTransmitter.setupPull(
                     driveId,
                     trigger,
                     this.saveStrand.bind(this),
@@ -749,7 +747,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             const result = await this._processOperations<
                 DocumentDriveDocument,
                 DocumentDriveAction
-            >(drive, documentStorage, operations);
+            >(drive, documentStorage, operations.slice());
 
             document = result.document;
             operationsApplied.push(...result.operationsApplied);
@@ -769,7 +767,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
             for (const operation of operationsApplied) {
                 if (operation.type === 'ADD_LISTENER') {
-                    const { listener } = operation.input as AddListenerInput;
+                    const { listener } = operation.input;
                     await this.listenerStateManager.addListener({
                         ...listener,
                         driveId: drive,
@@ -790,8 +788,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                         }
                     });
                 } else if (operation.type === 'REMOVE_LISTENER') {
-                    const { listenerId } =
-                        operation.input as RemoveListenerInput;
+                    const { listenerId } = operation.input;
                     await this.listenerStateManager.removeListener(
                         drive,
                         listenerId
