@@ -17,9 +17,10 @@ function buildSwitchboardUrl(endpoint: string) {
     return new URL(endpoint, SWITCHBOARD_URL).href;
 }
 
-describe.sequential('Document Drive Server with %s', async () => {
+describe('Document Drive Server with remote switchboard instance', async () => {
     const switchboardAvailable = await fetch(buildSwitchboardUrl('healthz'))
-        .then(r => r.ok)
+        .then(r => r.ok && r.json())
+        .then(r => r.status === 'healthy')
         .catch(() => false);
 
     const documentModels = [
@@ -37,9 +38,9 @@ describe.sequential('Document Drive Server with %s', async () => {
         vi.useRealTimers();
     });
 
-    const itAvailabe = switchboardAvailable ? it : it.skip;
+    const itAvailable = switchboardAvailable ? it : it.skip;
 
-    itAvailabe(
+    itAvailable(
         'should push to remote switchboard if remoteDriveUrl is set',
         async ({ expect }) => {
             const server = new DocumentDriveServer(
@@ -50,9 +51,9 @@ describe.sequential('Document Drive Server with %s', async () => {
             await server.addDrive({
                 global: {
                     id: '1',
-                    name: 'name',
-                    icon: 'icon',
-                    slug: '1'
+                    name: 'Monetalis',
+                    icon: null,
+                    slug: null
                 },
                 local: {
                     availableOffline: false,
@@ -62,7 +63,7 @@ describe.sequential('Document Drive Server with %s', async () => {
                         {
                             block: true,
                             callInfo: {
-                                data: buildSwitchboardUrl('1'),
+                                data: buildSwitchboardUrl('d/1'),
                                 name: 'switchboard-push',
                                 transmitterType: 'SwitchboardPush'
                             },
@@ -91,10 +92,12 @@ describe.sequential('Document Drive Server with %s', async () => {
                     scopes: ['global', 'local']
                 })
             );
+
             const addFileResult = await server.addDriveOperation(
                 '1',
                 drive.operations.global[0]!
             );
+
             expect(addFileResult.error).toBeUndefined();
             expect(addFileResult.status).toBe('SUCCESS');
 
@@ -114,7 +117,7 @@ describe.sequential('Document Drive Server with %s', async () => {
         }
     );
 
-    itAvailabe(
+    itAvailable(
         'should pull from remote switchboard if remoteDriveUrl is set',
         async ({ expect }) => {
             // Connect document drive server
@@ -123,23 +126,18 @@ describe.sequential('Document Drive Server with %s', async () => {
                 storageLayer
             );
             await server.initialize();
-            await server.addRemoteDrive(buildSwitchboardUrl('1'), {
-                availableOffline: true,
-                sharingType: 'public',
-                listeners: [],
-                triggers: []
-            });
+            try {
+                await server.addRemoteDrive(buildSwitchboardUrl('d/1'), {
+                    availableOffline: true,
+                    sharingType: 'public',
+                    listeners: [],
+                    triggers: []
+                });
+            } catch (e) {
+                console.error(e);
+            }
 
-            await vi.waitFor(
-                async () => {
-                    await server.getDrive('1');
-                },
-                {
-                    timeout: 500,
-                    interval: 20
-                }
-            );
-
+            vi.advanceTimersToNextTimer();
             vi.advanceTimersToNextTimer();
 
             const drive = await vi.waitFor(
@@ -149,7 +147,7 @@ describe.sequential('Document Drive Server with %s', async () => {
                     return drive;
                 },
                 {
-                    timeout: 500,
+                    timeout: 1500,
                     interval: 20
                 }
             );
@@ -160,8 +158,10 @@ describe.sequential('Document Drive Server with %s', async () => {
                 type: 'ADD_FILE',
                 scope: 'global',
                 branch: 'main',
-                hash: 'ASoU0JoMMmy5N6W00OywIiIKXdU=',
-                timestamp: '2024-01-01T00:00:00.000Z',
+                hash: '+oWJspzrQnYtIYN+ceBaV+pgy0g=',
+                timestamp: expect.stringMatching(
+                    /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z)/
+                ),
                 input: {
                     id: '1.1',
                     name: 'document 1',

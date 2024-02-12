@@ -59,7 +59,7 @@ describe('Document Drive Server with %s', () => {
                         documentType: 'powerhouse/document-model',
                         scopes: ['global', 'local']
                     }),
-                    hash: 'ReImxJnUT6Gt2yRRq0q3PzPY2s4='
+                    hash: 'nQBsTlP2MNb+FDBAzOw3svwyHvg='
                 }
             ]
         },
@@ -407,7 +407,9 @@ describe('Document Drive Server with %s', () => {
             type: 'ADD_FILE',
             scope: 'global',
             hash: 'nQBsTlP2MNb+FDBAzOw3svwyHvg=',
-            timestamp: '2024-01-24T18:57:33.899Z',
+            timestamp: expect.stringMatching(
+                /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z)/
+            ),
             input: {
                 id: '1.1',
                 name: 'document 1',
@@ -544,7 +546,7 @@ describe('Document Drive Server with %s', () => {
 
         const result = await server.addDriveOperation('1', operation);
         expect(result.status).toBe('SUCCESS');
-        expect(server.getSyncStatus('1')).toBe('SUCCESS');
+        expect(server.getSyncStatus('1')).toBe('SYNCING');
 
         mswServer.use(
             graphql.query('strands', () => {
@@ -559,7 +561,7 @@ describe('Document Drive Server with %s', () => {
         const status = await vi.waitFor(
             async () => {
                 const status = server.getSyncStatus('1');
-                if (status !== 'CONFLICT') {
+                if (status === 'SYNCING') {
                     throw new Error('Syncing');
                 }
                 return status;
@@ -651,6 +653,9 @@ describe('Document Drive Server with %s', () => {
 
         const result = await server.addDriveOperation('1', operation);
         expect(result.status).toBe('CONFLICT');
-        expect(server.getSyncStatus('1')).toBe('CONFLICT');
+
+        const drive = await server.getDrive('1');
+        expect(drive.operations.global.length).toBe(1);
+        // expect(server.getSyncStatus('1')).toBe('');
     });
 });

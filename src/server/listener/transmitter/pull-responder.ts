@@ -18,6 +18,14 @@ export type OperationUpdateGraphQL = Omit<OperationUpdate, 'input'> & {
     input: string;
 };
 
+export type PullStrandsGraphQL = {
+    system: {
+        sync: {
+            strands: StrandUpdateGraphQL[];
+        };
+    };
+};
+
 export type StrandUpdateGraphQL = Omit<StrandUpdate, 'operations'> & {
     operations: OperationUpdateGraphQL[];
 };
@@ -139,9 +147,11 @@ export class PullResponderTransmitter implements ITransmitter {
         listenerId: string,
         since?: string // TODO add support for since
     ): Promise<StrandUpdate[]> {
-        const { strands } = await requestGraphql<{
-            strands: StrandUpdateGraphQL[];
-        }>(
+        const {
+            system: {
+                sync: { strands }
+            }
+        } = await requestGraphql<PullStrandsGraphQL>(
             url,
             gql`
                 query strands($listenerId: ID!) {
