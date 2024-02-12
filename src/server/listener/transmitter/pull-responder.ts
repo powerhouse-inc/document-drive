@@ -225,7 +225,6 @@ export class PullResponderTransmitter implements ITransmitter {
                     listenerId
                     // since ?
                 );
-
                 const listenerRevisions: ListenerRevision[] = [];
 
                 for (const strand of strands) {

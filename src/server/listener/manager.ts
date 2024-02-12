@@ -293,7 +293,7 @@ export class ListenerManager extends BaseListenerManager {
                                 e.scope === unit.scope &&
                                 e.branch === unit.branch
                         );
-                        if (revision?.status === 'SUCCESS') {
+                        if (revision) {
                             unit.listenerRev = revision.revision;
                         }
                     }
@@ -308,6 +308,7 @@ export class ListenerManager extends BaseListenerManager {
                     }
                     listener.listenerStatus = 'SUCCESS';
                 } catch (e) {
+                    // TODO: Handle error based on listener params (blocking, retry, etc)
                     listener.listenerStatus =
                         e instanceof OperationError ? e.status : 'ERROR';
                     throw e;
