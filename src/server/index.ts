@@ -20,7 +20,7 @@ import {
 } from 'document-model/document';
 import { MemoryStorage } from '../storage/memory';
 import type { DocumentStorage, IDriveStorage } from '../storage/types';
-import { generateUUID, isDocumentDrive } from '../utils';
+import { generateUUID, isDocumentDrive, isNoopUpdate } from '../utils';
 import { requestPublicDrive } from '../utils/graphql';
 import { OperationError } from './error';
 import { ListenerManager } from './listener/manager';
@@ -471,10 +471,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const signals: SignalResult[] = [];
 
         // eslint-disable-next-line prefer-const
-        let [operationsToApply, error] = this._validateOperations(
-            operations,
-            documentStorage
-        );
+        let [operationsToApply, error, updatedOperations] =
+            this._validateOperations(operations, documentStorage);
 
         // retrieves the document's document model and
         // applies the operations using its reducer
@@ -507,7 +505,14 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 break;
             }
         }
-        return { document, operationsApplied, signals, error } as const;
+
+        return {
+            document,
+            operationsApplied,
+            signals,
+            error,
+            updatedOperations
+        } as const;
     }
 
     private _validateOperations<T extends Document, A extends Action>(
@@ -515,6 +520,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         documentStorage: DocumentStorage<T>
     ) {
         const operationsToApply: Operation<A | BaseAction>[] = [];
+        const updatedOperations: Operation<A | BaseAction>[] = [];
         let error: OperationError | undefined;
 
         // sort operations so from smaller index to biggest
@@ -527,7 +533,17 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 .slice(0, i);
             const scopeOperations = documentStorage.operations[op.scope];
 
-            const nextIndex = scopeOperations.length + pastOperations.length;
+            // get latest operaion
+            const ops = [...scopeOperations, ...pastOperations];
+            const latestOperation = ops.slice().pop();
+
+            const noopUpdate = isNoopUpdate(op, latestOperation);
+
+            let nextIndex = scopeOperations.length + pastOperations.length;
+            if (noopUpdate) {
+                nextIndex = nextIndex - 1;
+            }
+
             if (op.index > nextIndex) {
                 error = new OperationError(
                     'MISSING',
@@ -548,10 +564,14 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 }
             } else {
                 operationsToApply.push(op);
+
+                if (noopUpdate) {
+                    updatedOperations.push(op);
+                }
             }
         }
 
-        return [operationsToApply, error] as const;
+        return [operationsToApply, error, updatedOperations] as const;
     }
 
     private async _performOperation<T extends Document, A extends Action>(
@@ -636,6 +656,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
         let document: Document | undefined;
         const operationsApplied: Operation[] = [];
+        const updatedOperations: Operation[] = [];
         const signals: SignalResult[] = [];
         let error: Error | undefined;
 
@@ -649,7 +670,21 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             );
 
             document = result.document;
-            operationsApplied.push(...result.operationsApplied);
+
+            operationsApplied.push(
+                // remove updated operations from applied ops
+                ...result.operationsApplied.filter(opApplied => {
+                    const isUpdatedOp =
+                        result.updatedOperations.findIndex(
+                            updated =>
+                                updated.index === opApplied.index &&
+                                updated.scope === opApplied.scope
+                        ) !== -1;
+
+                    return !isUpdatedOp;
+                })
+            );
+            updatedOperations.push(...result.updatedOperations);
             signals.push(...result.signals);
             error = result.error;
 
@@ -662,11 +697,15 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 drive,
                 id,
                 operationsApplied,
-                document
+                document,
+                updatedOperations
             );
 
             // gets all the different scopes and branches combinations from the operations
-            const { scopes, branches } = operationsApplied.reduce(
+            const { scopes, branches } = [
+                ...operationsApplied,
+                ...updatedOperations
+            ].reduce(
                 (acc, operation) => {
                     if (!acc.scopes.includes(operation.scope)) {
                         acc.scopes.push(operation.scope);

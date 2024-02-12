@@ -27,7 +27,8 @@ export interface IStorage {
         drive: string,
         id: string,
         operations: Operation[],
-        header: DocumentHeader
+        header: DocumentHeader,
+        updatedOperations?: Operation[]
     ): Promise<void>;
     deleteDocument(drive: string, id: string): Promise<void>;
 }

@@ -12,7 +12,7 @@ import fs from 'fs/promises';
 import stringify from 'json-stringify-deterministic';
 import path from 'path';
 import sanitize from 'sanitize-filename';
-import { mergeOperations } from '..';
+import { applyUpdatedOperations, mergeOperations } from '..';
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 
 type FSError = {
@@ -104,7 +104,8 @@ export class FilesystemStorage implements IDriveStorage {
         drive: string,
         id: string,
         operations: Operation[],
-        header: DocumentHeader
+        header: DocumentHeader,
+        updatedOperations: Operation[] = []
     ) {
         const document = await this.getDocument(drive, id);
         if (!document) {
@@ -116,10 +117,15 @@ export class FilesystemStorage implements IDriveStorage {
             operations
         );
 
+        const mergedUpdatedOperations = applyUpdatedOperations(
+            mergedOperations,
+            updatedOperations
+        );
+
         this.createDocument(drive, id, {
             ...document,
             ...header,
-            operations: mergedOperations
+            operations: mergedUpdatedOperations
         });
     }
 
