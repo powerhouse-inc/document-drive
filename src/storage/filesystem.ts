@@ -82,7 +82,7 @@ export class FilesystemStorage implements IDriveStorage {
             const content = readFileSync(this._buildDocumentPath(drive, id), {
                 encoding: 'utf-8'
             });
-            return JSON.parse(content);
+            return JSON.parse(content) as Promise<DocumentStorage>;
         } catch (error) {
             throw new Error(`Document with id ${id} not found`);
         }

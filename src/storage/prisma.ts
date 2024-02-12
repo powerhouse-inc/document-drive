@@ -1,10 +1,9 @@
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { type Prisma } from '@prisma/client';
 import {
     DocumentDriveLocalState,
     DocumentDriveState
 } from 'document-model-libs/document-drive';
 import {
-    Document,
     DocumentHeader,
     ExtendedState,
     Operation,
@@ -13,19 +12,14 @@ import {
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 
 export class PrismaStorage implements IDriveStorage {
-    private db: PrismaClient;
+    private db: Prisma.TransactionClient;
 
-    constructor(db: PrismaClient) {
+    constructor(db: Prisma.TransactionClient) {
         this.db = db;
     }
 
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
-        // drive for all drive documents
-        await this.createDocument(
-            'drives',
-            id,
-            drive as DocumentStorage<Document>
-        );
+        await this.createDocument('drives', id, drive as DocumentStorage);
     }
     async addDriveOperations(
         id: string,
@@ -38,7 +32,7 @@ export class PrismaStorage implements IDriveStorage {
     async createDocument(
         drive: string,
         id: string,
-        document: DocumentStorage<Document>
+        document: DocumentStorage
     ): Promise<void> {
         await this.db.document.upsert({
             where: {
@@ -230,7 +224,7 @@ export class PrismaStorage implements IDriveStorage {
                     scope: op.scope as OperationScope
                     // attachments: fileRegistry
                 })),
-            revision: dbDoc.revision as Record<OperationScope, number>
+            revision: dbDoc.revision as Required<Record<OperationScope, number>>
         };
 
         return doc;
@@ -253,10 +247,8 @@ export class PrismaStorage implements IDriveStorage {
 
         await this.db.document.delete({
             where: {
-                id_driveId: {
-                    driveId: drive,
-                    id: id
-                }
+                driveId: drive,
+                id: id
             }
         });
 
@@ -286,12 +278,7 @@ export class PrismaStorage implements IDriveStorage {
     }
 
     async getDrive(id: string) {
-        try {
-            const doc = await this.getDocument('drives', id);
-            return doc as DocumentDriveStorage;
-        } catch (e) {
-            throw new Error(`Drive with id ${id} not found`);
-        }
+        return this.getDocument('drives', id) as Promise<DocumentDriveStorage>;
     }
 
     async deleteDrive(id: string) {
