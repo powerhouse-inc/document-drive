@@ -698,7 +698,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 throw error;
             }
 
-            this.syncStatus.set(drive, 'SUCCESS');
             return {
                 status: 'SUCCESS',
                 document,
@@ -715,7 +714,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                           (error as Error).message,
                           (error as Error).cause
                       );
-            this.syncStatus.set(drive, operationError.status);
+
             return {
                 status: operationError.status,
                 error: operationError,
@@ -826,8 +825,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 throw error;
             }
 
-            this.syncStatus.set(drive, 'SUCCESS');
-
             return {
                 status: 'SUCCESS',
                 document,
@@ -844,8 +841,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                           (error as Error).message,
                           (error as Error).cause
                       );
-
-            this.syncStatus.set(drive, operationError.status);
 
             return {
                 status: operationError.status,
