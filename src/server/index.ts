@@ -467,6 +467,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         operations: Operation<A | BaseAction>[]
     ) {
         const operationsApplied: Operation<A | BaseAction>[] = [];
+        const operationsUpdated: Operation<A | BaseAction>[] = [];
         let document: T | undefined;
         const signals: SignalResult[] = [];
 
@@ -474,9 +475,19 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         let [operationsToApply, error, updatedOperations] =
             this._validateOperations(operations, documentStorage);
 
+        const unregisteredOps = [
+            ...operationsToApply.map(operation => ({ operation, type: 'new' })),
+            ...updatedOperations.map(operation => ({
+                operation,
+                type: 'update'
+            }))
+        ].sort((a, b) => a.operation.index - b.operation.index);
+
         // retrieves the document's document model and
         // applies the operations using its reducer
-        for (const operation of operationsToApply) {
+        for (const unregisteredOp of unregisteredOps) {
+            const { operation, type } = unregisteredOp;
+
             try {
                 const {
                     document: newDocument,
@@ -488,7 +499,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     operation
                 );
                 document = newDocument;
-                operationsApplied.push(appliedOperation);
+
+                if (type === 'new') {
+                    operationsApplied.push(appliedOperation);
+                } else {
+                    operationsUpdated.push(appliedOperation);
+                }
+
                 signals.push(...signals);
             } catch (e) {
                 if (!error) {
@@ -511,7 +528,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             operationsApplied,
             signals,
             error,
-            updatedOperations
+            operationsUpdated
         } as const;
     }
 
@@ -533,7 +550,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 .slice(0, i);
             const scopeOperations = documentStorage.operations[op.scope];
 
-            // get latest operaion
+            // get latest operation
             const ops = [...scopeOperations, ...pastOperations];
             const latestOperation = ops.slice().pop();
 
@@ -563,10 +580,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     continue;
                 }
             } else {
-                operationsToApply.push(op);
-
                 if (noopUpdate) {
                     updatedOperations.push(op);
+                } else {
+                    operationsToApply.push(op);
                 }
             }
         }
@@ -671,20 +688,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
             document = result.document;
 
-            operationsApplied.push(
-                // remove updated operations from applied ops
-                ...result.operationsApplied.filter(opApplied => {
-                    const isUpdatedOp =
-                        result.updatedOperations.findIndex(
-                            updated =>
-                                updated.index === opApplied.index &&
-                                updated.scope === opApplied.scope
-                        ) !== -1;
+            operationsApplied.push(...result.operationsApplied);
+            updatedOperations.push(...result.operationsUpdated);
 
-                    return !isUpdatedOp;
-                })
-            );
-            updatedOperations.push(...result.updatedOperations);
             signals.push(...result.signals);
             error = result.error;
 

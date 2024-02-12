@@ -313,5 +313,29 @@ describe('Document operations', () => {
             expect(document.operations.global[5]?.index).toBe(5);
             expect(document.operations.global[5]?.skip).toBe(3);
         });
+
+        it('should not update latest operation when latest op !== NOOP with skip', async () => {
+            const undoActions = [
+                actions.undo(),
+                actions.setModelDescription({
+                    description: 'testDescription2'
+                }),
+                actions.undo()
+            ];
+            const document = await getDocumentWithOps(undoActions);
+
+            const expectedState = {
+                name: 'test',
+                id: 'testId',
+                description: 'testDescription',
+                extension: ''
+            };
+
+            expect(document.state.global).toMatchObject(expectedState);
+            expect(document.revision.global).toBe(8);
+            expect(document.operations.global.length).toBe(8);
+            expect(document.operations.global[7]?.index).toBe(7);
+            expect(document.operations.global[7]?.skip).toBe(1);
+        });
     });
 });
