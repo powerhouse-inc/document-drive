@@ -265,7 +265,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 (filter.since !== undefined &&
                     filter.since <= operation.timestamp) ||
                 (filter.fromRevision !== undefined &&
-                    operation.index >= filter.fromRevision)
+                    operation.index > filter.fromRevision)
         );
 
         return filteredOperations.map(operation => ({

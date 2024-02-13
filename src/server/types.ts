@@ -187,8 +187,7 @@ export abstract class BaseDocumentDriveServer {
 
 export abstract class BaseListenerManager {
     protected drive: BaseDocumentDriveServer;
-    protected listenerState: Map<string, Map<string, ListenerState>> =
-        new Map();
+    protected listenerState = new Map<string, Map<string, ListenerState>>();
     protected transmitters: Record<
         DocumentDriveState['id'],
         Record<Listener['listenerId'], ITransmitter>
@@ -196,7 +195,7 @@ export abstract class BaseListenerManager {
 
     constructor(
         drive: BaseDocumentDriveServer,
-        listenerState: Map<string, Map<string, ListenerState>> = new Map()
+        listenerState = new Map<string, Map<string, ListenerState>>()
     ) {
         this.drive = drive;
         this.listenerState = listenerState;
