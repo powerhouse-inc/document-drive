@@ -38,3 +38,40 @@ export function generateUUID(): string {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return crypto.randomUUID() as string;
 }
+
+export function applyUpdatedOperations<A extends Action = Action>(
+    currentOperations: DocumentOperations<A>,
+    updatedOperations: Operation<A | BaseAction>[]
+): DocumentOperations<A> {
+    return updatedOperations.reduce(
+        (acc, curr) => {
+            const operations = acc[curr.scope] ?? [];
+            acc[curr.scope] = operations.map(op => {
+                return op.index === curr.index ? curr : op;
+            });
+            return acc;
+        },
+        { ...currentOperations }
+    );
+}
+
+export function isNoopUpdate(
+    operation: Operation,
+    latestOperation?: Operation
+) {
+    if (!latestOperation) {
+        return false;
+    }
+
+    const isNoopOp = operation.type === 'NOOP';
+    const isNoopLatestOp = latestOperation.type === 'NOOP';
+    const isSameIndexOp = operation.index === latestOperation.index;
+    const isSkipOpGreaterThanLatestOp = operation.skip > latestOperation.skip;
+
+    return (
+        isNoopOp &&
+        isNoopLatestOp &&
+        isSameIndexOp &&
+        isSkipOpGreaterThanLatestOp
+    );
+}
