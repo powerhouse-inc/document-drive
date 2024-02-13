@@ -202,6 +202,19 @@ export class ListenerManager extends BaseListenerManager {
         }
     }
 
+    removeSyncUnits(syncUnits: SynchronizationUnit[]) {
+        for (const [driveId, drive] of this.listenerState) {
+            const syncIds = syncUnits
+                .filter(s => s.driveId === driveId)
+                .map(s => s.syncId);
+            for (const [, listenerState] of drive) {
+                listenerState.syncUnits = listenerState.syncUnits.filter(
+                    s => !syncIds.includes(s.syncId)
+                );
+            }
+        }
+    }
+
     async updateListenerRevision(
         listenerId: string,
         driveId: string,

@@ -456,6 +456,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     }
 
     async deleteDocument(driveId: string, id: string) {
+        const syncUnits = await this.getSynchronizationUnits(driveId, [id]);
+        this.listenerStateManager.removeSyncUnits(syncUnits);
         return this.storage.deleteDocument(driveId, id);
     }
 
