@@ -127,7 +127,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     acknowledgeSuccess => {}
                 );
                 driveTriggers.set(trigger.id, intervalId);
-                this.triggerMap.set(trigger.id, driveTriggers);
+                this.triggerMap.set(driveId, driveTriggers);
             }
         }
     }
@@ -521,6 +521,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             }
         }
 
+        if (!document) {
+            document = this._buildDocument(documentStorage);
+        }
+
         return {
             document,
             operationsApplied,
@@ -567,13 +571,15 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 );
                 continue;
             } else if (op.index < nextIndex) {
-                const existingOperation =
-                    scopeOperations.concat(pastOperations)[op.index];
+                const existingOperation = scopeOperations.find(
+                    existingOperation => existingOperation.index === op.index
+                );
                 if (existingOperation && existingOperation.hash !== op.hash) {
                     error = new OperationError(
                         'CONFLICT',
                         op,
-                        `Conflicting operation on index ${op.index}`
+                        `Conflicting operation on index ${op.index}`,
+                        { existingOperation, newOperation: op }
                     );
                     continue;
                 }
@@ -589,6 +595,21 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         return [operationsToApply, error, updatedOperations] as const;
     }
 
+    private _buildDocument<T extends Document>(
+        documentStorage: DocumentStorage<T>
+    ): T {
+        const documentModel = this._getDocumentModel(
+            documentStorage.documentType
+        );
+        return baseUtils.replayDocument(
+            documentStorage.initialState,
+            documentStorage.operations,
+            documentModel.reducer,
+            undefined,
+            documentStorage
+        ) as T;
+    }
+
     private async _performOperation<T extends Document, A extends Action>(
         drive: string,
         documentStorage: DocumentStorage<T>,
@@ -597,13 +618,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const documentModel = this._getDocumentModel(
             documentStorage.documentType
         );
-        const document = baseUtils.replayDocument(
-            documentStorage.initialState,
-            documentStorage.operations,
-            documentModel.reducer,
-            undefined,
-            documentStorage
-        ) as T;
+        const document = this._buildDocument(documentStorage);
 
         const signalResults: SignalResult[] = [];
         let newDocument = document;
@@ -697,13 +712,15 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             }
 
             // saves the applied operations to storage
-            await this.storage.addDocumentOperations(
-                drive,
-                id,
-                operationsApplied,
-                document,
-                updatedOperations
-            );
+            if (operationsApplied.length > 0 || updatedOperations.length > 0) {
+                await this.storage.addDocumentOperations(
+                    drive,
+                    id,
+                    operationsApplied,
+                    document,
+                    updatedOperations
+                );
+            }
 
             // gets all the different scopes and branches combinations from the operations
             const { scopes, branches } = [
@@ -727,12 +744,16 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             );
             // update listener cache
             for (const syncUnit of syncUnits) {
-                await this.listenerStateManager.updateSynchronizationRevision(
-                    drive,
-                    syncUnit.syncId,
-                    syncUnit.revision,
-                    syncUnit.lastUpdated
-                );
+                this.listenerStateManager
+                    .updateSynchronizationRevision(
+                        drive,
+                        syncUnit.syncId,
+                        syncUnit.revision,
+                        syncUnit.lastUpdated
+                    )
+                    .catch(error => {
+                        console.error('Error updating sync revision', error);
+                    });
             }
 
             // after applying all the valid operations,throws
@@ -804,11 +825,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             }
 
             // saves the applied operations to storage
-            await this.storage.addDriveOperations(
-                drive,
-                operationsApplied,
-                document
-            );
+            if (operationsApplied.length > 0) {
+                await this.storage.addDriveOperations(
+                    drive,
+                    operationsApplied,
+                    document
+                );
+            }
 
             for (const operation of operationsApplied) {
                 if (operation.type === 'ADD_LISTENER') {
@@ -847,12 +870,16 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 .slice()
                 .pop();
             if (lastOperation) {
-                await this.listenerStateManager.updateSynchronizationRevision(
-                    drive,
-                    '0',
-                    lastOperation.index,
-                    lastOperation.timestamp
-                );
+                this.listenerStateManager
+                    .updateSynchronizationRevision(
+                        drive,
+                        '0',
+                        lastOperation.index,
+                        lastOperation.timestamp
+                    )
+                    .catch(error => {
+                        console.error('Error updating sync revision', error);
+                    });
             }
 
             if (this.shouldSyncRemoteDrive(document)) {

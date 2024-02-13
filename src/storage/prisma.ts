@@ -1,9 +1,9 @@
-import { type Prisma } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import {
     DocumentDriveLocalState,
     DocumentDriveState
 } from 'document-model-libs/document-drive';
-import {
+import type {
     DocumentHeader,
     ExtendedState,
     Operation,
@@ -12,16 +12,16 @@ import {
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 
 export class PrismaStorage implements IDriveStorage {
-    private db: Prisma.TransactionClient;
+    private db: PrismaClient;
 
-    constructor(db: Prisma.TransactionClient) {
+    constructor(db: PrismaClient) {
         this.db = db;
     }
 
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
+        // drive for all drive documents
         await this.createDocument('drives', id, drive as DocumentStorage);
     }
-
     async addDriveOperations(
         id: string,
         operations: Operation[],
@@ -166,6 +166,9 @@ export class PrismaStorage implements IDriveStorage {
             },
             include: {
                 operations: {
+                    orderBy: {
+                        index: 'asc'
+                    },
                     include: {
                         attachments: true
                     }
@@ -225,7 +228,7 @@ export class PrismaStorage implements IDriveStorage {
                     scope: op.scope as OperationScope
                     // attachments: fileRegistry
                 })),
-            revision: dbDoc.revision as Required<Record<OperationScope, number>>
+            revision: dbDoc.revision as Record<OperationScope, number>
         };
 
         return doc;
@@ -281,7 +284,12 @@ export class PrismaStorage implements IDriveStorage {
     }
 
     async getDrive(id: string) {
-        return this.getDocument('drives', id) as Promise<DocumentDriveStorage>;
+        try {
+            const doc = await this.getDocument('drives', id);
+            return doc as DocumentDriveStorage;
+        } catch (e) {
+            throw new Error(`Drive with id ${id} not found`);
+        }
     }
 
     async deleteDrive(id: string) {

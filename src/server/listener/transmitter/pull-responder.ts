@@ -76,6 +76,11 @@ export class PullResponderTransmitter implements ITransmitter {
                     fromRevision: entry.listenerRev
                 }
             );
+
+            if (!operations.length) {
+                continue;
+            }
+
             strands.push({
                 driveId,
                 documentId,
@@ -94,12 +99,18 @@ export class PullResponderTransmitter implements ITransmitter {
         revisions: ListenerRevision[]
     ): Promise<boolean> {
         const listener = this.manager.getListener(driveId, listenerId);
+
         let success = true;
         for (const revision of revisions) {
-            const syncId = listener.syncUnits.find(
-                s => s.scope === revision.scope && s.branch === revision.branch && s.documentId === revision.documentId && s.driveId === driveId
-            )?.syncId;
-            if (!syncId) {
+            const syncUnit = listener.syncUnits.find(
+                s =>
+                    s.scope === revision.scope &&
+                    s.branch === revision.branch &&
+                    s.driveId === revision.driveId &&
+                    s.documentId == revision.documentId
+            );
+            if (!syncUnit) {
+                console.log('Sync unit not found', revision);
                 success = false;
                 continue;
             }
@@ -107,7 +118,7 @@ export class PullResponderTransmitter implements ITransmitter {
             await this.manager.updateListenerRevision(
                 listenerId,
                 driveId,
-                syncId,
+                syncUnit.syncId,
                 revision.revision
             );
         }
@@ -235,6 +246,12 @@ export class PullResponderTransmitter implements ITransmitter {
                     listenerId
                     // since ?
                 );
+
+                // if there are no new strands then do nothing
+                if (!strands.length) {
+                    return;
+                }
+
                 const listenerRevisions: ListenerRevision[] = [];
 
                 for (const strand of strands) {
