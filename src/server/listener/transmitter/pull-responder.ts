@@ -97,7 +97,7 @@ export class PullResponderTransmitter implements ITransmitter {
         let success = true;
         for (const revision of revisions) {
             const syncId = listener.syncUnits.find(
-                s => s.scope === revision.scope && s.branch === revision.branch
+                s => s.scope === revision.scope && s.branch === revision.branch && s.documentId === revision.documentId && s.driveId === driveId
             )?.syncId;
             if (!syncId) {
                 success = false;
