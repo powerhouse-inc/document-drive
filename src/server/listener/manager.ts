@@ -9,6 +9,7 @@ import {
     ErrorStatus,
     Listener,
     ListenerState,
+    OperationUpdate,
     StrandUpdate,
     SynchronizationUnit
 } from '../types';
@@ -272,13 +273,19 @@ export class ListenerManager extends BaseListenerManager {
                         continue;
                     }
 
-                    const opData = await this.drive.getOperationData(
-                        driveId,
-                        syncId,
-                        {
-                            fromRevision: listenerRev
-                        }
-                    );
+                    const opData: OperationUpdate[] = [];
+                    try {
+                        const data = await this.drive.getOperationData(
+                            driveId,
+                            syncId,
+                            {
+                                fromRevision: listenerRev
+                            }
+                        );
+                        opData.push(...data);
+                    } catch (e) {
+                        console.error(e);
+                    }
 
                     if (!opData.length) {
                         continue;

@@ -486,8 +486,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     }
 
     async deleteDocument(driveId: string, id: string) {
-        const syncUnits = await this.getSynchronizationUnits(driveId, [id]);
-        this.listenerStateManager.removeSyncUnits(syncUnits);
+        try {
+            const syncUnits = await this.getSynchronizationUnits(driveId, [id]);
+            this.listenerStateManager.removeSyncUnits(syncUnits);
+        } catch {
+            /* empty */
+        }
         return this.storage.deleteDocument(driveId, id);
     }
 
@@ -696,10 +700,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             );
         }
 
-        const results = await Promise.all(
-            operationSignals.map(handler => handler())
-        );
-        signalResults.push(...results);
+        for (const signalHandler of operationSignals) {
+            const result = await signalHandler();
+            signalResults.push(result);
+        }
 
         return {
             document: newDocument,
