@@ -15,6 +15,7 @@ import type {
     Signal,
     State
 } from 'document-model/document';
+import { Unsubscribe } from 'nanoevents';
 import { OperationError } from './error';
 import { ITransmitter } from './listener/transmitter/types';
 
@@ -114,6 +115,11 @@ export type StrandUpdate = {
 
 export type SyncStatus = 'SYNCING' | UpdateStatus;
 
+export interface DriveEvents {
+    syncStatus: (driveId: string, status: SyncStatus, error?: Error) => void;
+    strandUpdate: (update: StrandUpdate) => void;
+}
+
 export abstract class BaseDocumentDriveServer {
     /** Public methods **/
     abstract getDrives(): Promise<string[]>;
@@ -132,12 +138,12 @@ export abstract class BaseDocumentDriveServer {
         drive: string,
         id: string,
         operation: Operation
-    ): Promise<IOperationResult<Document>>;
+    ): Promise<IOperationResult>;
     abstract addOperations(
         drive: string,
         id: string,
         operations: Operation[]
-    ): Promise<IOperationResult<Document>>;
+    ): Promise<IOperationResult>;
 
     abstract addDriveOperation(
         drive: string,
@@ -183,6 +189,18 @@ export abstract class BaseDocumentDriveServer {
         driveId: string,
         listenerId: string
     ): Promise<ITransmitter | undefined>;
+
+    /** Event methods **/
+    protected abstract emit<K extends keyof DriveEvents>(
+        this: this,
+        event: K,
+        ...args: Parameters<DriveEvents[K]>
+    ): void;
+    abstract on<K extends keyof DriveEvents>(
+        this: this,
+        event: K,
+        cb: DriveEvents[K]
+    ): Unsubscribe;
 }
 
 export abstract class BaseListenerManager {

@@ -396,17 +396,9 @@ describe('Document Drive Server with %s', () => {
 
         vi.advanceTimersToNextTimer();
 
-        const drive = await vi.waitFor(
-            async () => {
-                const drive = await server.getDrive('1');
-                expect(drive.operations.global.length).toBeTruthy();
-                return drive;
-            },
-            {
-                timeout: 500,
-                interval: 20
-            }
-        );
+        await new Promise(resolve => server.on('strandUpdate', resolve));
+
+        const drive = await server.getDrive('1');
 
         expect(drive.operations.global[0]).toMatchObject({
             index: 0,
@@ -477,19 +469,7 @@ describe('Document Drive Server with %s', () => {
 
         vi.advanceTimersToNextTimer();
 
-        await vi.waitFor(
-            async () => {
-                const drive = await server.getDrive('1');
-                if (!drive.operations.global.length) {
-                    throw new Error('No operations');
-                }
-                return drive;
-            },
-            {
-                timeout: 500,
-                interval: 20
-            }
-        );
+        await new Promise(resolve => server.on('strandUpdate', resolve));
 
         const operation: Operation<DocumentDriveAction> = {
             index: 0,
@@ -586,21 +566,9 @@ describe('Document Drive Server with %s', () => {
 
         vi.advanceTimersToNextTimer();
 
-        const status = await vi.waitFor(
-            async () => {
-                const status = server.getSyncStatus('1');
-                if (status === 'SYNCING') {
-                    throw new Error('Syncing');
-                }
-                return status;
-            },
-            {
-                timeout: 500,
-                interval: 20
-            }
-        );
+        await new Promise(resolve => server.on('syncStatus', resolve));
 
-        expect(status).toBe('CONFLICT');
+        expect(server.getSyncStatus('1')).toBe('CONFLICT');
     });
 
     it('should detect conflict when pushing operation with existing index', async ({

@@ -101,6 +101,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
               ));
 
         this.updateSyncStatus(strand.driveId, result.status);
+        this.emit('strandUpdate', strand);
         return result;
     }
 
