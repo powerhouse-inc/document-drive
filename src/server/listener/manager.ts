@@ -120,7 +120,12 @@ export class ListenerManager extends BaseListenerManager {
         driveId: string,
         syncId: string,
         syncRev: number,
-        lastUpdated: string
+        lastUpdated: string,
+        onError?: (
+            error: Error,
+            driveId: string,
+            listener: ListenerState
+        ) => void
     ) {
         const drive = this.listenerState.get(driveId);
         if (!drive) {
@@ -148,7 +153,7 @@ export class ListenerManager extends BaseListenerManager {
         }
 
         if (newRevision) {
-            return this.triggerUpdate();
+            return this.triggerUpdate(onError);
         }
     }
 
@@ -238,7 +243,13 @@ export class ListenerManager extends BaseListenerManager {
         }
     }
 
-    async triggerUpdate() {
+    async triggerUpdate(
+        onError?: (
+            error: Error,
+            driveId: string,
+            listener: ListenerState
+        ) => void
+    ) {
         for (const [driveId, drive] of this.listenerState) {
             for (const [id, listener] of drive) {
                 const transmitter = await this.getTransmitter(driveId, id);
@@ -322,9 +333,9 @@ export class ListenerManager extends BaseListenerManager {
                     listener.listenerStatus = 'SUCCESS';
                 } catch (e) {
                     // TODO: Handle error based on listener params (blocking, retry, etc)
+                    onError?.(e as Error, driveId, listener);
                     listener.listenerStatus =
                         e instanceof OperationError ? e.status : 'ERROR';
-                    throw e;
                 }
             }
         }

@@ -3,19 +3,20 @@ import {
     DocumentDriveDocument,
     DocumentDriveState,
     FileNode,
-    Trigger,
     isFileNode,
+    Trigger,
     utils
 } from 'document-model-libs/document-drive';
 import {
     Action,
     BaseAction,
+    utils as baseUtils,
     Document,
     DocumentModel,
     Operation,
-    OperationScope,
-    utils as baseUtils
+    OperationScope
 } from 'document-model/document';
+import { createNanoEvents, Unsubscribe } from 'nanoevents';
 import { MemoryStorage } from '../storage/memory';
 import type { DocumentStorage, IDriveStorage } from '../storage/types';
 import { generateUUID, isDocumentDrive, isNoopUpdate } from '../utils';
@@ -26,7 +27,9 @@ import { PullResponderTransmitter } from './listener/transmitter';
 import type { ITransmitter } from './listener/transmitter/types';
 import {
     BaseDocumentDriveServer,
+    DriveEvents,
     IOperationResult,
+    ListenerState,
     RemoteDriveOptions,
     StrandUpdate,
     SyncStatus,
@@ -43,6 +46,7 @@ export type * from './types';
 export const PULL_DRIVE_INTERVAL = 5000;
 
 export class DocumentDriveServer extends BaseDocumentDriveServer {
+    private emitter = createNanoEvents<DriveEvents>();
     private documentModels: DocumentModel[];
     private storage: IDriveStorage;
     private listenerStateManager: ListenerManager;
@@ -60,6 +64,15 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         this.listenerStateManager = new ListenerManager(this);
         this.documentModels = documentModels;
         this.storage = storage;
+    }
+
+    private updateSyncStatus(
+        driveId: string,
+        status: SyncStatus,
+        error?: Error
+    ) {
+        this.syncStatus.set(driveId, status);
+        this.emit('syncStatus', driveId, status, error);
     }
 
     private async saveStrand(strand: StrandUpdate) {
@@ -86,8 +99,24 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                   strand.documentId,
                   operations
               ));
-        this.syncStatus.set(strand.driveId, result.status);
+
+        this.updateSyncStatus(strand.driveId, result.status);
         return result;
+    }
+
+    private handleListenerError(
+        error: Error,
+        driveId: string,
+        listener: ListenerState
+    ) {
+        console.error(
+            `Listener ${listener.listener.label ?? listener.listener.listenerId} error: ${error.message}`
+        );
+        this.updateSyncStatus(
+            driveId,
+            error instanceof OperationError ? error.status : 'ERROR',
+            error
+        );
     }
 
     private shouldSyncRemoteDrive(drive: DocumentDriveDocument) {
@@ -108,7 +137,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
             if (!driveTriggers) {
                 driveTriggers = new Map();
-                this.syncStatus.set(driveId, 'SYNCING');
+                this.updateSyncStatus(driveId, 'SYNCING');
             }
 
             if (PullResponderTransmitter.isPullResponderTrigger(trigger)) {
@@ -117,7 +146,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     trigger,
                     this.saveStrand.bind(this),
                     error => {
-                        this.syncStatus.set(
+                        this.updateSyncStatus(
                             driveId,
                             error instanceof OperationError
                                 ? error.status
@@ -751,10 +780,15 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                         drive,
                         syncUnit.syncId,
                         syncUnit.revision,
-                        syncUnit.lastUpdated
+                        syncUnit.lastUpdated,
+                        this.handleListenerError.bind(this)
                     )
                     .catch(error => {
-                        console.error('Error updating sync revision', error);
+                        console.error(
+                            'Non handled error updating sync revision',
+                            error
+                        );
+                        this.updateSyncStatus(drive, 'ERROR', error as Error);
                     });
             }
 
@@ -877,10 +911,15 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                         drive,
                         '0',
                         lastOperation.index,
-                        lastOperation.timestamp
+                        lastOperation.timestamp,
+                        this.handleListenerError.bind(this)
                     )
                     .catch(error => {
-                        console.error('Error updating sync revision', error);
+                        console.error(
+                            'Non handled error updating sync revision',
+                            error
+                        );
+                        this.updateSyncStatus(drive, 'ERROR', error as Error);
                     });
             }
 
@@ -936,5 +975,16 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             throw new Error(`Sync status not found for drive ${drive}`);
         }
         return status;
+    }
+
+    on<K extends keyof DriveEvents>(event: K, cb: DriveEvents[K]): Unsubscribe {
+        return this.emitter.on(event, cb);
+    }
+
+    protected emit<K extends keyof DriveEvents>(
+        event: K,
+        ...args: Parameters<DriveEvents[K]>
+    ): void {
+        return this.emitter.emit(event, ...args);
     }
 }

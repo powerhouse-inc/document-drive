@@ -28,6 +28,7 @@ import {
     DocumentDriveServer,
     ListenerRevision,
     StrandUpdateGraphQL,
+    SyncStatus,
     UpdateStatus
 } from '../src/server';
 import { PrismaStorage } from '../src/storage/prisma';
@@ -374,6 +375,12 @@ describe('Document Drive Server with %s', () => {
 
         const server = new DocumentDriveServer(documentModels, storageLayer);
         await server.initialize();
+
+        const statusEvents: SyncStatus[] = [];
+        server.on('syncStatus', (driveId, status) => {
+            statusEvents.push(status);
+        });
+
         await server.addRemoteDrive('http://switchboard.powerhouse.xyz/1', {
             availableOffline: true,
             sharingType: 'PUBLIC',
@@ -446,6 +453,8 @@ describe('Document Drive Server with %s', () => {
                 }
             })
         );
+
+        expect(statusEvents).toStrictEqual(['SYNCING', 'SUCCESS', 'SUCCESS']);
     });
 
     it('should detect conflict when adding operation with existing index', async ({
@@ -500,7 +509,26 @@ describe('Document Drive Server with %s', () => {
         const result = await server.addDriveOperation('1', operation);
         expect(result.status).toBe('CONFLICT');
         expect(result.error?.message).toBe('Conflicting operation on index 0');
-        expect(result.error?.cause).toStrictEqual(operation);
+        expect(result.error?.cause).toStrictEqual({
+            existingOperation: {
+                branch: 'main',
+                index: 0,
+                skip: 0,
+                type: 'ADD_FILE',
+                scope: 'global',
+                hash: 'nQBsTlP2MNb+FDBAzOw3svwyHvg=',
+                timestamp: expect.stringMatching(
+                    /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z)/
+                ),
+                input: {
+                    id: '1.1',
+                    name: 'document 1',
+                    documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local']
+                }
+            },
+            newOperation: operation
+        });
     });
 
     it('should detect conflict when pulling operation with existing index', async ({
@@ -651,8 +679,13 @@ describe('Document Drive Server with %s', () => {
             }
         };
 
-        const result = await server.addDriveOperation('1', operation);
-        expect(result.status).toBe('CONFLICT');
+        await server.addDriveOperation('1', operation);
+
+        const status = await new Promise(resolve => {
+            server.on('syncStatus', (_driveId, status) => resolve(status));
+            vi.advanceTimersToNextTimer();
+        });
+        expect(status).toBe('CONFLICT');
 
         const drive = await server.getDrive('1');
         expect(drive.operations.global.length).toBe(1);
