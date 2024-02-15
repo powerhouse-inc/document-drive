@@ -218,6 +218,87 @@ export class PullResponderTransmitter implements ITransmitter {
         return result.acknowledge;
     }
 
+    private static async executePull(
+        driveId: string,
+        trigger: PullResponderTrigger,
+        onStrandUpdate: (strand: StrandUpdate) => Promise<IOperationResult>,
+        onError: (error: Error) => void,
+        onAcknowledge?: (success: boolean) => void
+    ) {
+        try {
+            const { url, listenerId } = trigger.data;
+            const strands = await PullResponderTransmitter.pullStrands(
+                driveId,
+                url,
+                listenerId
+                // since ?
+            );
+
+            // if there are no new strands then do nothing
+            if (!strands.length) {
+                return;
+            }
+
+            const listenerRevisions: ListenerRevision[] = [];
+
+            for (const strand of strands) {
+                const operations: Operation[] = strand.operations.map(
+                    ({ index, type, hash, input, skip, timestamp }) => ({
+                        index,
+                        type,
+                        hash,
+                        input,
+                        skip,
+                        timestamp,
+                        scope: strand.scope,
+                        branch: strand.branch
+                    })
+                );
+
+                let error: Error | undefined = undefined;
+
+                try {
+                    const result = await onStrandUpdate(strand);
+                    if (result.error) {
+                        throw result.error;
+                    }
+                } catch (e) {
+                    error = e as Error;
+                    onError(error);
+                }
+
+                listenerRevisions.push({
+                    branch: strand.branch,
+                    documentId: strand.documentId || '',
+                    driveId: strand.driveId,
+                    revision: operations.pop()?.index ?? -1,
+                    scope: strand.scope as OperationScope,
+                    status: error
+                        ? error instanceof OperationError
+                            ? error.status
+                            : 'ERROR'
+                        : 'SUCCESS'
+                });
+
+                // TODO: Should try to parse remaining strands?
+                if (error) {
+                    break;
+                }
+            }
+
+            await PullResponderTransmitter.acknowledgeStrands(
+                driveId,
+                url,
+                listenerId,
+                listenerRevisions
+            )
+                .then(result => onAcknowledge?.(result))
+                .catch(error => console.error('ACK error', error));
+        } catch (error) {
+            onError(error as Error);
+        }
+    }
+
     static setupPull(
         driveId: string,
         trigger: PullResponderTrigger,
@@ -225,7 +306,7 @@ export class PullResponderTransmitter implements ITransmitter {
         onError: (error: Error) => void,
         onAcknowledge?: (success: boolean) => void
     ): number {
-        const { url, listenerId, interval } = trigger.data;
+        const { interval } = trigger.data;
         let loopInterval = PULL_DRIVE_INTERVAL;
         if (interval) {
             try {
@@ -238,79 +319,25 @@ export class PullResponderTransmitter implements ITransmitter {
             }
         }
 
-        const timeout = setInterval(async () => {
-            try {
-                const strands = await PullResponderTransmitter.pullStrands(
+        this.executePull(
+            driveId,
+            trigger,
+            onStrandUpdate,
+            onError,
+            onAcknowledge
+        );
+
+        const timeout = setInterval(
+            async () =>
+                this.executePull(
                     driveId,
-                    url,
-                    listenerId
-                    // since ?
-                );
-
-                // if there are no new strands then do nothing
-                if (!strands.length) {
-                    return;
-                }
-
-                const listenerRevisions: ListenerRevision[] = [];
-
-                for (const strand of strands) {
-                    const operations: Operation[] = strand.operations.map(
-                        ({ index, type, hash, input, skip, timestamp }) => ({
-                            index,
-                            type,
-                            hash,
-                            input,
-                            skip,
-                            timestamp,
-                            scope: strand.scope,
-                            branch: strand.branch
-                        })
-                    );
-
-                    let error: Error | undefined = undefined;
-
-                    try {
-                        const result = await onStrandUpdate(strand);
-                        if (result.error) {
-                            throw result.error;
-                        }
-                    } catch (e) {
-                        error = e as Error;
-                        onError?.(error);
-                    }
-
-                    listenerRevisions.push({
-                        branch: strand.branch,
-                        documentId: strand.documentId ?? '',
-                        driveId: strand.driveId,
-                        revision: operations.pop()?.index ?? -1,
-                        scope: strand.scope as OperationScope,
-                        status: error
-                            ? error instanceof OperationError
-                                ? error.status
-                                : 'ERROR'
-                            : 'SUCCESS'
-                    });
-
-                    // TODO: Should try to parse remaining strands?
-                    if (error) {
-                        break;
-                    }
-                }
-
-                await PullResponderTransmitter.acknowledgeStrands(
-                    driveId,
-                    url,
-                    listenerId,
-                    listenerRevisions
-                )
-                    .then(result => onAcknowledge?.(result))
-                    .catch(error => console.error('ACK error', error));
-            } catch (error) {
-                onError(error as Error);
-            }
-        }, loopInterval);
+                    trigger,
+                    onStrandUpdate,
+                    onError,
+                    onAcknowledge
+                ),
+            loopInterval
+        );
         return timeout as unknown as number;
     }
 
