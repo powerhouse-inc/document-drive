@@ -119,28 +119,6 @@ export class PrismaStorage implements IDriveStorage {
         } catch (e) {
             console.log(e);
         }
-
-        await this.db.document.upsert({
-            where: {
-                id_driveId: {
-                    id: 'drives',
-                    driveId: id
-                }
-            },
-            create: {
-                id: 'drives',
-                driveId: id,
-                documentType: header.documentType,
-                initialState: document.initialState,
-                lastModified: header.lastModified,
-                revision: header.revision,
-                created: header.created
-            },
-            update: {
-                lastModified: header.lastModified,
-                revision: header.revision
-            }
-        });
     }
 
     async getDocuments(drive: string) {
