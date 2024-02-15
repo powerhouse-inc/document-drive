@@ -9,6 +9,7 @@ import {
     ErrorStatus,
     Listener,
     ListenerState,
+    ListenerUpdate,
     OperationUpdate,
     StrandUpdate,
     SynchronizationUnit
@@ -122,6 +123,7 @@ export class ListenerManager extends BaseListenerManager {
         syncId: string,
         syncRev: number,
         lastUpdated: string,
+        willUpdate?: (listeners: Listener[]) => void,
         onError?: (
             error: Error,
             driveId: string,
@@ -130,10 +132,10 @@ export class ListenerManager extends BaseListenerManager {
     ) {
         const drive = this.listenerState.get(driveId);
         if (!drive) {
-            return;
+            return [];
         }
 
-        let newRevision = false;
+        const outdatedListeners: Listener[] = [];
         for (const [, listener] of drive) {
             const syncUnits = listener.syncUnits.filter(
                 e => e.syncId === syncId
@@ -149,13 +151,21 @@ export class ListenerManager extends BaseListenerManager {
 
                 syncUnit.syncRev = syncRev;
                 syncUnit.lastUpdated = lastUpdated;
-                newRevision = true;
+                if (
+                    !outdatedListeners.find(
+                        l => l.listenerId === listener.listener.listenerId
+                    )
+                ) {
+                    outdatedListeners.push(listener.listener);
+                }
             }
         }
 
-        if (newRevision) {
+        if (outdatedListeners.length) {
+            willUpdate?.(outdatedListeners);
             return this.triggerUpdate(onError);
         }
+        return [];
     }
 
     async addSyncUnits(syncUnits: SynchronizationUnit[]) {
@@ -251,6 +261,7 @@ export class ListenerManager extends BaseListenerManager {
             listener: ListenerState
         ) => void
     ) {
+        const listenerUpdates: ListenerUpdate[] = [];
         for (const [driveId, drive] of this.listenerState) {
             for (const [id, listener] of drive) {
                 const transmitter = await this.getTransmitter(driveId, id);
@@ -338,6 +349,10 @@ export class ListenerManager extends BaseListenerManager {
                         );
                     }
                     listener.listenerStatus = 'SUCCESS';
+                    listenerUpdates.push({
+                        listenerId: listener.listener.listenerId,
+                        listenerRevisions
+                    });
                 } catch (e) {
                     // TODO: Handle error based on listener params (blocking, retry, etc)
                     onError?.(e as Error, driveId, listener);
@@ -346,6 +361,7 @@ export class ListenerManager extends BaseListenerManager {
                 }
             }
         }
+        return listenerUpdates;
     }
 
     private _checkFilter(

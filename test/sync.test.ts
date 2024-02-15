@@ -31,7 +31,7 @@ import {
     SyncStatus,
     UpdateStatus
 } from '../src/server';
-import { PrismaStorage } from '../src/storage/prisma';
+import { MemoryStorage } from '../src/storage/memory';
 
 describe('Document Drive Server with %s', () => {
     const documentModels = [
@@ -40,7 +40,7 @@ describe('Document Drive Server with %s', () => {
     ] as DocumentModel[];
 
     const prismaClient = new PrismaClient();
-    const storageLayer = new PrismaStorage(prismaClient);
+    const storageLayer = new MemoryStorage();
 
     const strands: StrandUpdateGraphQL[] = [
         {
@@ -220,43 +220,43 @@ describe('Document Drive Server with %s', () => {
 
         const server = new DocumentDriveServer(documentModels, storageLayer);
         await server.initialize();
-        await server.addRemoteDrive('http://switchboard.powerhouse.xyz/1', {
-            listeners: [
-                {
-                    block: true,
-                    callInfo: {
-                        data: 'http://switchboard.powerhouse.xyz/1',
-                        name: 'switchboard-push',
-                        transmitterType: 'SwitchboardPush'
-                    },
-                    filter: {
-                        branch: ['main'],
-                        documentId: ['*'],
-                        documentType: ['*'],
-                        scope: ['global', 'local']
-                    },
-                    label: 'Switchboard Sync',
-                    listenerId: '1',
-                    system: true
-                }
-            ],
-            triggers: [],
-            availableOffline: true,
-            sharingType: 'PUBLIC',
-            pullFilter: {
-                branch: ['main'],
-                documentId: ['*'],
-                documentType: ['*'],
-                scope: ['global', 'local']
+        await server.addDrive({
+            global: { id: '1', name: 'name', icon: 'icon', slug: 'slug' },
+            local: {
+                listeners: [
+                    {
+                        block: true,
+                        callInfo: {
+                            data: 'http://switchboard.powerhouse.xyz/1',
+                            name: 'switchboard-push',
+                            transmitterType: 'SwitchboardPush'
+                        },
+                        filter: {
+                            branch: ['main'],
+                            documentId: ['*'],
+                            documentType: ['*'],
+                            scope: ['global']
+                        },
+                        label: 'Switchboard Sync',
+                        listenerId: '1',
+                        system: true
+                    }
+                ],
+                triggers: [],
+                availableOffline: false,
+                sharingType: 'PUBLIC'
             }
         });
+
         let drive = await server.getDrive('1');
 
         // adds file
         const addFileRequest = new Promise<Request>(resolve => {
-            mswServer.events.on('request:start', ({ request }) => {
-                resolve(request);
-            });
+            function listener(result: { request: Request }) {
+                resolve(result.request);
+                mswServer.events.removeListener('request:start', listener);
+            }
+            mswServer.events.on('request:start', listener);
         });
         drive = reducer(
             drive,
@@ -268,7 +268,15 @@ describe('Document Drive Server with %s', () => {
             })
         );
         await server.addDriveOperation('1', drive.operations.global[0]!);
-
+        expect(server.getSyncStatus('1')).toBe('SYNCING');
+        const waitSync = new Promise(resolve =>
+            server.on(
+                'syncStatus',
+                (drive, status) => status === 'SUCCESS' && resolve(status)
+            )
+        );
+        const status = await waitSync;
+        expect(status).toBe('SUCCESS');
         const addFileBody = await (await addFileRequest).json();
         expect(addFileBody).toEqual(
             expect.objectContaining({
@@ -298,16 +306,16 @@ describe('Document Drive Server with %s', () => {
         );
         expect(addFileBody.query.replace(/\s+/g, ' ').trim()).toStrictEqual(
             `mutation pushUpdates($strands: [InputStrandUpdate!]) {
-            pushUpdates(strands: $strands) {
-                driveId
-                documentId
-                scope
-                branch
-                status
-                revision
+                pushUpdates(strands: $strands) {
+                    driveId
+                    documentId
+                    scope
+                    branch
+                    status
+                    revision
+                }
             }
-        }
-    `
+        `
                 .replace(/\s+/g, ' ')
                 .trim()
         );
@@ -322,14 +330,17 @@ describe('Document Drive Server with %s', () => {
         );
 
         const setNameRequest = new Promise<Request>(resolve => {
-            mswServer.events.on('request:start', ({ request }) => {
-                resolve(request);
-            });
+            function listener(result: { request: Request }) {
+                resolve(result.request);
+                mswServer.events.removeListener('request:start', listener);
+            }
+            mswServer.events.on('request:start', listener);
         });
 
         const operation = document.operations.global[0]!;
         const result = await server.addOperation('1', '1.1', operation);
         expect(result.status).toBe('SUCCESS');
+        expect(server.getSyncStatus('1')).toBe('SYNCING');
 
         const setNameBody = await (await setNameRequest).json();
         expect(setNameBody).toEqual(
@@ -446,7 +457,17 @@ describe('Document Drive Server with %s', () => {
             })
         );
 
-        expect(statusEvents).toStrictEqual(['SYNCING', 'SUCCESS', 'SUCCESS']);
+        expect(statusEvents).toStrictEqual([
+            'SYNCING',
+            'SYNCING',
+            'SUCCESS',
+            'SYNCING',
+            'SUCCESS',
+            'SUCCESS',
+            'SYNCING',
+            'SUCCESS',
+            'SUCCESS'
+        ]);
     });
 
     it('should detect conflict when adding operation with existing index', async ({
