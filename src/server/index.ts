@@ -138,9 +138,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
             if (!driveTriggers) {
                 driveTriggers = new Map();
-                this.updateSyncStatus(driveId, 'SYNCING');
             }
 
+            this.updateSyncStatus(driveId, 'SYNCING');
             if (PullResponderTransmitter.isPullResponderTrigger(trigger)) {
                 const intervalId = PullResponderTransmitter.setupPull(
                     driveId,
@@ -786,7 +786,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                         syncUnit.syncId,
                         syncUnit.revision,
                         syncUnit.lastUpdated,
+                        () => this.updateSyncStatus(drive, 'SYNCING'),
                         this.handleListenerError.bind(this)
+                    )
+                    .then(
+                        updates =>
+                            updates.length &&
+                            this.updateSyncStatus(drive, 'SUCCESS')
                     )
                     .catch(error => {
                         console.error(
@@ -917,7 +923,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                         '0',
                         lastOperation.index,
                         lastOperation.timestamp,
+                        () => this.updateSyncStatus(drive, 'SYNCING'),
                         this.handleListenerError.bind(this)
+                    )
+                    .then(
+                        updates =>
+                            updates.length &&
+                            this.updateSyncStatus(drive, 'SUCCESS')
                     )
                     .catch(error => {
                         console.error(

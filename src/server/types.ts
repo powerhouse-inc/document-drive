@@ -93,6 +93,11 @@ export type ListenerRevision = {
     revision: number;
 };
 
+export type ListenerUpdate = {
+    listenerId: string;
+    listenerRevisions: ListenerRevision[];
+};
+
 export type UpdateStatus = 'SUCCESS' | 'CONFLICT' | 'MISSING' | 'ERROR';
 export type ErrorStatus = Exclude<UpdateStatus, 'SUCCESS'>;
 
@@ -233,8 +238,14 @@ export abstract class BaseListenerManager {
         driveId: string,
         syncId: string,
         syncRev: number,
-        lastUpdated: string
-    ): Promise<void>;
+        lastUpdated: string,
+        willUpdate?: (listeners: Listener[]) => void,
+        onError?: (
+            error: Error,
+            driveId: string,
+            listener: ListenerState
+        ) => void
+    ): Promise<ListenerUpdate[]>;
 
     abstract updateListenerRevision(
         listenerId: string,
