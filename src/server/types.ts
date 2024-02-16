@@ -190,11 +190,6 @@ export abstract class BaseDocumentDriveServer {
     ): Promise<Document>;
     protected abstract deleteDocument(drive: string, id: string): Promise<void>;
 
-    abstract getTransmitter(
-        driveId: string,
-        listenerId: string
-    ): Promise<ITransmitter | undefined>;
-
     /** Event methods **/
     protected abstract emit<K extends keyof DriveEvents>(
         this: this,
@@ -206,6 +201,11 @@ export abstract class BaseDocumentDriveServer {
         event: K,
         cb: DriveEvents[K]
     ): Unsubscribe;
+
+    abstract getTransmitter(
+        driveId: string,
+        listenerId: string
+    ): Promise<ITransmitter | undefined>;
 }
 
 export abstract class BaseListenerManager {
@@ -225,15 +225,27 @@ export abstract class BaseListenerManager {
     }
 
     abstract init(): Promise<void>;
+
     abstract addListener(listener: Listener): Promise<ITransmitter>;
     abstract removeListener(
         driveId: string,
         listenerId: string
     ): Promise<boolean>;
+    abstract getListener(
+        driveId: string,
+        listenerId: string
+    ): Promise<ListenerState | undefined>;
+
     abstract getTransmitter(
         driveId: string,
         listenerId: string
     ): Promise<ITransmitter | undefined>;
+
+    abstract getStrands(
+        listenerId: string,
+        since?: string
+    ): Promise<StrandUpdate[]>;
+
     abstract updateSynchronizationRevision(
         driveId: string,
         syncId: string,

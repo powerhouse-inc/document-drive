@@ -11,6 +11,7 @@ import {
     DocumentModelDocument,
     module as DocumentModelLib
 } from 'document-model/document-model';
+import stringify from 'json-stringify-deterministic';
 import { HttpResponse, graphql, http } from 'msw';
 import { setupServer } from 'msw/node';
 import {
@@ -22,8 +23,6 @@ import {
     it,
     vi
 } from 'vitest';
-
-import stringify from 'json-stringify-deterministic';
 import {
     DocumentDriveServer,
     ListenerRevision,
