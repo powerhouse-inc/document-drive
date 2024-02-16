@@ -419,11 +419,53 @@ export class ListenerManager extends BaseListenerManager {
         }
     }
 
-    getListener(driveId: string, listenerId: string): ListenerState {
+    getListener(driveId: string, listenerId: string): Promise<ListenerState> {
         const drive = this.listenerState.get(driveId);
         if (!drive) throw new Error('Drive not found');
         const listener = drive.get(listenerId);
         if (!listener) throw new Error('Listener not found');
-        return listener;
+        return Promise.resolve(listener);
+    }
+
+    async getStrands(
+        driveId: string,
+        listenerId: string,
+        since?: string
+    ): Promise<StrandUpdate[]> {
+        // fetch listenerState from listenerManager
+        const entries = await this.getListener(driveId, listenerId);
+
+        // fetch operations from drive  and prepare strands
+        const strands: StrandUpdate[] = [];
+
+        for (const entry of entries.syncUnits) {
+            if (entry.listenerRev >= entry.syncRev) {
+                continue;
+            }
+
+            const { documentId, driveId, scope, branch } = entry;
+            const operations = await this.drive.getOperationData(
+                entry.driveId,
+                entry.syncId,
+                {
+                    since,
+                    fromRevision: entry.listenerRev
+                }
+            );
+
+            if (!operations.length) {
+                continue;
+            }
+
+            strands.push({
+                driveId,
+                documentId,
+                scope: scope as OperationScope,
+                branch,
+                operations
+            });
+        }
+
+        return strands;
     }
 }

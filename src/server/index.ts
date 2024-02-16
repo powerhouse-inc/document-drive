@@ -24,7 +24,6 @@ import { requestPublicDrive } from '../utils/graphql';
 import { OperationError } from './error';
 import { ListenerManager } from './listener/manager';
 import { PullResponderTransmitter } from './listener/transmitter';
-import type { ITransmitter } from './listener/transmitter/types';
 import {
     BaseDocumentDriveServer,
     DriveEvents,
@@ -979,11 +978,11 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         }
     }
 
-    getTransmitter(
+    getListener(
         driveId: string,
         listenerId: string
-    ): Promise<ITransmitter | undefined> {
-        return this.listenerStateManager.getTransmitter(driveId, listenerId);
+    ): Promise<ListenerState | undefined> {
+        return this.listenerStateManager.getListener(driveId, listenerId);
     }
 
     getSyncStatus(drive: string): SyncStatus {

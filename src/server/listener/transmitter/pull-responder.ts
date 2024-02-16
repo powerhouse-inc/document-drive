@@ -30,7 +30,11 @@ export type StrandUpdateGraphQL = Omit<StrandUpdate, 'operations'> & {
     operations: OperationUpdateGraphQL[];
 };
 
-export class PullResponderTransmitter implements ITransmitter {
+export interface IPullResponderTransmitter extends ITransmitter {
+    getStrands(since?: string): Promise<StrandUpdate[]>;
+}
+
+export class PullResponderTransmitter implements IPullResponderTransmitter {
     private drive: BaseDocumentDriveServer;
     private listener: Listener;
     private manager: ListenerManager;
@@ -49,48 +53,12 @@ export class PullResponderTransmitter implements ITransmitter {
         return [];
     }
 
-    async getStrands(
-        listenerId: string,
-        since?: string
-    ): Promise<StrandUpdate[]> {
-        // fetch listenerState from listenerManager
-        const entries = this.manager.getListener(
+    getStrands(since?: string | undefined): Promise<StrandUpdate[]> {
+        return this.manager.getStrands(
             this.listener.driveId,
-            listenerId
+            this.listener.listenerId,
+            since
         );
-
-        // fetch operations from drive  and prepare strands
-        const strands: StrandUpdate[] = [];
-
-        for (const entry of entries.syncUnits) {
-            if (entry.listenerRev >= entry.syncRev) {
-                continue;
-            }
-
-            const { documentId, driveId, scope, branch } = entry;
-            const operations = await this.drive.getOperationData(
-                entry.driveId,
-                entry.syncId,
-                {
-                    since,
-                    fromRevision: entry.listenerRev
-                }
-            );
-
-            if (!operations.length) {
-                continue;
-            }
-
-            strands.push({
-                driveId,
-                documentId,
-                scope: scope as OperationScope,
-                branch,
-                operations
-            });
-        }
-
-        return strands;
     }
 
     async processAcknowledge(
@@ -98,7 +66,7 @@ export class PullResponderTransmitter implements ITransmitter {
         listenerId: string,
         revisions: ListenerRevision[]
     ): Promise<boolean> {
-        const listener = this.manager.getListener(driveId, listenerId);
+        const listener = await this.manager.getListener(driveId, listenerId);
 
         let success = true;
         for (const revision of revisions) {
