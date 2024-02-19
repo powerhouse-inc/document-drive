@@ -1,13 +1,6 @@
 import * as DocumentDrive from 'document-model-libs/document-drive';
 import * as DocumentModelsLibs from 'document-model-libs/document-models';
-import {
-    Action,
-    BaseAction,
-    Document,
-    DocumentModel,
-    Operation,
-    Reducer
-} from 'document-model/document';
+import { BaseAction, DocumentModel } from 'document-model/document';
 import {
     DocumentModelAction,
     DocumentModelDocument,
@@ -18,39 +11,7 @@ import {
 import { beforeEach } from 'node:test';
 import { describe, expect, it } from 'vitest';
 import { DocumentDriveServer } from '../src';
-
-function buildOperation(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    reducer: Reducer<any, any, any>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    document: Document<any, any, any>,
-    action: Action,
-    index?: number
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Operation<any> {
-    const newDocument = reducer(document, action);
-    const operation = newDocument.operations[action.scope].slice().pop()!;
-    return { ...operation, index: index ?? operation.index };
-}
-
-function buildOperations(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    reducer: Reducer<any, any, any>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    document: Document<any, any, any>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    actions: Array<Action>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Operation<Action>[] {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const operations: Operation<Action>[] = [];
-    for (const action of actions) {
-        document = reducer(document, action);
-        const operation = document.operations[action.scope].slice().pop()!;
-        operations.push(operation);
-    }
-    return operations;
-}
+import { buildOperation, buildOperations } from './utils';
 
 describe('Document operations', () => {
     const documentModels = [
