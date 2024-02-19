@@ -23,7 +23,7 @@ import { generateUUID, isDocumentDrive, isNoopUpdate } from '../utils';
 import { requestPublicDrive } from '../utils/graphql';
 import { OperationError } from './error';
 import { ListenerManager } from './listener/manager';
-import { PullResponderTransmitter } from './listener/transmitter';
+import { ITransmitter, PullResponderTransmitter } from './listener/transmitter';
 import {
     BaseDocumentDriveServer,
     DriveEvents,
@@ -99,7 +99,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                   operations
               ));
 
-        this.updateSyncStatus(strand.driveId, result.status);
+        this.updateSyncStatus(strand.driveId, result.status, result.error);
         this.emit('strandUpdate', strand);
         return result;
     }
@@ -150,7 +150,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                             driveId,
                             error instanceof OperationError
                                 ? error.status
-                                : 'ERROR'
+                                : 'ERROR',
+                            error
                         );
                     },
                     acknowledgeSuccess => {}
@@ -606,9 +607,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 );
                 continue;
             } else if (op.index < nextIndex) {
-                const existingOperation = scopeOperations.find(
-                    existingOperation => existingOperation.index === op.index
-                );
+                const existingOperation = scopeOperations
+                    .concat(pastOperations)
+                    .find(
+                        existingOperation =>
+                            existingOperation.index === op.index
+                    );
                 if (existingOperation && existingOperation.hash !== op.hash) {
                     error = new OperationError(
                         'CONFLICT',
@@ -976,6 +980,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 signals
             } satisfies IOperationResult;
         }
+    }
+
+    getTransmitter(
+        driveId: string,
+        listenerId: string
+    ): Promise<ITransmitter | undefined> {
+        return this.listenerStateManager.getTransmitter(driveId, listenerId);
     }
 
     getListener(

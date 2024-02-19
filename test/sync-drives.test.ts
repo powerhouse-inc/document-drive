@@ -11,7 +11,7 @@ import {
     Operation,
     OperationScope
 } from 'document-model/document';
-import { module as DocumentModelLib } from 'document-model/document-model';
+import * as DocumentModelLib from 'document-model/document-model';
 import stringify from 'json-stringify-deterministic';
 import { GraphQLQuery, HttpResponse, graphql } from 'msw';
 import { setupServer } from 'msw/node';
@@ -20,11 +20,13 @@ import {
     DocumentDriveServer,
     ListenerRevision,
     PullResponderTransmitter,
-    StrandUpdate
+    StrandUpdate,
+    SyncStatus
 } from '../src/server';
 import { generateUUID } from '../src/utils';
+import { buildOperation, buildOperations } from './utils';
 
-describe('Document Drive Server with %s', () => {
+describe('Document Drive Server interaction', () => {
     const documentModels = [
         DocumentModelLib,
         ...Object.values(DocumentModelsLibs)
@@ -133,7 +135,7 @@ describe('Document Drive Server with %s', () => {
             graphql.query<GraphQLQuery, { listenerId: string }>(
                 'strands',
                 async ({ variables }) => {
-                    const transmitter = server.getTransmitter(
+                    const transmitter = await server.getTransmitter(
                         '1',
                         variables.listenerId
                     );
@@ -198,7 +200,7 @@ describe('Document Drive Server with %s', () => {
                     success = false;
                 }
                 return HttpResponse.json({
-                    data: { success }
+                    data: { acknowledge: success }
                 });
             })
         ];
@@ -216,7 +218,7 @@ describe('Document Drive Server with %s', () => {
         vi.useRealTimers();
     });
 
-    it('should add pull trigger from remote drive', async ({ expect }) => {
+    async function createRemoteDrive() {
         const remoteServer = new DocumentDriveServer(documentModels);
         await remoteServer.initialize();
 
@@ -231,6 +233,11 @@ describe('Document Drive Server with %s', () => {
                 triggers: []
             }
         });
+        return { remoteServer, mswServer } as const;
+    }
+
+    it('should create remote drive', async ({ expect }) => {
+        const { mswServer } = await createRemoteDrive();
 
         const connectServer = new DocumentDriveServer(documentModels);
         await connectServer.addRemoteDrive('http://test', {
@@ -265,6 +272,314 @@ describe('Document Drive Server with %s', () => {
                 }
             ]
         });
+
+        mswServer.close();
+    });
+
+    it('should synchronize drive operations', async ({ expect }) => {
+        const { remoteServer, mswServer } = await createRemoteDrive();
+
+        const connectServer = new DocumentDriveServer(documentModels);
+
+        await connectServer.addRemoteDrive('http://test', {
+            availableOffline: true,
+            sharingType: 'public',
+            listeners: [],
+            triggers: []
+        });
+
+        let connectDrive = await connectServer.getDrive('1');
+        expect(connectDrive.operations.global.length).toBe(0);
+
+        const remoteDrive = await remoteServer.getDrive('1');
+        await remoteServer.addDriveOperation(
+            '1',
+            buildOperation(
+                reducer,
+                remoteDrive,
+                actions.addFolder({ id: '1', name: 'test' })
+            )
+        );
+
+        await new Promise<SyncStatus>(resolve =>
+            connectServer.on(
+                'syncStatus',
+                (_, status) => status === 'SUCCESS' && resolve(status)
+            )
+        );
+
+        connectDrive = await connectServer.getDrive('1');
+        expect(connectDrive.operations.global.length).toBe(1);
+        expect(connectDrive.state.global.nodes).toStrictEqual([
+            {
+                id: '1',
+                kind: 'folder',
+                name: 'test',
+                parentFolder: null
+            }
+        ]);
+
+        mswServer.close();
+    });
+
+    it('should synchronize document operations', async ({ expect }) => {
+        const { remoteServer, mswServer } = await createRemoteDrive();
+
+        const connectServer = new DocumentDriveServer(documentModels);
+
+        await connectServer.addRemoteDrive('http://test', {
+            availableOffline: true,
+            sharingType: 'public',
+            listeners: [],
+            triggers: []
+        });
+
+        let connectDrive = await connectServer.getDrive('1');
+        expect(connectDrive.operations.global.length).toBe(0);
+
+        const remoteDrive = await remoteServer.getDrive('1');
+        await remoteServer.addDriveOperation(
+            '1',
+            buildOperation(
+                reducer,
+                remoteDrive,
+                actions.addFile({
+                    id: '1',
+                    name: 'test',
+                    documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local']
+                })
+            )
+        );
+        const remoteDocument = await remoteServer.getDocument('1', '1');
+        await remoteServer.addOperation(
+            '1',
+            '1',
+            buildOperation(
+                DocumentModelLib.reducer,
+                remoteDocument,
+                DocumentModelLib.actions.setModelName({ name: 'test' })
+            )
+        );
+
+        await vi.waitFor(async () => {
+            const connectDocument = (await connectServer.getDocument(
+                '1',
+                '1'
+            )) as DocumentModelLib.DocumentModelDocument;
+            expect(connectDocument.operations.global.length).toBe(1);
+        });
+
+        connectDrive = await connectServer.getDrive('1');
+        expect(connectDrive.operations.global.length).toBe(1);
+        expect(connectDrive.state.global.nodes).toStrictEqual([
+            {
+                id: '1',
+                kind: 'file',
+                name: 'test',
+                documentType: 'powerhouse/document-model',
+                scopes: ['global', 'local'],
+                parentFolder: null,
+                synchronizationUnits: [
+                    {
+                        branch: 'main',
+                        scope: 'global',
+                        syncId: '1'
+                    },
+                    {
+                        branch: 'main',
+                        scope: 'local',
+                        syncId: '2'
+                    }
+                ]
+            }
+        ]);
+
+        const connectDocument = (await connectServer.getDocument(
+            '1',
+            '1'
+        )) as DocumentModelLib.DocumentModelDocument;
+        expect(connectDocument.state.global.name).toBe('test');
+
+        mswServer.close();
+    });
+
+    it('should handle strand with deleted file', async ({ expect }) => {
+        const { remoteServer, mswServer } = await createRemoteDrive();
+
+        let remoteDrive = await remoteServer.getDrive('1');
+        await remoteServer.addDriveOperations(
+            '1',
+            buildOperations(reducer, remoteDrive, [
+                actions.addFolder({ id: 'folder', name: 'new folder' }),
+                actions.addFile({
+                    id: '1',
+                    name: 'test',
+                    documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local']
+                })
+            ])
+        );
+        const remoteDocument = await remoteServer.getDocument('1', '1');
+        await remoteServer.addOperation(
+            '1',
+            '1',
+            buildOperation(
+                DocumentModelLib.reducer,
+                remoteDocument,
+                DocumentModelLib.actions.setModelName({ name: 'test' })
+            )
+        );
+
+        remoteDrive = await remoteServer.getDrive('1');
+        await remoteServer.addDriveOperation(
+            '1',
+            buildOperation(
+                reducer,
+                remoteDrive,
+                actions.deleteNode({ id: '1' })
+            )
+        );
+
+        const connectServer = new DocumentDriveServer(documentModels);
+
+        await connectServer.addRemoteDrive('http://test', {
+            availableOffline: true,
+            sharingType: 'public',
+            listeners: [],
+            triggers: []
+        });
+
+        let connectDrive = await connectServer.getDrive('1');
+
+        await vi.waitFor(async () => {
+            const connectDocument = await connectServer.getDrive('1');
+            expect(connectDocument.operations.global.length).toBe(3);
+        });
+
+        connectDrive = await connectServer.getDrive('1');
+        expect(connectDrive.state.global.nodes).toStrictEqual([
+            {
+                id: 'folder',
+                kind: 'folder',
+                name: 'new folder',
+                parentFolder: null
+            }
+        ]);
+
+        mswServer.close();
+    });
+
+    it('should handle deleted file after sync', async ({ expect }) => {
+        const { remoteServer, mswServer } = await createRemoteDrive();
+
+        let remoteDrive = await remoteServer.getDrive('1');
+        await remoteServer.addDriveOperations(
+            '1',
+            buildOperations(reducer, remoteDrive, [
+                actions.addFolder({ id: 'folder', name: 'new folder' }),
+                actions.addFile({
+                    id: '1',
+                    name: 'test',
+                    documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local']
+                })
+            ])
+        );
+        let remoteDocument = await remoteServer.getDocument('1', '1');
+        await remoteServer.addOperation(
+            '1',
+            '1',
+            buildOperation(
+                DocumentModelLib.reducer,
+                remoteDocument,
+                DocumentModelLib.actions.setModelName({ name: 'test' })
+            )
+        );
+
+        const connectServer = new DocumentDriveServer(documentModels);
+
+        await connectServer.addRemoteDrive('http://test', {
+            availableOffline: true,
+            sharingType: 'public',
+            listeners: [],
+            triggers: []
+        });
+
+        let connectDrive = await connectServer.getDrive('1');
+
+        await vi.waitFor(async () => {
+            const connectDocument = await connectServer.getDrive('1');
+            expect(connectDocument.operations.global.length).toBe(2);
+        });
+
+        connectDrive = await connectServer.getDrive('1');
+        expect(connectDrive.state.global.nodes).toStrictEqual([
+            {
+                id: 'folder',
+                kind: 'folder',
+                name: 'new folder',
+                parentFolder: null
+            },
+            {
+                id: '1',
+                name: 'test',
+                documentType: 'powerhouse/document-model',
+                kind: 'file',
+                parentFolder: null,
+                scopes: ['global', 'local'],
+                synchronizationUnits: [
+                    {
+                        branch: 'main',
+                        scope: 'global',
+                        syncId: '1'
+                    },
+                    {
+                        branch: 'main',
+                        scope: 'local',
+                        syncId: '2'
+                    }
+                ]
+            }
+        ]);
+
+        remoteDocument = await remoteServer.getDocument('1', '1');
+        await remoteServer.addOperation(
+            '1',
+            '1',
+            buildOperation(
+                DocumentModelLib.reducer,
+                remoteDocument,
+                DocumentModelLib.actions.setModelName({ name: 'test 2' })
+            )
+        );
+
+        remoteDrive = await remoteServer.getDrive('1');
+        await remoteServer.addDriveOperation(
+            '1',
+            buildOperation(
+                reducer,
+                remoteDrive,
+                actions.deleteNode({ id: '1' })
+            )
+        );
+
+        vi.advanceTimersToNextTimer();
+
+        await vi.waitFor(async () => {
+            const connectDocument = await connectServer.getDrive('1');
+            expect(connectDocument.operations.global.length).toBe(3);
+        });
+
+        connectDrive = await connectServer.getDrive('1');
+        expect(connectDrive.state.global.nodes).toStrictEqual([
+            {
+                id: 'folder',
+                kind: 'folder',
+                name: 'new folder',
+                parentFolder: null
+            }
+        ]);
 
         mswServer.close();
     });

@@ -56,7 +56,7 @@ devDependencies:
     specifier: ^1.0.29
     version: 1.0.30
   document-model-libs:
-    specifier: ^1.1.44
+    specifier: ^1.1.48
     version: 1.1.48(graphql@16.8.1)(react-dom@18.2.0)(react@18.2.0)
   eslint:
     specifier: ^8.56.0
