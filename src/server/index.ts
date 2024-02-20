@@ -23,7 +23,11 @@ import { generateUUID, isDocumentDrive, isNoopUpdate } from '../utils';
 import { requestPublicDrive } from '../utils/graphql';
 import { OperationError } from './error';
 import { ListenerManager } from './listener/manager';
-import { ITransmitter, PullResponderTransmitter } from './listener/transmitter';
+import {
+    CancelPullLoop,
+    ITransmitter,
+    PullResponderTransmitter
+} from './listener/transmitter';
 import {
     BaseDocumentDriveServer,
     DriveEvents,
@@ -51,7 +55,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     private listenerStateManager: ListenerManager;
     private triggerMap = new Map<
         DocumentDriveState['id'],
-        Map<Trigger['id'], number>
+        Map<Trigger['id'], CancelPullLoop>
     >();
     private syncStatus = new Map<DocumentDriveState['id'], SyncStatus>();
 
@@ -141,7 +145,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
             this.updateSyncStatus(driveId, 'SYNCING');
             if (PullResponderTransmitter.isPullResponderTrigger(trigger)) {
-                const intervalId = PullResponderTransmitter.setupPull(
+                const cancelPullLoop = PullResponderTransmitter.setupPull(
                     driveId,
                     trigger,
                     this.saveStrand.bind(this),
@@ -156,7 +160,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     },
                     acknowledgeSuccess => {}
                 );
-                driveTriggers.set(trigger.id, intervalId);
+                driveTriggers.set(trigger.id, cancelPullLoop);
                 this.triggerMap.set(driveId, driveTriggers);
             }
         }
@@ -164,7 +168,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
     private async stopSyncRemoteDrive(driveId: string) {
         const triggers = this.triggerMap.get(driveId);
-        triggers?.forEach(clearInterval);
+        triggers?.forEach(cancel => cancel());
         return this.triggerMap.delete(driveId);
     }
 
