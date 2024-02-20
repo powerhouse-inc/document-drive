@@ -103,7 +103,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                   operations
               ));
 
-        this.updateSyncStatus(strand.driveId, result.status, result.error);
+        if (result.status === 'ERROR') {
+            this.updateSyncStatus(strand.driveId, result.status, result.error);
+        }
         this.emit('strandUpdate', strand);
         return result;
     }
@@ -158,7 +160,14 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                             error
                         );
                     },
-                    acknowledgeSuccess => {}
+                    revisions => {
+                        const errorRevision = revisions.find(
+                            r => r.status !== 'SUCCESS'
+                        );
+                        if (!errorRevision) {
+                            this.updateSyncStatus(driveId, 'SUCCESS');
+                        }
+                    }
                 );
                 driveTriggers.set(trigger.id, cancelPullLoop);
                 this.triggerMap.set(driveId, driveTriggers);

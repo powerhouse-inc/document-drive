@@ -31,6 +31,7 @@ import {
     UpdateStatus
 } from '../src/server';
 import { MemoryStorage } from '../src/storage/memory';
+import { testStrands } from './test-cases';
 
 describe('Document Drive Server with %s', () => {
     const documentModels = [
@@ -375,11 +376,14 @@ describe('Document Drive Server with %s', () => {
     }) => {
         const ackRequestPromise = new Promise<JSON>(resolve => {
             mswServer.events.on('request:end', async ({ request }) => {
-                void request.json().then(body => {
-                    if (body.operationName === 'acknowledge') {
-                        resolve(body);
-                    }
-                });
+                void request
+                    .clone()
+                    .json()
+                    .then(body => {
+                        if (body.operationName === 'acknowledge') {
+                            resolve(body);
+                        }
+                    });
             });
         });
 
@@ -456,23 +460,14 @@ describe('Document Drive Server with %s', () => {
             })
         );
 
-        expect(statusEvents).toStrictEqual([
-            'SYNCING',
-            'SYNCING',
-            'SUCCESS',
-            'SYNCING',
-            'SUCCESS',
-            'SUCCESS',
-            'SYNCING',
-            'SUCCESS',
-            'SUCCESS'
-        ]);
+        expect(statusEvents).toStrictEqual(['SYNCING', 'SUCCESS']);
     });
 
     it('should detect conflict when adding operation with existing index', async ({
         expect
     }) => {
         const server = new DocumentDriveServer(documentModels);
+
         await server.initialize();
         await server.addRemoteDrive('http://switchboard.powerhouse.xyz/1', {
             availableOffline: true,
@@ -543,6 +538,10 @@ describe('Document Drive Server with %s', () => {
         );
 
         const server = new DocumentDriveServer(documentModels);
+        const statusEvents: SyncStatus[] = [];
+        server.on('syncStatus', (driveId, status) => {
+            statusEvents.push(status);
+        });
         await server.initialize();
         await server.addRemoteDrive('http://switchboard.powerhouse.xyz/1', {
             availableOffline: true,
@@ -584,11 +583,13 @@ describe('Document Drive Server with %s', () => {
             })
         );
 
-        vi.advanceTimersToNextTimer();
-
-        await new Promise(resolve => server.on('syncStatus', resolve));
+        await vi.waitFor(() => {
+            vi.advanceTimersToNextTimer();
+            expect(statusEvents.length).greaterThan(1);
+        });
 
         expect(server.getSyncStatus('1')).toBe('CONFLICT');
+        expect(statusEvents).toStrictEqual(['SYNCING', 'CONFLICT']);
     });
 
     it('should detect conflict when pushing operation with existing index', async ({
@@ -678,5 +679,42 @@ describe('Document Drive Server with %s', () => {
         const drive = await server.getDrive('1');
         expect(drive.operations.global.length).toBe(1);
         // expect(server.getSyncStatus('1')).toBe('');
+    });
+
+    it('should pull test case successfully', async ({ expect }) => {
+        mswServer.use(
+            graphql.query('strands', () => {
+                return HttpResponse.json({
+                    data: { system: { sync: { strands: testStrands } } }
+                });
+            })
+        );
+
+        const server = new DocumentDriveServer(documentModels);
+        await server.initialize();
+        await server.addRemoteDrive('http://switchboard.powerhouse.xyz/1', {
+            availableOffline: true,
+            sharingType: 'PUBLIC',
+            triggers: [],
+            listeners: [],
+            pullFilter: {
+                branch: ['main'],
+                documentId: ['*'],
+                documentType: ['*'],
+                scope: ['global', 'local']
+            }
+        });
+
+        vi.advanceTimersToNextTimer();
+
+        const result = await new Promise<{ status: SyncStatus; error?: Error }>(
+            resolve =>
+                server.on('syncStatus', (_, status, error) =>
+                    resolve({ status, error })
+                )
+        );
+
+        expect(result.error).toBeUndefined();
+        expect(server.getSyncStatus('1')).toBe('SUCCESS');
     });
 });

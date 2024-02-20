@@ -93,6 +93,8 @@ export type ListenerRevision = {
     revision: number;
 };
 
+export type ListenerRevisionWithError = ListenerRevision & { error?: Error };
+
 export type ListenerUpdate = {
     listenerId: string;
     listenerRevisions: ListenerRevision[];
