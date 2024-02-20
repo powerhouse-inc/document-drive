@@ -1,3 +1,10 @@
+# [1.0.0-alpha.3](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.2...v1.0.0-alpha.3) (2024-02-20)
+
+
+### Features
+
+* bump document-model dep ([7442070](https://github.com/powerhouse-inc/document-drive/commit/744207006dad191e214f0547d78d185530476560))
+
 # [1.0.0-alpha.2](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.1...v1.0.0-alpha.2) (2024-02-20)
 
 
