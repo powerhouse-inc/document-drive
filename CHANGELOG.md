@@ -1,3 +1,10 @@
+# [1.0.0-alpha.7](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.6...v1.0.0-alpha.7) (2024-02-20)
+
+
+### Features
+
+* fixed date comparison ([6d28a3b](https://github.com/powerhouse-inc/document-drive/commit/6d28a3bfd6b338deaa5ede718b7a9ebc0cccf498))
+
 # [1.0.0-alpha.6](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.5...v1.0.0-alpha.6) (2024-02-20)
 
 
