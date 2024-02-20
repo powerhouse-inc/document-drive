@@ -29,8 +29,8 @@ devDependencies:
     specifier: ^18.6.2
     version: 18.6.2
   '@prisma/client':
-    specifier: 5.8.1
-    version: 5.8.1
+    specifier: 5.10.0
+    version: 5.10.0
   '@semantic-release/changelog':
     specifier: ^6.0.3
     version: 6.0.3(semantic-release@23.0.2)
@@ -1639,8 +1639,8 @@ packages:
       config-chain: 1.1.13
     dev: true
 
-  /@prisma/client@5.8.1:
-    resolution: {integrity: sha512-xQtMPfbIwLlbm0VVIVQY2yqQVOxPwRQhvIp7Z3m2900g1bu/zRHKhYZJQWELqmjl6d8YwBy0K2NvMqh47v1ubw==}
+  /@prisma/client@5.10.0:
+    resolution: {integrity: sha512-JQqKYpKplsAaPDk0RVKBsN4ly6AWJys6Hkjh9PJMgtdY0IME1C0aHckyGUhHpenmOO2J6liPDDm1svSrzce8BQ==}
     engines: {node: '>=16.13'}
     requiresBuild: true
     peerDependencies:
