@@ -68,17 +68,8 @@ export class PrismaStorage implements IDriveStorage {
         try {
             await Promise.all(
                 operations.map(async op => {
-                    return this.db.operation.upsert({
-                        where: {
-                            driveId_documentId_scope_branch_index: {
-                                driveId: drive,
-                                documentId: id,
-                                scope: op.scope,
-                                branch: 'main',
-                                index: op.index
-                            }
-                        },
-                        create: {
+                    return this.db.operation.createMany({
+                        data: {
                             driveId: drive,
                             documentId: id,
                             hash: op.hash,
@@ -90,18 +81,6 @@ export class PrismaStorage implements IDriveStorage {
                             branch: 'main',
                             skip: op.skip
                         },
-                        update: {
-                            driveId: drive,
-                            documentId: id,
-                            hash: op.hash,
-                            index: op.index,
-                            input: op.input as Prisma.InputJsonObject,
-                            timestamp: op.timestamp,
-                            type: op.type,
-                            scope: op.scope,
-                            branch: 'main',
-                            skip: op.skip
-                        }
                     });
                 })
             );
@@ -213,48 +192,22 @@ export class PrismaStorage implements IDriveStorage {
     }
 
     async deleteDocument(drive: string, id: string) {
-        await this.db.attachment.deleteMany({
-            where: {
-                driveId: drive,
-                documentId: id
-            }
-        });
-
-        await this.db.operation.deleteMany({
-            where: {
-                driveId: drive,
-                documentId: id
-            }
-        });
-
         await this.db.document.delete({
             where: {
                 id_driveId: {
                     driveId: drive,
                     id: id
                 }
+            },
+            include: {
+                operations: {
+                    include: {
+                        attachments: true
+                    }
+                }
             }
         });
 
-        if (drive === 'drives') {
-            await this.db.attachment.deleteMany({
-                where: {
-                    driveId: id
-                }
-            });
-
-            await this.db.operation.deleteMany({
-                where: {
-                    driveId: id
-                }
-            });
-
-            await this.db.document.deleteMany({
-                where: {
-                    driveId: id
-                }
-            });
-        }
     }
 
     async getDrives() {
@@ -271,6 +224,11 @@ export class PrismaStorage implements IDriveStorage {
     }
 
     async deleteDrive(id: string) {
+        const docs = await this.getDocuments(id);
+        console.log(docs);
+        await Promise.all(docs.map(async doc => {
+            return this.deleteDocument(id, doc)
+        }));
         await this.deleteDocument('drives', id);
     }
 }
