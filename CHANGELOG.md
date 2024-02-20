@@ -1,3 +1,10 @@
+# [1.0.0-alpha.6](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.5...v1.0.0-alpha.6) (2024-02-20)
+
+
+### Bug Fixes
+
+* reverse since change ([3e09362](https://github.com/powerhouse-inc/document-drive/commit/3e093623ca2f315e7faebeee3b3f3fc42bad083b))
+
 # [1.0.0-alpha.5](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.4...v1.0.0-alpha.5) (2024-02-20)
 
 
