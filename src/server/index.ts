@@ -19,7 +19,12 @@ import {
 import { createNanoEvents, Unsubscribe } from 'nanoevents';
 import { MemoryStorage } from '../storage/memory';
 import type { DocumentStorage, IDriveStorage } from '../storage/types';
-import { generateUUID, isDocumentDrive, isNoopUpdate } from '../utils';
+import {
+    generateUUID,
+    isBefore,
+    isDocumentDrive,
+    isNoopUpdate
+} from '../utils';
 import { requestPublicDrive } from '../utils/graphql';
 import { OperationError } from './error';
 import { ListenerManager } from './listener/manager';
@@ -305,10 +310,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const filteredOperations = operations.filter(
             operation =>
                 Object.keys(filter).length === 0 ||
-                (filter.since !== undefined &&
-                    filter.since <= operation.timestamp) ||
-                (filter.fromRevision !== undefined &&
-                    operation.index > filter.fromRevision)
+                ((filter.since === undefined ||
+                    isBefore(filter.since, operation.timestamp)) &&
+                    (filter.fromRevision === undefined ||
+                        operation.index > filter.fromRevision))
         );
 
         return filteredOperations.map(operation => ({

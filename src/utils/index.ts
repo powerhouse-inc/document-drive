@@ -75,3 +75,8 @@ export function isNoopUpdate(
         isSkipOpGreaterThanLatestOp
     );
 }
+
+// return true if dateA is before dateB
+export function isBefore(dateA: Date | string, dateB: Date | string) {
+    return new Date(dateA) < new Date(dateB);
+}
