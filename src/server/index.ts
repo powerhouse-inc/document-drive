@@ -305,10 +305,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const filteredOperations = operations.filter(
             operation =>
                 Object.keys(filter).length === 0 ||
-                (filter.since !== undefined &&
-                    filter.since <= operation.timestamp) ||
-                (filter.fromRevision !== undefined &&
-                    operation.index > filter.fromRevision)
+                ((filter.since === undefined ||
+                    filter.since <= operation.timestamp) &&
+                    (filter.fromRevision === undefined ||
+                        operation.index > filter.fromRevision))
         );
 
         return filteredOperations.map(operation => ({
