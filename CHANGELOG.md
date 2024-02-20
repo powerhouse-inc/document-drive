@@ -1,3 +1,10 @@
+# [1.0.0-alpha.4](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.3...v1.0.0-alpha.4) (2024-02-20)
+
+
+### Features
+
+* fix filter operations with since timestamp ([8a19d30](https://github.com/powerhouse-inc/document-drive/commit/8a19d30f892a9862be15c670d8114f4493198245))
+
 # [1.0.0-alpha.3](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.2...v1.0.0-alpha.3) (2024-02-20)
 
 
