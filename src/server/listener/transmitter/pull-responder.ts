@@ -8,6 +8,7 @@ import {
     IOperationResult,
     Listener,
     ListenerRevision,
+    ListenerRevisionWithError,
     OperationUpdate,
     StrandUpdate
 } from '../../types';
@@ -25,6 +26,8 @@ export type PullStrandsGraphQL = {
         };
     };
 };
+
+export type CancelPullLoop = () => void;
 
 export type StrandUpdateGraphQL = Omit<StrandUpdate, 'operations'> & {
     operations: OperationUpdateGraphQL[];
@@ -191,6 +194,7 @@ export class PullResponderTransmitter implements IPullResponderTransmitter {
         trigger: PullResponderTrigger,
         onStrandUpdate: (strand: StrandUpdate) => Promise<IOperationResult>,
         onError: (error: Error) => void,
+        onRevisions?: (revisions: ListenerRevisionWithError[]) => void,
         onAcknowledge?: (success: boolean) => void
     ) {
         try {
@@ -207,7 +211,7 @@ export class PullResponderTransmitter implements IPullResponderTransmitter {
                 return;
             }
 
-            const listenerRevisions: ListenerRevision[] = [];
+            const listenerRevisions: ListenerRevisionWithError[] = [];
 
             for (const strand of strands) {
                 const operations: Operation[] = strand.operations.map(
@@ -224,7 +228,6 @@ export class PullResponderTransmitter implements IPullResponderTransmitter {
                 );
 
                 let error: Error | undefined = undefined;
-
                 try {
                     const result = await onStrandUpdate(strand);
                     if (result.error) {
@@ -245,20 +248,26 @@ export class PullResponderTransmitter implements IPullResponderTransmitter {
                         ? error instanceof OperationError
                             ? error.status
                             : 'ERROR'
-                        : 'SUCCESS'
+                        : 'SUCCESS',
+                    error
                 });
 
                 // TODO: Should try to parse remaining strands?
-                if (error) {
-                    break;
-                }
+                // if (error) {
+                //     break;
+                // }
             }
+
+            onRevisions?.(listenerRevisions);
 
             await PullResponderTransmitter.acknowledgeStrands(
                 driveId,
                 url,
                 listenerId,
-                listenerRevisions
+                listenerRevisions.map(revision => {
+                    const { error, ...rest } = revision;
+                    return rest;
+                })
             )
                 .then(result => onAcknowledge?.(result))
                 .catch(error => console.error('ACK error', error));
@@ -272,8 +281,9 @@ export class PullResponderTransmitter implements IPullResponderTransmitter {
         trigger: PullResponderTrigger,
         onStrandUpdate: (strand: StrandUpdate) => Promise<IOperationResult>,
         onError: (error: Error) => void,
+        onRevisions?: (revisions: ListenerRevisionWithError[]) => void,
         onAcknowledge?: (success: boolean) => void
-    ): number {
+    ): CancelPullLoop {
         const { interval } = trigger.data;
         let loopInterval = PULL_DRIVE_INTERVAL;
         if (interval) {
@@ -287,26 +297,36 @@ export class PullResponderTransmitter implements IPullResponderTransmitter {
             }
         }
 
-        this.executePull(
-            driveId,
-            trigger,
-            onStrandUpdate,
-            onError,
-            onAcknowledge
-        );
+        let isCancelled = false;
+        let timeout: number | undefined;
 
-        const timeout = setInterval(
-            async () =>
-                this.executePull(
+        const executeLoop = async () => {
+            while (!isCancelled) {
+                await this.executePull(
                     driveId,
                     trigger,
                     onStrandUpdate,
                     onError,
+                    onRevisions,
                     onAcknowledge
-                ),
-            loopInterval
-        );
-        return timeout as unknown as number;
+                );
+                await new Promise(resolve => {
+                    timeout = setTimeout(
+                        resolve,
+                        loopInterval
+                    ) as unknown as number;
+                });
+            }
+        };
+
+        executeLoop().catch(console.error);
+
+        return () => {
+            isCancelled = true;
+            if (timeout !== undefined) {
+                clearTimeout(timeout);
+            }
+        };
     }
 
     static isPullResponderTrigger(
