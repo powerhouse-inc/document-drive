@@ -56,8 +56,8 @@ devDependencies:
     specifier: ^1.0.29
     version: 1.0.30
   document-model-libs:
-    specifier: ^1.1.48
-    version: 1.1.48(graphql@16.8.1)(react-dom@18.2.0)(react@18.2.0)
+    specifier: ^1.1.51
+    version: 1.1.51(graphql@16.8.1)(react-dom@18.2.0)(react@18.2.0)
   eslint:
     specifier: ^8.56.0
     version: 8.56.0
@@ -4256,8 +4256,8 @@ packages:
       esutils: 2.0.3
     dev: true
 
-  /document-model-libs@1.1.48(graphql@16.8.1)(react-dom@18.2.0)(react@18.2.0):
-    resolution: {integrity: sha512-8JG9z+mwxrpRKOCa5Vng7OlIZNRMna3ooTKMHnpCohVkdbNOXjdZjoTnJne0zfJzuOpDvFSaOUXSB5HWrvHrNA==}
+  /document-model-libs@1.1.51(graphql@16.8.1)(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-58SYxLfSklaImunLD/kcfXLpKrlNz1yIbIHYtBFto2SQmAhEoBpr8d1bMDbqX03Q7HrPHzRf0qnUfwlS5y22wA==}
     peerDependencies:
       react: ^18.2.0
       react-dom: ^18.2.0
