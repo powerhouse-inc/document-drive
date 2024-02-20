@@ -1,3 +1,12 @@
+# [1.0.0-alpha.2](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.1...v1.0.0-alpha.2) (2024-02-20)
+
+
+### Features
+
+* emit single sync status event for multiple strands ([1b9cf53](https://github.com/powerhouse-inc/document-drive/commit/1b9cf5313cca31f696c104b169d1210a3c2b829f))
+* improved error reporting and fixed operation hash check ([c6cc70f](https://github.com/powerhouse-inc/document-drive/commit/c6cc70f627dbdd2eab6399543fd41544fb959506))
+* proceed with loop only after previous request is done ([d7eec70](https://github.com/powerhouse-inc/document-drive/commit/d7eec7044233c060c56e98698360070198a540dd))
+
 # 1.0.0-alpha.1 (2024-02-16)
 
 
