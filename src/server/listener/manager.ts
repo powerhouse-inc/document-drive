@@ -42,41 +42,17 @@ export class ListenerManager extends BaseListenerManager {
         }
 
         const driveMap = this.listenerState.get(drive)!;
-
-        const driveDocument = await this.drive.getDrive(drive);
-
-        const lastDriveOperation = driveDocument.operations.global
-            .slice()
-            .pop();
-
         driveMap.set(listener.listenerId, {
             block: listener.block,
             driveId: listener.driveId,
             pendingTimeout: '0',
             listener,
             listenerStatus: 'CREATED',
-            syncUnits: [
-                {
-                    syncId: '0',
-                    driveId: listener.driveId,
-                    documentId: '',
-                    documentType: driveDocument.documentType,
-                    scope: 'global',
-                    branch: 'main',
-                    lastUpdated:
-                        lastDriveOperation?.timestamp ??
-                        driveDocument.lastModified,
-                    revision: lastDriveOperation?.index ?? 0,
-                    listenerRev: -1,
-                    syncRev: lastDriveOperation?.index ?? 0
-                }
-            ].concat(
-                filteredSyncUnits.map(e => ({
-                    ...e,
-                    listenerRev: -1,
-                    syncRev: e.revision
-                }))
-            )
+            syncUnits: filteredSyncUnits.map(e => ({
+                ...e,
+                listenerRev: -1,
+                syncRev: e.revision
+            }))
         });
 
         let transmitter: ITransmitter | undefined;

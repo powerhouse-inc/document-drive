@@ -583,4 +583,101 @@ describe('Document Drive Server interaction', () => {
 
         mswServer.close();
     });
+
+    it('should filter strands', async ({ expect }) => {
+        const { remoteServer, mswServer } = await createRemoteDrive();
+        let remoteDrive = await remoteServer.getDrive('1');
+        await remoteServer.addDriveOperations(
+            '1',
+            buildOperations(reducer, remoteDrive, [
+                actions.addFolder({ id: 'folder', name: 'new folder' }),
+                actions.addFile({
+                    id: '1',
+                    name: 'test',
+                    documentType: 'powerhouse/document-model',
+                    scopes: ['global', 'local']
+                })
+            ])
+        );
+        const remoteDocument = await remoteServer.getDocument('1', '1');
+        await remoteServer.addOperation(
+            '1',
+            '1',
+            buildOperation(
+                DocumentModelLib.reducer,
+                remoteDocument,
+                DocumentModelLib.actions.setModelName({ name: 'test' })
+            )
+        );
+
+        remoteDrive = await remoteServer.getDrive('1');
+        await remoteServer.addDriveOperation(
+            '1',
+            buildOperation(
+                reducer,
+                remoteDrive,
+                actions.addListener({
+                    listener: {
+                        block: false,
+                        callInfo: {
+                            data: '',
+                            name: 'PullResponder',
+                            transmitterType: 'PullResponder'
+                        },
+                        filter: {
+                            branch: ['*'],
+                            documentId: ['*'],
+                            documentType: ['*'],
+                            scope: ['*']
+                        },
+                        label: `Pullresponder #3`,
+                        listenerId: 'all',
+                        system: false
+                    }
+                })
+            )
+        );
+        remoteDrive = await remoteServer.getDrive('1');
+        await remoteServer.addDriveOperation(
+            '1',
+            buildOperation(
+                reducer,
+                remoteDrive,
+                actions.addListener({
+                    listener: {
+                        block: false,
+                        callInfo: {
+                            data: '',
+                            name: 'PullResponder',
+                            transmitterType: 'PullResponder'
+                        },
+                        filter: {
+                            branch: ['*'],
+                            documentId: ['*'],
+                            documentType: ['powerhouse/document-model'],
+                            scope: ['*']
+                        },
+                        label: `Pullresponder #3`,
+                        listenerId: 'documentModel',
+                        system: false
+                    }
+                })
+            )
+        );
+
+        const transmitterAll = (await remoteServer.getTransmitter(
+            '1',
+            'all'
+        )) as PullResponderTransmitter;
+        const strandsAll = await transmitterAll.getStrands();
+        expect(strandsAll.length).toBe(2);
+
+        const transmitterDocumentModel = (await remoteServer.getTransmitter(
+            '1',
+            'documentModel'
+        )) as PullResponderTransmitter;
+        const strandsDocumentModel =
+            await transmitterDocumentModel.getStrands();
+        expect(strandsDocumentModel.length).toBe(1);
+    });
 });

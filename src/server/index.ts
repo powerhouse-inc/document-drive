@@ -208,11 +208,36 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const nodes = drive.state.global.nodes.filter(
             node =>
                 isFileNode(node) &&
-                (!documentId?.length || documentId.includes(node.id)) // TODO support * as documentId
-        ) as FileNode[];
+                (!documentId?.length ||
+                    documentId.includes(node.id) ||
+                    documentId.includes('*'))
+        ) as Pick<
+            FileNode,
+            'id' | 'documentType' | 'scopes' | 'synchronizationUnits'
+        >[];
 
         if (documentId && !nodes.length) {
             throw new Error('File node not found');
+        }
+
+        // checks if document drive synchronization unit should be added
+        if (
+            !documentId ||
+            documentId.includes('*') ||
+            documentId.includes('')
+        ) {
+            nodes.unshift({
+                id: '',
+                documentType: 'powerhouse/document-drive',
+                scopes: ['global'],
+                synchronizationUnits: [
+                    {
+                        syncId: '0',
+                        scope: 'global',
+                        branch: 'main'
+                    }
+                ]
+            });
         }
 
         const synchronizationUnits: SynchronizationUnit[] = [];
@@ -230,7 +255,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 continue;
             }
 
-            const document = await this.getDocument(driveId, node.id);
+            const document = await (node.id
+                ? this.getDocument(driveId, node.id)
+                : this.getDrive(driveId));
 
             for (const { syncId, scope, branch } of nodeUnits) {
                 const operations =
