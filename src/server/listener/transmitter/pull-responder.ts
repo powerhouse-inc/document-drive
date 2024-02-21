@@ -208,6 +208,7 @@ export class PullResponderTransmitter implements IPullResponderTransmitter {
 
             // if there are no new strands then do nothing
             if (!strands.length) {
+                onRevisions?.([]);
                 return;
             }
 

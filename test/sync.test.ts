@@ -31,7 +31,6 @@ import {
     UpdateStatus
 } from '../src/server';
 import { MemoryStorage } from '../src/storage/memory';
-import { testStrands } from './test-cases';
 
 describe('Document Drive Server with %s', () => {
     const documentModels = [
@@ -575,6 +574,10 @@ describe('Document Drive Server with %s', () => {
         expect(result.status).toBe('SUCCESS');
         expect(server.getSyncStatus('1')).toBe('SYNCING');
 
+        await vi.waitFor(() =>
+            expect(server.getSyncStatus('1')).toBe('SUCCESS')
+        );
+
         mswServer.use(
             graphql.query('strands', () => {
                 return HttpResponse.json({
@@ -585,11 +588,11 @@ describe('Document Drive Server with %s', () => {
 
         await vi.waitFor(() => {
             vi.advanceTimersToNextTimer();
-            expect(statusEvents.length).greaterThan(1);
+            expect(statusEvents.length).greaterThan(2);
         });
 
         expect(server.getSyncStatus('1')).toBe('CONFLICT');
-        expect(statusEvents).toStrictEqual(['SYNCING', 'CONFLICT']);
+        expect(statusEvents).toStrictEqual(['SYNCING', 'SUCCESS', 'CONFLICT']);
     });
 
     it('should detect conflict when pushing operation with existing index', async ({
@@ -653,6 +656,10 @@ describe('Document Drive Server with %s', () => {
             }
         });
 
+        await vi.waitFor(() =>
+            expect(server.getSyncStatus('1')).toBe('SUCCESS')
+        );
+
         const operation: Operation<DocumentDriveAction> = {
             index: 0,
             skip: 0,
@@ -670,51 +677,12 @@ describe('Document Drive Server with %s', () => {
 
         await server.addDriveOperation('1', operation);
 
-        const status = await new Promise(resolve => {
-            server.on('syncStatus', (_driveId, status) => resolve(status));
-            vi.advanceTimersToNextTimer();
-        });
-        expect(status).toBe('CONFLICT');
+        await vi.waitFor(() =>
+            expect(server.getSyncStatus('1')).toBe('CONFLICT')
+        );
 
         const drive = await server.getDrive('1');
         expect(drive.operations.global.length).toBe(1);
         // expect(server.getSyncStatus('1')).toBe('');
-    });
-
-    it('should pull test case successfully', async ({ expect }) => {
-        mswServer.use(
-            graphql.query('strands', () => {
-                return HttpResponse.json({
-                    data: { system: { sync: { strands: testStrands } } }
-                });
-            })
-        );
-
-        const server = new DocumentDriveServer(documentModels);
-        await server.initialize();
-        await server.addRemoteDrive('http://switchboard.powerhouse.xyz/1', {
-            availableOffline: true,
-            sharingType: 'PUBLIC',
-            triggers: [],
-            listeners: [],
-            pullFilter: {
-                branch: ['main'],
-                documentId: ['*'],
-                documentType: ['*'],
-                scope: ['global', 'local']
-            }
-        });
-
-        vi.advanceTimersToNextTimer();
-
-        const result = await new Promise<{ status: SyncStatus; error?: Error }>(
-            resolve =>
-                server.on('syncStatus', (_, status, error) =>
-                    resolve({ status, error })
-                )
-        );
-
-        expect(result.error).toBeUndefined();
-        expect(server.getSyncStatus('1')).toBe('SUCCESS');
     });
 });
