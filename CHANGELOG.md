@@ -1,3 +1,10 @@
+# [1.0.0-alpha.10](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.9...v1.0.0-alpha.10) (2024-02-21)
+
+
+### Features
+
+* improve add operations insert statement ([1c238ce](https://github.com/powerhouse-inc/document-drive/commit/1c238cef779e62bf89d2341a05a3af3633b9ec59))
+
 # [1.0.0-alpha.9](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.8...v1.0.0-alpha.9) (2024-02-21)
 
 
