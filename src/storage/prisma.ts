@@ -58,16 +58,21 @@ export class PrismaStorage implements IDriveStorage {
         drive: string,
         id: string,
         operations: Operation[],
-        header: DocumentHeader
+        header: DocumentHeader,
+        updatedOperations: Operation[] = []
     ): Promise<void> {
         const document = await this.getDocument(drive, id);
         if (!document) {
             throw new Error(`Document with id ${id} not found`);
         }
 
+        const mergedOperations = [...operations, ...updatedOperations].sort(
+            (a, b) => a.index - b.index
+        );
+
         try {
             await Promise.all(
-                operations.map(async op => {
+                mergedOperations.map(async op => {
                     return this.db.operation.createMany({
                         data: {
                             driveId: drive,
@@ -80,7 +85,7 @@ export class PrismaStorage implements IDriveStorage {
                             scope: op.scope,
                             branch: 'main',
                             skip: op.skip
-                        },
+                        }
                     });
                 })
             );
@@ -207,7 +212,6 @@ export class PrismaStorage implements IDriveStorage {
                 }
             }
         });
-
     }
 
     async getDrives() {
@@ -225,9 +229,11 @@ export class PrismaStorage implements IDriveStorage {
 
     async deleteDrive(id: string) {
         const docs = await this.getDocuments(id);
-        await Promise.all(docs.map(async doc => {
-            return this.deleteDocument(id, doc)
-        }));
+        await Promise.all(
+            docs.map(async doc => {
+                return this.deleteDocument(id, doc);
+            })
+        );
         await this.deleteDocument('drives', id);
     }
 }
