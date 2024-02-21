@@ -1,3 +1,10 @@
+# [1.0.0-alpha.8](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.7...v1.0.0-alpha.8) (2024-02-21)
+
+
+### Features
+
+* set sync status success if no new strands ([7a9627c](https://github.com/powerhouse-inc/document-drive/commit/7a9627cd72c80ae3c56a933bcd92c3da87529e00))
+
 # [1.0.0-alpha.7](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.6...v1.0.0-alpha.7) (2024-02-20)
 
 
