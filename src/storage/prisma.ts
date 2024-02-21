@@ -71,24 +71,20 @@ export class PrismaStorage implements IDriveStorage {
         );
 
         try {
-            await Promise.all(
-                mergedOperations.map(async op => {
-                    return this.db.operation.createMany({
-                        data: {
-                            driveId: drive,
-                            documentId: id,
-                            hash: op.hash,
-                            index: op.index,
-                            input: op.input as Prisma.InputJsonObject,
-                            timestamp: op.timestamp,
-                            type: op.type,
-                            scope: op.scope,
-                            branch: 'main',
-                            skip: op.skip
-                        }
-                    });
-                })
-            );
+            await this.db.operation.createMany({
+                data: mergedOperations.map(op => ({
+                    driveId: drive,
+                    documentId: id,
+                    hash: op.hash,
+                    index: op.index,
+                    input: op.input as Prisma.InputJsonObject,
+                    timestamp: op.timestamp,
+                    type: op.type,
+                    scope: op.scope,
+                    branch: 'main',
+                    skip: op.skip
+                }))
+            });
 
             await this.db.document.updateMany({
                 where: {
