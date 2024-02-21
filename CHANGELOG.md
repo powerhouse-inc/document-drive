@@ -1,3 +1,10 @@
+# [1.0.0-alpha.9](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.8...v1.0.0-alpha.9) (2024-02-21)
+
+
+### Features
+
+* added update operations in prisma storage addDocumentOperations ([#71](https://github.com/powerhouse-inc/document-drive/issues/71)) ([eeb96af](https://github.com/powerhouse-inc/document-drive/commit/eeb96afbad520f90ce8c9b71bf573950dadadf4b))
+
 # [1.0.0-alpha.8](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.7...v1.0.0-alpha.8) (2024-02-21)
 
 
