@@ -680,4 +680,39 @@ describe('Document Drive Server interaction', () => {
             await transmitterDocumentModel.getStrands();
         expect(strandsDocumentModel.length).toBe(1);
     });
+
+    it('should stop pulling if trigger is removed', async ({ expect }) => {
+        const { remoteServer, mswServer } = await createRemoteDrive();
+
+        const connectServer = new DocumentDriveServer(documentModels);
+        await connectServer.addRemoteDrive('http://test', {
+            availableOffline: true,
+            sharingType: 'public',
+            listeners: [],
+            triggers: []
+        });
+
+        let connectDrive = await connectServer.getDrive('1');
+        expect(connectDrive.state.local.triggers.length).toBe(1);
+        const trigger = connectDrive.state.local.triggers[0];
+        expect(trigger).toStrictEqual(
+            expect.objectContaining({ type: 'PullResponder' })
+        );
+        expect(connectServer.getSyncStatus('1')).toBe('SYNCING');
+
+        const result = await connectServer.addDriveOperation(
+            '1',
+            buildOperation(
+                reducer,
+                connectDrive,
+                actions.removeTrigger({ triggerId: trigger!.id })
+            )
+        );
+        expect(result.status).toBe('SUCCESS');
+        connectDrive = await connectServer.getDrive('1');
+        expect(connectDrive.state.local.triggers.length).toBe(0);
+        expect(() => connectServer.getSyncStatus('1')).toThrowError(
+            'Sync status not found for drive 1'
+        );
+    });
 });

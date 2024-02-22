@@ -1,6 +1,7 @@
 import { ListenerFilter, Trigger, z } from 'document-model-libs/document-drive';
 import { Operation, OperationScope } from 'document-model/document';
 import { PULL_DRIVE_INTERVAL } from '../..';
+import { generateUUID } from '../../../utils';
 import { gql, requestGraphql } from '../../../utils/graphql';
 import { OperationError } from '../../error';
 import {
@@ -10,6 +11,7 @@ import {
     ListenerRevision,
     ListenerRevisionWithError,
     OperationUpdate,
+    RemoteDriveOptions,
     StrandUpdate
 } from '../../types';
 import { ListenerManager } from '../manager';
@@ -328,6 +330,35 @@ export class PullResponderTransmitter implements IPullResponderTransmitter {
                 clearTimeout(timeout);
             }
         };
+    }
+
+    static async createPullResponderTrigger(
+        driveId: string,
+        url: string,
+        options: Pick<RemoteDriveOptions, 'pullInterval' | 'pullFilter'>
+    ): Promise<PullResponderTrigger> {
+        const { pullFilter, pullInterval } = options;
+        const listenerId = await PullResponderTransmitter.registerPullResponder(
+            driveId,
+            url,
+            pullFilter ?? {
+                documentId: ['*'],
+                documentType: ['*'],
+                branch: ['*'],
+                scope: ['*']
+            }
+        );
+
+        const pullTrigger: PullResponderTrigger = {
+            id: generateUUID(),
+            type: 'PullResponder',
+            data: {
+                url,
+                listenerId,
+                interval: pullInterval?.toString() ?? ''
+            }
+        };
+        return pullTrigger;
     }
 
     static isPullResponderTrigger(
