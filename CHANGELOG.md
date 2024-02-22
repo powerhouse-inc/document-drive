@@ -1,3 +1,10 @@
+# [1.0.0-alpha.11](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.10...v1.0.0-alpha.11) (2024-02-22)
+
+
+### Features
+
+* filter out drive strand if filter excludes it ([a6d3cd2](https://github.com/powerhouse-inc/document-drive/commit/a6d3cd25e63c917cf0033429ab75d265e76bde32))
+
 # [1.0.0-alpha.10](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.9...v1.0.0-alpha.10) (2024-02-21)
 
 
