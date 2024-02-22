@@ -1,9 +1,11 @@
 import {
+    AddListenerInput,
     DocumentDriveAction,
     DocumentDriveDocument,
     DocumentDriveState,
     FileNode,
     isFileNode,
+    RemoveListenerInput,
     Trigger,
     utils
 } from 'document-model-libs/document-drive';
@@ -76,11 +78,15 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
     private updateSyncStatus(
         driveId: string,
-        status: SyncStatus,
+        status: SyncStatus | null,
         error?: Error
     ) {
-        this.syncStatus.set(driveId, status);
-        this.emit('syncStatus', driveId, status, error);
+        if (status === null) {
+            this.syncStatus.delete(driveId);
+        } else {
+            this.syncStatus.set(driveId, status);
+            this.emit('syncStatus', driveId, status, error);
+        }
     }
 
     private async saveStrand(strand: StrandUpdate) {
@@ -183,6 +189,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     private async stopSyncRemoteDrive(driveId: string) {
         const triggers = this.triggerMap.get(driveId);
         triggers?.forEach(cancel => cancel());
+        this.updateSyncStatus(driveId, null);
         return this.triggerMap.delete(driveId);
     }
 
@@ -417,26 +424,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             listeners,
             triggers
         } = options;
-        const listenerId = await PullResponderTransmitter.registerPullResponder(
-            id,
-            url,
-            pullFilter ?? {
-                documentId: ['*'],
-                documentType: ['*'],
-                branch: ['*'],
-                scope: ['*']
-            }
-        );
 
-        const pullTrigger: Trigger = {
-            id: generateUUID(),
-            type: 'PullResponder',
-            data: {
-                url,
-                listenerId,
-                interval: pullInterval?.toString() ?? ''
-            }
-        };
+        const pullTrigger =
+            await PullResponderTransmitter.createPullResponderTrigger(id, url, {
+                pullFilter,
+                pullInterval
+            });
 
         return await this.addDrive({
             global: {
@@ -929,33 +922,15 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             }
 
             for (const operation of operationsApplied) {
-                if (operation.type === 'ADD_LISTENER') {
-                    const { listener } = operation.input;
-                    await this.listenerStateManager.addListener({
-                        ...listener,
-                        driveId: drive,
-                        label: listener.label ?? '',
-                        system: listener.system ?? false,
-                        filter: {
-                            branch: listener.filter.branch ?? [],
-                            documentId: listener.filter.documentId ?? [],
-                            documentType: listener.filter.documentType ?? [],
-                            scope: listener.filter.scope ?? []
-                        },
-                        callInfo: {
-                            data: listener.callInfo?.data ?? '',
-                            name: listener.callInfo?.name ?? 'PullResponder',
-                            transmitterType:
-                                listener.callInfo?.transmitterType ??
-                                'PullResponder'
-                        }
-                    });
-                } else if (operation.type === 'REMOVE_LISTENER') {
-                    const { listenerId } = operation.input;
-                    await this.listenerStateManager.removeListener(
-                        drive,
-                        listenerId
-                    );
+                switch (operation.type) {
+                    case 'ADD_LISTENER': {
+                        await this.addListener(drive, operation);
+                        break;
+                    }
+                    case 'REMOVE_LISTENER': {
+                        await this.removeListener(drive, operation);
+                        break;
+                    }
                 }
             }
 
@@ -1025,6 +1000,39 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 signals
             } satisfies IOperationResult;
         }
+    }
+
+    private async addListener(
+        driveId: string,
+        operation: Operation<Action<'ADD_LISTENER', AddListenerInput>>
+    ) {
+        const { listener } = operation.input;
+        await this.listenerStateManager.addListener({
+            ...listener,
+            driveId,
+            label: listener.label ?? '',
+            system: listener.system ?? false,
+            filter: {
+                branch: listener.filter.branch ?? [],
+                documentId: listener.filter.documentId ?? [],
+                documentType: listener.filter.documentType ?? [],
+                scope: listener.filter.scope ?? []
+            },
+            callInfo: {
+                data: listener.callInfo?.data ?? '',
+                name: listener.callInfo?.name ?? 'PullResponder',
+                transmitterType:
+                    listener.callInfo?.transmitterType ?? 'PullResponder'
+            }
+        });
+    }
+
+    private async removeListener(
+        driveId: string,
+        operation: Operation<Action<'REMOVE_LISTENER', RemoveListenerInput>>
+    ) {
+        const { listenerId } = operation.input;
+        await this.listenerStateManager.removeListener(driveId, listenerId);
     }
 
     getTransmitter(
