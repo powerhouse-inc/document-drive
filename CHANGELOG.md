@@ -1,3 +1,10 @@
+# [1.0.0-alpha.12](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.11...v1.0.0-alpha.12) (2024-02-26)
+
+
+### Features
+
+* stop drive sync if triggers are removed ([dcf2df2](https://github.com/powerhouse-inc/document-drive/commit/dcf2df256f43f234bfb9188c750521fb57df880f))
+
 # [1.0.0-alpha.11](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.10...v1.0.0-alpha.11) (2024-02-22)
 
 
