@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vitest } from "vitest";
-import { DocumentDriveServer, InternalTransmitter, StrandUpdate } from "../src";
+import { DocumentDriveServer, InternalTransmitter } from "../src";
 import * as DocumentModelsLibs from 'document-model-libs/document-models';
 import * as DocumentDrive from 'document-model-libs/document-drive';
 import {
@@ -8,7 +8,7 @@ import {
     reducer
 } from 'document-model/document-model';
 import { DocumentModel } from "document-model/document";
-import { buildOperation, buildOperations } from './utils';
+import { buildOperation } from './utils';
 
 describe("Internal Listener", () => {
     const documentModels = [
