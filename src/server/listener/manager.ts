@@ -17,6 +17,7 @@ import {
 import { PullResponderTransmitter } from './transmitter';
 import { SwitchboardPushTransmitter } from './transmitter/switchboard-push';
 import { ITransmitter } from './transmitter/types';
+import { InternalTransmitter } from './transmitter/internal';
 
 export class ListenerManager extends BaseListenerManager {
     async getTransmitter(
@@ -72,6 +73,10 @@ export class ListenerManager extends BaseListenerManager {
                     this.drive,
                     this
                 );
+            }
+
+            case 'Internal': {
+                transmitter = new InternalTransmitter(listener, this.drive);
             }
         }
 
