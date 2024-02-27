@@ -6,7 +6,7 @@ import {
 } from '../../types';
 import { ITransmitter } from './types';
 
-interface IReceiver {
+export interface IReceiver {
   transmit: (strands: StrandUpdate[]) => Promise<ListenerRevision[]>;
 }
 
@@ -27,7 +27,7 @@ export class InternalTransmitter implements ITransmitter {
     return this.receiver.transmit(strands);
   }
 
-  setReciver(receiver: IReceiver) {
+  setReceiver(receiver: IReceiver) {
     this.receiver = receiver
   }
 }
