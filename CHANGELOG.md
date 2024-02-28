@@ -1,3 +1,15 @@
+# [1.0.0-alpha.13](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.12...v1.0.0-alpha.13) (2024-02-28)
+
+
+### Bug Fixes
+
+* wording issues ([fcbb994](https://github.com/powerhouse-inc/document-drive/commit/fcbb994d49eb035cdb9e553b104b6c8279b7fbef))
+
+
+### Features
+
+* added internal transmitter ([d728aed](https://github.com/powerhouse-inc/document-drive/commit/d728aed8ae692a83a0b998ccd6d7e36496e08b95))
+
 # [1.0.0-alpha.12](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.11...v1.0.0-alpha.12) (2024-02-26)
 
 
