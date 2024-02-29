@@ -53,6 +53,10 @@ export class BrowserStorage implements IDriveStorage {
         await (await this.db).removeItem(this.buildKey(drive, id));
     }
 
+    async clearStorage(): Promise<void> {
+        return (await this.db).clear();
+    }
+
     async addDocumentOperations(
         drive: string,
         id: string,

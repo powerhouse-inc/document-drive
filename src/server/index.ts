@@ -884,6 +884,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         return this.addDriveOperations(drive, [operation]);
     }
 
+    async clearStorage() {
+        await this.storage.clearStorage?.();
+    }
+
     async addDriveOperations(
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[]

@@ -96,6 +96,56 @@ export class FilesystemStorage implements IDriveStorage {
         });
     }
 
+    async clearStorage() {
+        const drivesPath = path.join(
+            this.basePath,
+            FilesystemStorage.DRIVES_DIR
+        );
+
+        // delete content of drives directory
+        const drives = (
+            await fs.readdir(drivesPath, {
+                withFileTypes: true,
+                recursive: true
+            })
+        ).filter(dirent => !!dirent.name);
+
+        await Promise.all(
+            drives.map(async dirent => {
+                if (dirent.isFile()) {
+                    await fs.rm(path.join(drivesPath, dirent.name), {
+                        recursive: true
+                    });
+                } else {
+                    await fs.rm(path.join(drivesPath, dirent.name), {
+                        recursive: true
+                    });
+                }
+            })
+        );
+
+        // delete files in basePath
+        const files = (
+            await fs.readdir(this.basePath, { withFileTypes: true })
+        ).filter(
+            file => file.name !== FilesystemStorage.DRIVES_DIR && !!file.name
+        );
+
+        await Promise.all(
+            files.map(async dirent => {
+                if (dirent.isFile()) {
+                    await fs.rm(path.join(this.basePath, dirent.name), {
+                        recursive: true
+                    });
+                } else {
+                    await fs.rm(path.join(this.basePath, dirent.name), {
+                        recursive: true
+                    });
+                }
+            })
+        );
+    }
+
     async deleteDocument(drive: string, id: string) {
         return fs.rm(this._buildDocumentPath(drive, id));
     }
