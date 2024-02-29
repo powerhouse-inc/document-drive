@@ -7,6 +7,7 @@ import type {
     ListenerFilter
 } from 'document-model-libs/document-drive';
 import type {
+    Action,
     BaseAction,
     CreateChildDocumentInput,
     Document,
@@ -159,6 +160,26 @@ export abstract class BaseDocumentDriveServer {
     abstract addDriveOperations(
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[]
+    ): Promise<IOperationResult<DocumentDriveDocument>>;
+
+    abstract addAction(
+        drive: string,
+        id: string,
+        action: Action
+    ): Promise<IOperationResult>;
+    abstract addActions(
+        drive: string,
+        id: string,
+        actions: Action[]
+    ): Promise<IOperationResult>;
+
+    abstract addDriveAction(
+        drive: string,
+        action: DocumentDriveAction | BaseAction
+    ): Promise<IOperationResult<DocumentDriveDocument>>;
+    abstract addDriveActions(
+        drive: string,
+        actions: (DocumentDriveAction | BaseAction)[]
     ): Promise<IOperationResult<DocumentDriveDocument>>;
 
     abstract getSyncStatus(drive: string): SyncStatus;
