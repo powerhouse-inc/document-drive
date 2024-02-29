@@ -42,6 +42,7 @@ import {
 import {
     BaseDocumentDriveServer,
     DriveEvents,
+    GetDocumentOptions,
     IOperationResult,
     ListenerState,
     RemoteDriveOptions,
@@ -53,6 +54,7 @@ import {
     type SignalResult,
     type SynchronizationUnit
 } from './types';
+import { filterOperationsByRevision } from './utils';
 
 export * from './listener';
 export type * from './types';
@@ -460,12 +462,15 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         return this.storage.getDrives();
     }
 
-    async getDrive(drive: string) {
+    async getDrive(drive: string, options?: GetDocumentOptions) {
         const driveStorage = await this.storage.getDrive(drive);
         const documentModel = this._getDocumentModel(driveStorage.documentType);
         const document = baseUtils.replayDocument(
             driveStorage.initialState,
-            driveStorage.operations,
+            filterOperationsByRevision(
+                driveStorage.operations,
+                options?.revisions
+            ),
             documentModel.reducer,
             undefined,
             driveStorage
@@ -479,7 +484,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         }
     }
 
-    async getDocument(drive: string, id: string) {
+    async getDocument(drive: string, id: string, options?: GetDocumentOptions) {
         const { initialState, operations, ...header } =
             await this.storage.getDocument(drive, id);
 
@@ -487,7 +492,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
         return baseUtils.replayDocument(
             initialState,
-            operations,
+            filterOperationsByRevision(operations, options?.revisions),
             documentModel.reducer,
             undefined,
             header
