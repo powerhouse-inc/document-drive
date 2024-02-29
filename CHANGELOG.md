@@ -1,3 +1,11 @@
+# [1.0.0-alpha.14](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.13...v1.0.0-alpha.14) (2024-02-29)
+
+
+### Features
+
+* added addAction methods and addInternalListener ([9a076b3](https://github.com/powerhouse-inc/document-drive/commit/9a076b3155060825d442351a2cd36d935a17ca44))
+* also transmit scope state on internal transmitters ([c75a5d5](https://github.com/powerhouse-inc/document-drive/commit/c75a5d5b01ddaf166f0d86cd0afab4f888757a17))
+
 # [1.0.0-alpha.13](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.12...v1.0.0-alpha.13) (2024-02-28)
 
 
