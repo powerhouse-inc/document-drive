@@ -128,6 +128,17 @@ export interface DriveEvents {
     strandUpdate: (update: StrandUpdate) => void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type PartialRecord<K extends keyof any, T> = {
+    [P in K]?: T;
+};
+
+export type RevisionsFilter = PartialRecord<OperationScope, number>;
+
+export type GetDocumentOptions = {
+    revisions?: RevisionsFilter;
+};
+
 export abstract class BaseDocumentDriveServer {
     /** Public methods **/
     abstract getDrives(): Promise<string[]>;
@@ -137,10 +148,17 @@ export abstract class BaseDocumentDriveServer {
         options: RemoteDriveOptions
     ): Promise<void>;
     abstract deleteDrive(id: string): Promise<void>;
-    abstract getDrive(id: string): Promise<DocumentDriveDocument>;
+    abstract getDrive(
+        id: string,
+        options?: GetDocumentOptions
+    ): Promise<DocumentDriveDocument>;
 
     abstract getDocuments(drive: string): Promise<string[]>;
-    abstract getDocument(drive: string, id: string): Promise<Document>;
+    abstract getDocument(
+        drive: string,
+        id: string,
+        options?: GetDocumentOptions
+    ): Promise<Document>;
 
     abstract addOperation(
         drive: string,
