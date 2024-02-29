@@ -28,6 +28,6 @@ export class InternalTransmitter implements ITransmitter {
     }
 
     setReceiver(receiver: IReceiver) {
-        this.receiver = receiver
+        this.receiver = receiver;
     }
 }

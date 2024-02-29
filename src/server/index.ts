@@ -1,10 +1,12 @@
 import {
+    actions,
     AddListenerInput,
     DocumentDriveAction,
     DocumentDriveDocument,
     DocumentDriveState,
     FileNode,
     isFileNode,
+    ListenerFilter,
     RemoveListenerInput,
     Trigger,
     utils
@@ -32,6 +34,8 @@ import { OperationError } from './error';
 import { ListenerManager } from './listener/manager';
 import {
     CancelPullLoop,
+    InternalTransmitter,
+    IReceiver,
     ITransmitter,
     PullResponderTransmitter
 } from './listener/transmitter';
@@ -1000,6 +1004,116 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 signals
             } satisfies IOperationResult;
         }
+    }
+
+    private _buildOperation<T extends Action>(
+        documentStorage: DocumentStorage,
+        action: T | BaseAction
+    ): Operation<T | BaseAction> {
+        const [operation] = this._buildOperations(documentStorage, [action]);
+        if (!operation) {
+            throw new Error('Error creating operation');
+        }
+        return operation;
+    }
+
+    private _buildOperations<T extends Action>(
+        documentStorage: DocumentStorage,
+        actions: (T | BaseAction)[]
+    ): Operation<T | BaseAction>[] {
+        const operations: Operation<T | BaseAction>[] = [];
+        const { reducer } = this._getDocumentModel(
+            documentStorage.documentType
+        );
+        let document = baseUtils.replayDocument(
+            documentStorage.initialState,
+            documentStorage.operations,
+            reducer,
+            undefined,
+            documentStorage
+        );
+        for (const action of actions) {
+            document = reducer(document, action);
+            const operation = document.operations[action.scope].slice().pop();
+            if (!operation) {
+                throw new Error('Error creating operations');
+            }
+            operations.push(operation);
+        }
+        return operations;
+    }
+
+    async addAction(
+        drive: string,
+        id: string,
+        action: Action
+    ): Promise<IOperationResult> {
+        const documentStorage = await this.storage.getDocument(drive, id);
+        const operation = this._buildOperation(documentStorage, action);
+        return this.addOperation(drive, id, operation);
+    }
+
+    async addActions(
+        drive: string,
+        id: string,
+        actions: Action[]
+    ): Promise<IOperationResult> {
+        const documentStorage = await this.storage.getDocument(drive, id);
+        const operations = this._buildOperations(documentStorage, actions);
+        return this.addOperations(drive, id, operations);
+    }
+
+    async addDriveAction(
+        drive: string,
+        action: DocumentDriveAction | BaseAction
+    ): Promise<IOperationResult<DocumentDriveDocument>> {
+        const documentStorage = await this.storage.getDrive(drive);
+        const operation = this._buildOperation(documentStorage, action);
+        return this.addDriveOperation(drive, operation);
+    }
+
+    async addDriveActions(
+        drive: string,
+        actions: (DocumentDriveAction | BaseAction)[]
+    ): Promise<IOperationResult<DocumentDriveDocument>> {
+        const documentStorage = await this.storage.getDrive(drive);
+        const operations = this._buildOperations(documentStorage, actions);
+        return this.addDriveOperations(drive, operations);
+    }
+
+    async addInternalListener(
+        driveId: string,
+        receiver: IReceiver,
+        options: {
+            listenerId: string;
+            label: string;
+            block: boolean;
+            filter: ListenerFilter;
+        }
+    ) {
+        const listener: AddListenerInput['listener'] = {
+            callInfo: {
+                data: '',
+                name: 'Interal',
+                transmitterType: 'Internal'
+            },
+            system: true,
+            ...options
+        };
+        await this.addDriveAction(driveId, actions.addListener({ listener }));
+        const transmitter = await this.getTransmitter(
+            driveId,
+            options.listenerId
+        );
+        if (!transmitter) {
+            throw new Error('Internal listener not found');
+        }
+        if (!(transmitter instanceof InternalTransmitter)) {
+            throw new Error('Listener is not an internal transmitter');
+        }
+
+        transmitter.setReceiver(receiver);
+        return transmitter;
     }
 
     private async addListener(
