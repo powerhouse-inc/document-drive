@@ -1,3 +1,10 @@
+# [1.0.0-alpha.15](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.14...v1.0.0-alpha.15) (2024-03-04)
+
+
+### Features
+
+* instantiate listeners on server initialization ([367396d](https://github.com/powerhouse-inc/document-drive/commit/367396d8205b6ba81f7c4261d516be2eebfb664e))
+
 # [1.0.0-alpha.14](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.13...v1.0.0-alpha.14) (2024-02-29)
 
 
