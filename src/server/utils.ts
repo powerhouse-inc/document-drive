@@ -27,7 +27,7 @@ export function filterOperationsByRevision(
     >((acc, scope) => {
         const revision = revisions[scope];
         if (revision !== undefined) {
-            acc[scope] = operations[scope].filter(op => op.index < revision);
+            acc[scope] = operations[scope].filter(op => op.index <= revision);
         }
         return acc;
     }, operations);
