@@ -202,11 +202,33 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     async initialize() {
         await this.listenerStateManager.init();
         const drives = await this.getDrives();
-        for (const id of drives) {
-            const drive = await this.getDrive(id);
-            if (this.shouldSyncRemoteDrive(drive)) {
-                this.startSyncRemoteDrive(id);
-            }
+        for (const drive of drives) {
+            await this._initializeDrive(drive);
+        }
+    }
+
+    private async _initializeDrive(driveId: string) {
+        const drive = await this.getDrive(driveId);
+
+        if (this.shouldSyncRemoteDrive(drive)) {
+            await this.startSyncRemoteDrive(driveId);
+        }
+
+        for (const listener of drive.state.local.listeners) {
+            await this.listenerStateManager.addListener({
+                driveId,
+                block: listener.block,
+                filter: {
+                    branch: listener.filter.branch ?? [],
+                    documentId: listener.filter.documentId ?? [],
+                    documentType: listener.filter.documentType ?? [],
+                    scope: listener.filter.scope ?? []
+                },
+                listenerId: listener.listenerId,
+                system: listener.system,
+                callInfo: listener.callInfo ?? undefined,
+                label: listener.label ?? ''
+            });
         }
     }
 
@@ -394,30 +416,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         });
 
         await this.storage.createDrive(id, document);
-
-        // add listeners to state manager
-        for (const listener of drive.local.listeners) {
-            await this.listenerStateManager.addListener({
-                block: listener.block,
-                driveId: id,
-                filter: {
-                    branch: listener.filter.branch ?? [],
-                    documentId: listener.filter.documentId ?? [],
-                    documentType: listener.filter.documentType ?? [],
-                    scope: listener.filter.scope ?? []
-                },
-                listenerId: listener.listenerId,
-                system: listener.system,
-                callInfo: listener.callInfo ?? undefined,
-                label: listener.label ?? ''
-            });
-        }
-
-        // if it is a remote drive that should be available offline, starts
-        // the sync process to pull changes from remote every 30 seconds
-        if (this.shouldSyncRemoteDrive(document)) {
-            await this.startSyncRemoteDrive(id);
-        }
+        await this._initializeDrive(id);
     }
 
     async addRemoteDrive(url: string, options: RemoteDriveOptions) {
