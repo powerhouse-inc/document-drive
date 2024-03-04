@@ -1,3 +1,10 @@
+# [1.0.0-alpha.16](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.15...v1.0.0-alpha.16) (2024-03-04)
+
+
+### Features
+
+* fixed state on internal transmitter strand ([5dbe930](https://github.com/powerhouse-inc/document-drive/commit/5dbe930af551375117d36f9b4d36fd613de8d9f7))
+
 # [1.0.0-alpha.15](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.14...v1.0.0-alpha.15) (2024-03-04)
 
 
