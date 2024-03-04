@@ -15,9 +15,9 @@ import {
     SynchronizationUnit
 } from '../types';
 import { PullResponderTransmitter } from './transmitter';
+import { InternalTransmitter } from './transmitter/internal';
 import { SwitchboardPushTransmitter } from './transmitter/switchboard-push';
 import { ITransmitter } from './transmitter/types';
-import { InternalTransmitter } from './transmitter/internal';
 
 export class ListenerManager extends BaseListenerManager {
     async getTransmitter(
@@ -73,10 +73,11 @@ export class ListenerManager extends BaseListenerManager {
                     this.drive,
                     this
                 );
+                break;
             }
-
             case 'Internal': {
                 transmitter = new InternalTransmitter(listener, this.drive);
+                break;
             }
         }
 
