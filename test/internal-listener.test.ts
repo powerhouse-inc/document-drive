@@ -158,7 +158,64 @@ describe('Internal Listener', () => {
                     description: '',
                     extension: '',
                     id: '',
-                    name: '',
+                    name: 'test',
+                    specifications: [
+                        {
+                            changeLog: [],
+                            modules: [],
+                            state: {
+                                global: {
+                                    examples: [],
+                                    initialValue: '',
+                                    schema: ''
+                                },
+                                local: {
+                                    examples: [],
+                                    initialValue: '',
+                                    schema: ''
+                                }
+                            },
+                            version: 1
+                        }
+                    ]
+                },
+                scope: 'global'
+            }
+        ]);
+
+        await server.addAction(
+            'drive',
+            '1',
+            DocumentModelLib.actions.setModelName({ name: 'test 2' })
+        );
+
+        await vi.waitFor(() => expect(transmitFn).toHaveBeenCalledTimes(3));
+        expect(transmitFn).toHaveBeenLastCalledWith([
+            {
+                branch: 'main',
+                documentId: '1',
+                driveId: 'drive',
+                operations: [
+                    {
+                        hash: 's7RBcer0JqjSGvNb12gqpeeJGRY=',
+                        index: 1,
+                        input: {
+                            name: 'test 2'
+                        },
+                        skip: 0,
+                        timestamp: '2024-01-01T00:00:00.200Z',
+                        type: 'SET_MODEL_NAME'
+                    }
+                ],
+                state: {
+                    author: {
+                        name: '',
+                        website: ''
+                    },
+                    description: '',
+                    extension: '',
+                    id: '',
+                    name: 'test 2',
                     specifications: [
                         {
                             changeLog: [],

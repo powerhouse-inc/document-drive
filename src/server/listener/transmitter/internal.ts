@@ -58,7 +58,7 @@ export class InternalTransmitter implements ITransmitter {
                           strand.documentId,
                           { revisions }
                       )
-                    : this.drive.getDrive(strand.driveId));
+                    : this.drive.getDrive(strand.driveId, { revisions }));
                 retrievedDocuments.set(
                     `${strand.driveId}:${strand.documentId}`,
                     document
