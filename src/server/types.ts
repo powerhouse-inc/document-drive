@@ -247,6 +247,8 @@ export abstract class BaseDocumentDriveServer {
         driveId: string,
         listenerId: string
     ): Promise<ITransmitter | undefined>;
+
+    abstract clearStorage(): Promise<void>;
 }
 
 export abstract class BaseListenerManager {

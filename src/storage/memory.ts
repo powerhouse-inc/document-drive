@@ -39,6 +39,11 @@ export class MemoryStorage implements IDriveStorage {
         this.documents[drive]![id] = document;
     }
 
+    async clearStorage(): Promise<void> {
+        this.documents = {};
+        this.drives = {};
+    }
+
     async createDocument(drive: string, id: string, document: DocumentStorage) {
         this.documents[drive] = this.documents[drive] ?? {};
         const {
