@@ -885,6 +885,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     }
 
     async clearStorage() {
+        for (const drive of await this.getDrives()) {
+            await this.deleteDrive(drive);
+        }
+
         await this.storage.clearStorage?.();
     }
 

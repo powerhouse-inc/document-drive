@@ -112,15 +112,9 @@ export class FilesystemStorage implements IDriveStorage {
 
         await Promise.all(
             drives.map(async dirent => {
-                if (dirent.isFile()) {
-                    await fs.rm(path.join(drivesPath, dirent.name), {
-                        recursive: true
-                    });
-                } else {
-                    await fs.rm(path.join(drivesPath, dirent.name), {
-                        recursive: true
-                    });
-                }
+                await fs.rm(path.join(drivesPath, dirent.name), {
+                    recursive: true
+                });
             })
         );
 
@@ -133,15 +127,9 @@ export class FilesystemStorage implements IDriveStorage {
 
         await Promise.all(
             files.map(async dirent => {
-                if (dirent.isFile()) {
-                    await fs.rm(path.join(this.basePath, dirent.name), {
-                        recursive: true
-                    });
-                } else {
-                    await fs.rm(path.join(this.basePath, dirent.name), {
-                        recursive: true
-                    });
-                }
+                await fs.rm(path.join(this.basePath, dirent.name), {
+                    recursive: true
+                });
             })
         );
     }
