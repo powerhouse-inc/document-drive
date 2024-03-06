@@ -1,3 +1,10 @@
+# [1.0.0-alpha.17](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.16...v1.0.0-alpha.17) (2024-03-06)
+
+
+### Features
+
+* added clearStorage support ([#82](https://github.com/powerhouse-inc/document-drive/issues/82)) ([323a93f](https://github.com/powerhouse-inc/document-drive/commit/323a93f0aaf1da1bd66b3b3292e35aefd92e9c5f))
+
 # [1.0.0-alpha.16](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.15...v1.0.0-alpha.16) (2024-03-04)
 
 
