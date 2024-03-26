@@ -71,8 +71,8 @@ devDependencies:
     specifier: ^1.10.0
     version: 1.10.0
   msw:
-    specifier: ^2.1.2
-    version: 2.2.0(typescript@5.3.3)
+    specifier: ^2.2.11
+    version: 2.2.11(typescript@5.3.3)
   prettier:
     specifier: ^3.1.1
     version: 3.2.5
@@ -5962,13 +5962,13 @@ packages:
     dev: true
     optional: true
 
-  /msw@2.2.0(typescript@5.3.3):
-    resolution: {integrity: sha512-98cUGcIphhdf3KDbmSxji7XFqLxeSFAmPUNV00N/U76GOkuUKEwp6MHqM6KW70rlpgeJP8qIWueppdnVThzG1g==}
+  /msw@2.2.11(typescript@5.3.3):
+    resolution: {integrity: sha512-XtIoewF7XWLT0a39Ftkazt9PprBA1bxHZ4CSlomN74sCBJOJU2w5VwLmGlswwsOBhGoF7jovt6bxrSIESxA1KA==}
     engines: {node: '>=18'}
     hasBin: true
     requiresBuild: true
     peerDependencies:
-      typescript: '>= 4.7.x <= 5.3.x'
+      typescript: '>= 4.7.x'
     peerDependenciesMeta:
       typescript:
         optional: true
