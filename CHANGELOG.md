@@ -1,3 +1,10 @@
+# [1.0.0-alpha.18](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.17...v1.0.0-alpha.18) (2024-03-27)
+
+
+### Features
+
+* only emit event when syncStatus changes ([1cedf61](https://github.com/powerhouse-inc/document-drive/commit/1cedf6110fead2410a61d0d8f261a57d11c48fa1))
+
 # [1.0.0-alpha.17](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.16...v1.0.0-alpha.17) (2024-03-06)
 
 
