@@ -1,3 +1,10 @@
+# [1.0.0-alpha.20](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.19...v1.0.0-alpha.20) (2024-03-28)
+
+
+### Features
+
+* updated document model dep ([37fa455](https://github.com/powerhouse-inc/document-drive/commit/37fa4556c44b000837bcb95673c90cf06af784c7))
+
 # [1.0.0-alpha.19](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.18...v1.0.0-alpha.19) (2024-03-28)
 
 
