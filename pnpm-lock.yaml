@@ -53,8 +53,8 @@ devDependencies:
     specifier: ^0.34.6
     version: 0.34.6(vitest@1.2.2)
   document-model:
-    specifier: ^1.0.30
-    version: 1.0.30
+    specifier: ^1.0.33
+    version: 1.0.33
   document-model-libs:
     specifier: ^1.1.51
     version: 1.1.51(graphql@16.8.1)(react-dom@18.2.0)(react@18.2.0)
@@ -4267,7 +4267,7 @@ packages:
       '@graphql-codegen/typescript': 4.0.4(graphql@16.8.1)
       '@internationalized/date': 3.5.2
       date-fns: 3.3.1
-      document-model: 1.0.30
+      document-model: 1.0.33
       jsonc-parser: 3.2.1
       jszip: 3.10.1
       react: 18.2.0
@@ -4280,8 +4280,8 @@ packages:
       - supports-color
     dev: true
 
-  /document-model@1.0.30:
-    resolution: {integrity: sha512-9J2pRg/TDotIEBJvMrJ55t/IIAfSyCb5U6x9l8XZaQ7wq+hTNNO6G4fH6cJsleQGFO2HZqf8tFZ9ySJWkA+MAA==}
+  /document-model@1.0.33:
+    resolution: {integrity: sha512-oPRRksqW0vp9dxBpwfnddSw81RRb345fYREbSOntbiIrIV5iUgXALcNHpL/DQGV4fnWXfbWCA7qr2liMu6Eppw==}
     dependencies:
       immer: 10.0.3
       json-stringify-deterministic: 1.0.12
