@@ -9,16 +9,33 @@ type MergeMethod<A extends Action = Action> = (
     ...operations: Operation<A | BaseAction>[][]
 ) => Operation<A | BaseAction>[];
 
-type ConflictOperationHistory<A extends Action = Action> = Partial<
+type OperationHistory<A extends Action = Action> = Partial<
     Record<OperationScope, Operation<A | BaseAction>[]>
 >;
 
+type ResolvedOperationsResult<A extends Action = Action> = Partial<
+    Record<
+        OperationScope,
+        {
+            resolvedOperations: Operation<A | BaseAction>[];
+            updatedOperations: Operation<A | BaseAction>[];
+        }
+    >
+>;
+
 export class ConflictOperationsManager {
-    private conflictOperationsByScope: ConflictOperationHistory = {};
+    private conflictOperationsByScope: OperationHistory = {};
+    private documentOperations: OperationHistory = {};
+    private operationsToUpdate: OperationHistory = {};
 
     constructor(
-        private mergeMethod: MergeMethod = ConflictOperationsManager.timestampMerge
-    ) {}
+        private mergeMethod: MergeMethod = ConflictOperationsManager.timestampMerge,
+        operationHistory?: OperationHistory
+    ) {
+        if (operationHistory) {
+            this.documentOperations = operationHistory;
+        }
+    }
 
     public static timestampMerge: MergeMethod = (...operations) => {
         const flatOperations = operations.flat();
@@ -35,6 +52,14 @@ export class ConflictOperationsManager {
         return operations.flat();
     };
 
+    setDocumentOperations(operations: OperationHistory) {
+        this.documentOperations = operations;
+    }
+
+    getDocumentOperations() {
+        return this.documentOperations;
+    }
+
     getConflictOperations() {
         return this.conflictOperationsByScope;
     }
@@ -44,6 +69,24 @@ export class ConflictOperationsManager {
         ...operations: Operation<A | BaseAction>[]
     ) {
         const existingOperations = this.conflictOperationsByScope[scope] || [];
+
+        const operationsToUpdate = (
+            this.documentOperations[scope] || []
+        ).filter(op => operations.some(newOp => newOp.index === op.index));
+
+        // remove duplicated operations and update operationsToUpdate
+        this.operationsToUpdate[scope] = Object.values(
+            [
+                ...(this.operationsToUpdate[scope] || []),
+                ...operationsToUpdate
+            ].reduce(
+                (acc, op) => ({
+                    ...acc,
+                    [op.index]: op
+                }),
+                {}
+            )
+        );
 
         this.conflictOperationsByScope[scope] = [
             ...existingOperations,
@@ -58,7 +101,7 @@ export class ConflictOperationsManager {
     resolveConflicts() {
         const resolvedOperations = Object.keys(
             this.conflictOperationsByScope
-        ).reduce<ConflictOperationHistory>((acc, scope) => {
+        ).reduce<ResolvedOperationsResult>((acc, scope) => {
             const operations =
                 this.conflictOperationsByScope[scope as OperationScope] || [];
             let sortedOperations = this.mergeMethod(operations);
@@ -85,7 +128,11 @@ export class ConflictOperationsManager {
 
             return {
                 ...acc,
-                [scope]: reIndexedOperations
+                [scope]: {
+                    resolvedOperations: reIndexedOperations,
+                    updatedOperations:
+                        this.operationsToUpdate[scope as OperationScope] || []
+                }
             };
         }, {});
 

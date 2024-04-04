@@ -635,7 +635,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         operations = operations.sort((a, b) => a.index - b.index);
 
         const conflictManager = new ConflictOperationsManager(
-            ConflictOperationsManager.timestampMerge
+            ConflictOperationsManager.timestampMerge,
+            documentStorage.operations
         );
 
         for (let i = 0; i < operations.length; i++) {
@@ -696,12 +697,20 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             }
         }
 
-        const flatResolvedOps = Object.values(
-            conflictManager.resolveConflicts()
-        ).flat();
+        const resolvedScopes = conflictManager.resolveConflicts();
+
+        const flatResolvedOps = Object.values(resolvedScopes)
+            .map(resolvedScope => resolvedScope.resolvedOperations)
+            .flat();
+
+        const flatUpdatedOps = Object.values(resolvedScopes)
+            .map(resolvedScope => resolvedScope.updatedOperations)
+            .flat();
+
         operationsToApply = [...operationsToApply, ...flatResolvedOps].sort(
             (a, b) => a.index - b.index
         );
+        // updatedOperations = [...updatedOperations, ...flatUpdatedOps];
 
         // TODO: if there's resolved operations, then we have to include skipped operations
         // into the updatedOperations array (so they can be updated to NOOP)
@@ -780,6 +789,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             newDocument.operations[operation.scope][operation.index];
         if (!appliedOperation || appliedOperation.hash !== operation.hash) {
             // TODO: disable this error when operation is a fix of a conflict
+            // console.log('>>>>>>> aplliedOperation', appliedOperation);
+            // console.log('>>>>>>> operation', operation);
             // throw new OperationError(
             //     'CONFLICT',
             //     operation,
