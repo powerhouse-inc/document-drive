@@ -703,14 +703,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             .map(resolvedScope => resolvedScope.resolvedOperations)
             .flat();
 
-        const flatUpdatedOps = Object.values(resolvedScopes)
-            .map(resolvedScope => resolvedScope.updatedOperations)
-            .flat();
-
         operationsToApply = [...operationsToApply, ...flatResolvedOps].sort(
             (a, b) => a.index - b.index
         );
-        // updatedOperations = [...updatedOperations, ...flatUpdatedOps];
 
         // TODO: if there's resolved operations, then we have to include skipped operations
         // into the updatedOperations array (so they can be updated to NOOP)
