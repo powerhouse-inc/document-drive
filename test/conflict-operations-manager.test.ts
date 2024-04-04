@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
 import { ConflictOperationsManager, DocumentDriveServer } from '../src';
 import { buildOpAndOverride, buildOperation } from './utils';
 
-describe('Merge Manager', () => {
+describe('Conflict Operations Manager', () => {
     const documentModels = [
         DocumentModelLib,
         ...Object.values(DocumentModelsLibs)
@@ -236,12 +236,6 @@ describe('Merge Manager', () => {
             });
 
             const resolvedOperations = conflictManger.resolveConflicts();
-
-            // TODO: remove this comments
-            // const res = Object.values(resolvedOperations)
-            //     .map(resolvedScope => resolvedScope.resolvedOperations)
-            //     .flat();
-            // console.log(res);
 
             expect(resolvedOperations.global).toBeDefined();
             expect(resolvedOperations.global?.resolvedOperations.length).toBe(

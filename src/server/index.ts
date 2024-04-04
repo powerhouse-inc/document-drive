@@ -778,14 +778,11 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const appliedOperation =
             newDocument.operations[operation.scope][operation.index];
         if (!appliedOperation || appliedOperation.hash !== operation.hash) {
-            // TODO: disable this error when operation is a fix of a conflict
-            // console.log('>>>>>>> aplliedOperation', appliedOperation);
-            // console.log('>>>>>>> operation', operation);
-            // throw new OperationError(
-            //     'CONFLICT',
-            //     operation,
-            //     `Operation with index ${operation.index} had different result`
-            // );
+            throw new OperationError(
+                'CONFLICT',
+                operation,
+                `Operation with index ${operation.index} had different result`
+            );
         }
 
         for (const signalHandler of operationSignals) {
