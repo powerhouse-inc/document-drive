@@ -104,7 +104,10 @@ export class ConflictOperationsManager {
         ).reduce<ResolvedOperationsResult>((acc, scope) => {
             const operations =
                 this.conflictOperationsByScope[scope as OperationScope] || [];
-            let sortedOperations = this.mergeMethod(operations);
+
+            const opsToUpdate =
+                this.operationsToUpdate[scope as OperationScope] || [];
+            let sortedOperations = this.mergeMethod(operations, opsToUpdate);
             const operationsIndex = sortedOperations.map(op => op.index);
 
             // find duplicates

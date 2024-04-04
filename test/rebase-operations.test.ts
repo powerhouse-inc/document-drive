@@ -180,18 +180,30 @@ describe('Merge Manager', () => {
     describe('Resolve conflicts', () => {
         it('should resolve conflicts using timestamp method', () => {
             const conflictManger = new ConflictOperationsManager(
-                ConflictOperationsManager.timestampMerge
+                ConflictOperationsManager.timestampMerge,
+                {
+                    global: [
+                        {
+                            hash: '2',
+                            index: 4,
+                            input: { name: 'test 1' },
+                            scope: 'global',
+                            skip: 0,
+                            timestamp: '2024-04-02T19:55:02.737Z',
+                            type: 'SET_MODEL_NAME'
+                        },
+                        {
+                            hash: '4',
+                            index: 5,
+                            input: { name: 'test 3' },
+                            scope: 'global',
+                            skip: 0,
+                            timestamp: '2024-04-04T19:55:02.737Z',
+                            type: 'SET_MODEL_NAME'
+                        }
+                    ]
+                }
             );
-
-            conflictManger.addConflictOperation('global', {
-                hash: '2',
-                index: 4,
-                input: { name: 'test 1' },
-                scope: 'global',
-                skip: 0,
-                timestamp: '2024-04-02T19:55:02.737Z',
-                type: 'SET_MODEL_NAME'
-            });
 
             conflictManger.addConflictOperation('global', {
                 hash: '1',
@@ -200,16 +212,6 @@ describe('Merge Manager', () => {
                 scope: 'global',
                 skip: 0,
                 timestamp: '2024-04-01T19:55:02.737Z',
-                type: 'SET_MODEL_NAME'
-            });
-
-            conflictManger.addConflictOperation('global', {
-                hash: '4',
-                index: 5,
-                input: { name: 'test 3' },
-                scope: 'global',
-                skip: 0,
-                timestamp: '2024-04-04T19:55:02.737Z',
                 type: 'SET_MODEL_NAME'
             });
 
@@ -258,18 +260,21 @@ describe('Merge Manager', () => {
 
         it("should resolve conflicts when there's 2 conflicting ops", () => {
             const conflictManger = new ConflictOperationsManager(
-                ConflictOperationsManager.timestampMerge
+                ConflictOperationsManager.timestampMerge,
+                {
+                    global: [
+                        {
+                            hash: '1',
+                            index: 1,
+                            input: { name: 'test 1' },
+                            scope: 'global',
+                            skip: 0,
+                            timestamp: '2024-04-04T22:02:13.558Z',
+                            type: 'SET_MODEL_NAME'
+                        }
+                    ]
+                }
             );
-
-            conflictManger.addConflictOperation('global', {
-                hash: '1',
-                index: 1,
-                input: { name: 'test 1' },
-                scope: 'global',
-                skip: 0,
-                timestamp: '2024-04-04T22:02:13.558Z',
-                type: 'SET_MODEL_NAME'
-            });
 
             conflictManger.addConflictOperation('global', {
                 hash: '1',
@@ -358,9 +363,7 @@ describe('Merge Manager', () => {
                 global: [op0, op1, op3]
             });
 
-            conflictManger.addConflictOperation('global', op1);
             conflictManger.addConflictOperation('global', op2);
-            conflictManger.addConflictOperation('global', op3);
             conflictManger.addConflictOperation('global', op4);
             conflictManger.addConflictOperation('global', op5);
 

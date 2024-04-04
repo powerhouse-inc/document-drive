@@ -634,6 +634,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         // sort operations so from smaller index to biggest
         operations = operations.sort((a, b) => a.index - b.index);
 
+        // initialize conflict manager with current document operations and
+        // timestamp merge method (it combines operations by timestamp)
         const conflictManager = new ConflictOperationsManager(
             ConflictOperationsManager.timestampMerge,
             documentStorage.operations
@@ -672,15 +674,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     existingOperation.hash !== op.hash &&
                     op.type !== 'NOOP'
                 ) {
-                    // TODO: Validate that there's no other errors than the conflict operation
-
-                    // error = new ConflictOperationError(existingOperation, op);
-                    conflictManager.addConflictOperation(
-                        op.scope,
-                        existingOperation
-                    );
+                    // Push operation to conflict manager
                     conflictManager.addConflictOperation(op.scope, op);
-
                     continue;
                 } else if (!existingOperation) {
                     error = new MissingOperationError(nextIndex, op);
@@ -697,18 +692,18 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             }
         }
 
-        const resolvedScopes = conflictManager.resolveConflicts();
+        // if there's no errors, resolves operation conflicts and update operationsToApply
+        if (!error) {
+            const resolvedScopes = conflictManager.resolveConflicts();
 
-        const flatResolvedOps = Object.values(resolvedScopes)
-            .map(resolvedScope => resolvedScope.resolvedOperations)
-            .flat();
+            const flatResolvedOps = Object.values(resolvedScopes)
+                .map(resolvedScope => resolvedScope.resolvedOperations)
+                .flat();
 
-        operationsToApply = [...operationsToApply, ...flatResolvedOps].sort(
-            (a, b) => a.index - b.index
-        );
-
-        // TODO: if there's resolved operations, then we have to include skipped operations
-        // into the updatedOperations array (so they can be updated to NOOP)
+            operationsToApply = [...operationsToApply, ...flatResolvedOps].sort(
+                (a, b) => a.index - b.index
+            );
+        }
 
         return [operationsToApply, error, updatedOperations] as const;
     }
