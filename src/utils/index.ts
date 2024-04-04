@@ -11,6 +11,7 @@ import {
     Operation
 } from 'document-model/document';
 import { ConflictOperationError } from '../server/error';
+export * from './combine-ops';
 
 export function isDocumentDrive(
     document: Document

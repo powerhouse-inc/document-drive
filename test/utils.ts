@@ -47,3 +47,17 @@ export function buildOperations(
     }
     return operations;
 }
+
+export function buildOpAndOverride(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    reducer: Reducer<any, any, any>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    document: Document<any, any, any>,
+    action: Action,
+    override: Partial<Operation<NOOPAction & Action>> = {}
+): Operation<NOOPAction & Action> {
+    return {
+        ...buildOperation(reducer, document, action),
+        ...override
+    };
+}

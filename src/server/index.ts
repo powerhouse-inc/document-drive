@@ -29,17 +29,14 @@ import type {
     IDriveStorage
 } from '../storage/types';
 import {
+    ConflictOperationsManager,
     generateUUID,
     isBefore,
     isDocumentDrive,
     isNoopUpdate
 } from '../utils';
 import { requestPublicDrive } from '../utils/graphql';
-import {
-    ConflictOperationError,
-    MissingOperationError,
-    OperationError
-} from './error';
+import { MissingOperationError, OperationError } from './error';
 import { ListenerManager } from './listener/manager';
 import {
     CancelPullLoop,
@@ -630,12 +627,16 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         operations: Operation<A | BaseAction>[],
         documentStorage: DocumentStorage<T>
     ) {
-        const operationsToApply: Operation<A | BaseAction>[] = [];
+        let operationsToApply: Operation<A | BaseAction>[] = [];
         const updatedOperations: Operation<A | BaseAction>[] = [];
         let error: OperationError | undefined;
 
         // sort operations so from smaller index to biggest
         operations = operations.sort((a, b) => a.index - b.index);
+
+        const conflictManager = new ConflictOperationsManager(
+            ConflictOperationsManager.timestampMerge
+        );
 
         for (let i = 0; i < operations.length; i++) {
             const op = operations[i]!;
@@ -665,8 +666,20 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                         existingOperation =>
                             existingOperation.index === op.index
                     );
-                if (existingOperation && existingOperation.hash !== op.hash) {
-                    error = new ConflictOperationError(existingOperation, op);
+                if (
+                    existingOperation &&
+                    existingOperation.hash !== op.hash &&
+                    op.type !== 'NOOP'
+                ) {
+                    // TODO: Validate that there's no other errors than the conflict operation
+
+                    // error = new ConflictOperationError(existingOperation, op);
+                    conflictManager.addConflictOperation(
+                        op.scope,
+                        existingOperation
+                    );
+                    conflictManager.addConflictOperation(op.scope, op);
+
                     continue;
                 } else if (!existingOperation) {
                     error = new MissingOperationError(nextIndex, op);
@@ -675,11 +688,23 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             } else {
                 if (noopUpdate) {
                     updatedOperations.push(op);
+                } else if (conflictManager.isConflictedScope(op.scope)) {
+                    conflictManager.addConflictOperation(op.scope, op);
                 } else {
                     operationsToApply.push(op);
                 }
             }
         }
+
+        const flatResolvedOps = Object.values(
+            conflictManager.resolveConflicts()
+        ).flat();
+        operationsToApply = [...operationsToApply, ...flatResolvedOps].sort(
+            (a, b) => a.index - b.index
+        );
+
+        // TODO: if there's resolved operations, then we have to include skipped operations
+        // into the updatedOperations array (so they can be updated to NOOP)
 
         return [operationsToApply, error, updatedOperations] as const;
     }
@@ -713,44 +738,53 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         let newDocument = document;
 
         const operationSignals: (() => Promise<SignalResult>)[] = [];
-        newDocument = documentModel.reducer(newDocument, operation, signal => {
-            let handler: (() => Promise<unknown>) | undefined = undefined;
-            switch (signal.type) {
-                case 'CREATE_CHILD_DOCUMENT':
-                    handler = () => this.createDocument(drive, signal.input);
-                    break;
-                case 'DELETE_CHILD_DOCUMENT':
-                    handler = () => this.deleteDocument(drive, signal.input.id);
-                    break;
-                case 'COPY_CHILD_DOCUMENT':
-                    handler = () =>
-                        this.getDocument(drive, signal.input.id).then(
-                            documentToCopy =>
-                                this.createDocument(drive, {
-                                    id: signal.input.newId,
-                                    documentType: documentToCopy.documentType,
-                                    document: documentToCopy,
-                                    synchronizationUnits:
-                                        signal.input.synchronizationUnits
-                                })
-                        );
-                    break;
-            }
-            if (handler) {
-                operationSignals.push(() =>
-                    handler().then(result => ({ signal, result }))
-                );
-            }
-        }) as T;
+        newDocument = documentModel.reducer(
+            newDocument,
+            operation,
+            signal => {
+                let handler: (() => Promise<unknown>) | undefined = undefined;
+                switch (signal.type) {
+                    case 'CREATE_CHILD_DOCUMENT':
+                        handler = () =>
+                            this.createDocument(drive, signal.input);
+                        break;
+                    case 'DELETE_CHILD_DOCUMENT':
+                        handler = () =>
+                            this.deleteDocument(drive, signal.input.id);
+                        break;
+                    case 'COPY_CHILD_DOCUMENT':
+                        handler = () =>
+                            this.getDocument(drive, signal.input.id).then(
+                                documentToCopy =>
+                                    this.createDocument(drive, {
+                                        id: signal.input.newId,
+                                        documentType:
+                                            documentToCopy.documentType,
+                                        document: documentToCopy,
+                                        synchronizationUnits:
+                                            signal.input.synchronizationUnits
+                                    })
+                            );
+                        break;
+                }
+                if (handler) {
+                    operationSignals.push(() =>
+                        handler().then(result => ({ signal, result }))
+                    );
+                }
+            },
+            { skip: operation.skip }
+        ) as T;
 
         const appliedOperation =
             newDocument.operations[operation.scope][operation.index];
         if (!appliedOperation || appliedOperation.hash !== operation.hash) {
-            throw new OperationError(
-                'CONFLICT',
-                operation,
-                `Operation with index ${operation.index} had different result`
-            );
+            // TODO: disable this error when operation is a fix of a conflict
+            // throw new OperationError(
+            //     'CONFLICT',
+            //     operation,
+            //     `Operation with index ${operation.index} had different result`
+            // );
         }
 
         for (const signalHandler of operationSignals) {
