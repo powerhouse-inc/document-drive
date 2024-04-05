@@ -367,6 +367,133 @@ describe('Conflict Operations Manager', () => {
             expect(result.global?.updatedOperations.length).toBe(2);
             expect(result.global?.updatedOperations).toMatchObject([op1, op3]);
         });
+
+        it('should resolve operations considering the whole history affected', () => {
+            const op0: Operation<Action | BaseAction> = {
+                hash: '0',
+                index: 0,
+                input: {},
+                scope: 'global',
+                skip: 0,
+                timestamp: '2024-03-01T19:55:02.737Z',
+                type: 'NOOP'
+            };
+
+            const op1: Operation<Action | BaseAction> = {
+                hash: '1',
+                index: 1,
+                input: { name: 'test 1' },
+                scope: 'global',
+                skip: 1,
+                timestamp: '2024-04-02T19:55:02.737Z',
+                type: 'SET_MODEL_NAME'
+            };
+
+            const op2: Operation<Action | BaseAction> = {
+                hash: '2',
+                index: 2,
+                input: { name: 'test 2' },
+                scope: 'global',
+                skip: 0,
+                timestamp: '2024-04-03T19:55:02.737Z',
+                type: 'SET_MODEL_NAME'
+            };
+
+            const op3: Operation<Action | BaseAction> = {
+                hash: '3',
+                index: 1,
+                input: { name: 'test 3' },
+                scope: 'global',
+                skip: 0,
+                timestamp: '2024-04-04T19:55:02.737Z',
+                type: 'SET_MODEL_NAME'
+            };
+
+            const conflictManger = new ConflictOperationsManager(
+                ConflictOperationsManager.timestampMerge,
+                { global: [op0, op1, op2] }
+            );
+
+            conflictManger.addConflictOperation('global', op3);
+
+            const result = conflictManger.resolveConflicts();
+
+            expect(result.global).toBeDefined();
+            expect(result.global?.resolvedOperations.length).toBe(3);
+            expect(result.global?.resolvedOperations).toMatchObject([
+                { index: 3, hash: '1', skip: 2 },
+                { index: 4, hash: '2', skip: 0 },
+                { index: 5, hash: '3', skip: 0 }
+            ]);
+        });
+
+        it('should override skip values when a re-index is applied', () => {
+            const conflictManger = new ConflictOperationsManager(
+                ConflictOperationsManager.timestampMerge,
+                {
+                    global: [
+                        {
+                            hash: '0',
+                            index: 0,
+                            input: { name: 'test 0' },
+                            scope: 'global',
+                            skip: 1,
+                            timestamp: '2024-04-01T19:55:02.737Z',
+                            type: 'SET_MODEL_NAME'
+                        },
+                        {
+                            hash: '1',
+                            index: 1,
+                            input: {},
+                            scope: 'global',
+                            skip: 0,
+                            timestamp: '2024-04-02T19:55:02.737Z',
+                            type: 'NOOP'
+                        },
+                        {
+                            hash: '2',
+                            index: 2,
+                            input: { name: 'test 2' },
+                            scope: 'global',
+                            skip: 1,
+                            timestamp: '2024-04-03T19:55:02.737Z',
+                            type: 'SET_MODEL_NAME'
+                        },
+                        {
+                            hash: '3',
+                            index: 3,
+                            input: { name: 'test 3' },
+                            scope: 'global',
+                            skip: 0,
+                            timestamp: '2024-04-05T19:55:02.737Z',
+                            type: 'SET_MODEL_NAME'
+                        }
+                    ]
+                }
+            );
+
+            const duplicatedOP: Operation<Action | BaseAction> = {
+                hash: '2.2',
+                index: 2,
+                input: { name: 'test 2.2' },
+                scope: 'global',
+                skip: 0,
+                timestamp: '2024-04-04T19:55:02.737Z',
+                type: 'SET_MODEL_NAME'
+            };
+
+            conflictManger.addConflictOperation('global', duplicatedOP);
+
+            const result = conflictManger.resolveConflicts();
+
+            expect(result.global).toBeDefined();
+            expect(result.global?.resolvedOperations.length).toBe(3);
+            expect(result.global?.resolvedOperations).toMatchObject([
+                { index: 4, hash: '2', skip: 2 },
+                { index: 5, hash: '2.2', skip: 0 },
+                { index: 6, hash: '3', skip: 0 }
+            ]);
+        });
     });
 
     describe('AddOperation conflict resolution', () => {
@@ -433,6 +560,103 @@ describe('Conflict Operations Manager', () => {
                     type: 'SET_MODEL_NAME',
                     skip: 0,
                     input: { name: 'test 3' }
+                }
+            ]);
+        });
+
+        it('should override skip values when a re-index is applied', async () => {
+            let document = await buildFile();
+
+            const op0 = buildOpAndOverride(
+                reducer,
+                document,
+                actions.setModelName({
+                    name: 'test 1'
+                }),
+                { index: 0 }
+            );
+
+            const op1 = buildOpAndOverride(
+                reducer,
+                document,
+                actions.setModelName({
+                    name: 'test 2'
+                }),
+                { index: 1 }
+            );
+
+            await server.addOperations('1', '1', [op0, op1]);
+
+            const duplicatedIndexOp = buildOpAndOverride(
+                reducer,
+                document,
+                actions.setModelName({
+                    name: 'test 3'
+                }),
+                { index: 1 }
+            );
+
+            await server.addOperations('1', '1', [duplicatedIndexOp]);
+
+            const nextIndexOp = buildOpAndOverride(
+                reducer,
+                document,
+                actions.setModelName({
+                    name: 'test 4'
+                }),
+                { index: 2 }
+            );
+
+            const result = await server.addOperations('1', '1', [nextIndexOp]);
+
+            document = (await server.getDocument(
+                '1',
+                '1'
+            )) as DocumentModelDocument;
+
+            // console.log(document.operations.global);
+            // console.log(result);
+
+            expect(result.status).toBe('SUCCESS');
+            expect(document.operations.global.length).toBe(7);
+            expect(document.state.global.name).toBe('test 4');
+            expect(document.operations.global).toMatchObject([
+                {
+                    index: 0,
+                    type: 'SET_MODEL_NAME',
+                    skip: 0,
+                    input: { name: 'test 1' }
+                },
+                { index: 1, type: 'NOOP', skip: 0, input: {} },
+                {
+                    index: 2,
+                    type: 'NOOP',
+                    skip: 1,
+                    input: {}
+                },
+                {
+                    index: 3,
+                    type: 'NOOP',
+                    skip: 0,
+                    input: {}
+                },
+                {
+                    index: 4,
+                    type: 'SET_MODEL_NAME',
+                    skip: 2,
+                    input: { name: 'test 2' }
+                },
+                {
+                    index: 5,
+                    type: 'SET_MODEL_NAME',
+                    skip: 0,
+                    input: { name: 'test 3' }
+                },
+                {
+                    index: 6,
+                    type: 'SET_MODEL_NAME',
+                    skip: 0,
+                    input: { name: 'test 4' }
                 }
             ]);
         });

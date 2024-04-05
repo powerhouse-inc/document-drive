@@ -105,23 +105,30 @@ export class ConflictOperationsManager {
             const operations =
                 this.conflictOperationsByScope[scope as OperationScope] || [];
 
-            const opsToUpdate =
-                this.operationsToUpdate[scope as OperationScope] || [];
-            let sortedOperations = this.mergeMethod(operations, opsToUpdate);
-            const operationsIndex = sortedOperations.map(op => op.index);
+            const firstConflictedIndex = [...operations].sort(
+                (a, b) => a.index - b.index
+            )[0]?.index;
 
-            // find duplicates
-            const duplicates = operationsIndex.filter(
-                (opIndex, index) => operationsIndex.indexOf(opIndex) !== index
+            if (firstConflictedIndex === undefined) return {};
+
+            const conflictedOperaionsInScope = (
+                this.documentOperations[scope as OperationScope] || []
+            ).filter(op => op.index >= firstConflictedIndex);
+
+            let sortedOperations = this.mergeMethod(
+                operations,
+                conflictedOperaionsInScope
             );
 
             const lastIndexWithConflicts =
-                duplicates.sort((a, b) => b - a)[0] || 0;
-            const overlapOperations = duplicates.length;
+                conflictedOperaionsInScope.sort((a, b) => b.index - a.index)[0]
+                    ?.index || 0;
+            const overlapOperations = conflictedOperaionsInScope.length;
 
             sortedOperations = sortedOperations.map((op, index) => {
                 if (index === 0) return { ...op, skip: overlapOperations };
-                return op;
+                // override skip value
+                return { ...op, skip: 0 };
             });
 
             const reIndexedOperations = sortedOperations.map((op, i) => {

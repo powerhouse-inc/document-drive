@@ -93,32 +93,6 @@ describe('Document operations', () => {
             expect(result.error?.message).toBe('Invalid scope: invalid');
         });
 
-        it('should reject operation with existing index', async () => {
-            const document = await buildFile();
-
-            const result = await server.addOperations('1', '1', [
-                buildOperation(
-                    reducer,
-                    document,
-                    actions.setModelName({
-                        name: 'test'
-                    })
-                ),
-                buildOperation(
-                    reducer,
-                    document,
-                    actions.setModelName({
-                        name: 'test 2'
-                    }),
-                    0
-                )
-            ]);
-            expect(result.status).toBe('CONFLICT');
-            expect(result.error?.message).toBe(
-                'Conflicting operation on index 0'
-            );
-        });
-
         it('should reject operation with missing index', async () => {
             const document = await buildFile();
 
@@ -164,11 +138,11 @@ describe('Document operations', () => {
                     actions.setModelName({
                         name: 'test 2'
                     }),
-                    2
+                    4
                 )
             ]);
 
-            expect(result.status).toBe('CONFLICT');
+            expect(result.status).toBe('MISSING');
             expect(result.operations.length).toBe(3);
 
             document = (await server.getDocument(
