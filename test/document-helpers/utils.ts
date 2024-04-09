@@ -5,14 +5,28 @@ export type InputOperation = Partial<Omit<Operation, 'index' | 'skip'>> & {
     skip: number;
 };
 
-export const buildOperation = (input: InputOperation): Operation => ({
-    hash: `hash-${input.index}`,
-    timestamp: new Date().toISOString(),
-    input: {},
-    scope: 'global',
-    type: 'TEST',
-    ...input
-});
+export const buildOperation = (input: InputOperation, shuffled = false): Operation => {
 
-export const buildOperations = (inputs: InputOperation[]): Operation[] =>
-    inputs.map(buildOperation);
+    if (shuffled) {
+        return {
+            scope: 'global',
+            type: 'TEST',
+            timestamp: new Date().toISOString(),
+            input: {},
+            hash: `hash-${input.index}`,
+            ...input
+        };
+    }
+
+    return {
+        hash: `hash-${input.index}`,
+        timestamp: new Date().toISOString(),
+        input: {},
+        scope: 'global',
+        type: 'TEST',
+        ...input
+    };
+};
+
+export const buildOperations = (inputs: InputOperation[], shuffled = false): Operation[] =>
+    inputs.map(i => buildOperation(i, shuffled));

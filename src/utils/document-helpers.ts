@@ -1,4 +1,5 @@
 import { Operation } from 'document-model/document';
+import stringify from 'json-stringify-deterministic';
 
 type OperationIndex = {
     index: number;
@@ -13,12 +14,6 @@ type IntegrityIssue = {
     operation: OperationIndex;
     issue: IntegrityIssueType;
     message: string;
-};
-
-type CleanedOperationsResult = {
-    operations: Operation[];
-    removals: number;
-    issues: IntegrityIssue[];
 };
 
 type Reshuffle = (
@@ -184,6 +179,11 @@ export const reshuffleByTimestampAndIndex: Reshuffle = (
         }));
 };
 
+// TODO: implement better operation equality function 
+export function operationsAreEqual(op1:Operation, op2:Operation) {
+    return stringify(op1) === stringify(op2);
+}
+
 export function split(
     targetOperations: Operation[],
     mergeOperations: Operation[]
@@ -195,22 +195,23 @@ export function split(
     // get bigger array length
     const maxLength = Math.max(targetOperations.length, mergeOperations.length);
 
+    let splitHappened = false;
     for (let i = 0; i < maxLength; i++) {
         const targetOperation = targetOperations[i];
         const mergeOperation = mergeOperations[i];
 
         if (targetOperation && mergeOperation) {
-            if (
-                JSON.stringify(targetOperation) ===
-                JSON.stringify(mergeOperation)
-            ) {
+            if (!splitHappened && operationsAreEqual(targetOperation, mergeOperation)) {
                 commonOperations.push(targetOperation);
             } else {
+                splitHappened = true;
                 targetDiffOperations.push(targetOperation);
                 mergeDiffOperations.push(mergeOperation);
             }
+
         } else if (targetOperation) {
             targetDiffOperations.push(targetOperation);
+
         } else if (mergeOperation) {
             mergeDiffOperations.push(mergeOperation);
         }
