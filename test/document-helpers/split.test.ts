@@ -1,0 +1,90 @@
+import { describe, expect, it } from 'vitest';
+
+import { split } from '../../src/utils/document-helpers';
+import { buildOperations } from './utils';
+
+describe('split', () => {
+    const scenarios = [
+        {
+            title: 'case 1',
+            commonOperations: buildOperations([
+                { index: 0, skip: 0, type: 'OP_0' },
+                { index: 1, skip: 0, type: 'OP_1' }
+            ]),
+            targetOperations: buildOperations([
+                { index: 2, skip: 0, type: 'OP_A_2' },
+                { index: 3, skip: 0, type: 'OP_A_3' },
+                { index: 4, skip: 0, type: 'OP_A_4' },
+                { index: 5, skip: 0, type: 'OP_A_5' }
+            ]),
+            mergeOperations: buildOperations([
+                { index: 4, skip: 2, type: 'OP_B_4' },
+                { index: 5, skip: 0, type: 'OP_B_5' }
+            ])
+        },
+        {
+            title: 'case 2 (no common operations)',
+            commonOperations: buildOperations([]),
+            targetOperations: buildOperations([
+                { index: 0, skip: 0, type: 'OP_A_0' },
+                { index: 1, skip: 0, type: 'OP_A_1' },
+                { index: 2, skip: 0, type: 'OP_A_2' }
+            ]),
+            mergeOperations: buildOperations([
+                { index: 1, skip: 1, type: 'OP_B_1' },
+                { index: 2, skip: 0, type: 'OP_B_2' }
+            ])
+        },
+        {
+            title: 'case 3 (target operations and merge operations are the same)',
+            commonOperations: buildOperations([
+                { index: 0, skip: 0, type: 'OP_0' },
+                { index: 1, skip: 0, type: 'OP_1' },
+                { index: 3, skip: 0, type: 'OP_3' }
+            ]),
+            targetOperations: buildOperations([]),
+            mergeOperations: buildOperations([])
+        },
+        {
+            title: 'case 4 (empty operations)',
+            commonOperations: buildOperations([]),
+            targetOperations: buildOperations([]),
+            mergeOperations: buildOperations([])
+        },
+        {
+            title: 'case 5',
+            commonOperations: buildOperations([
+                { index: 1, skip: 1, type: 'OP_1' },
+                { index: 2, skip: 0, type: 'OP_2' },
+                { index: 4, skip: 1, type: 'OP_4' }
+            ]),
+            targetOperations: buildOperations([
+                { index: 6, skip: 1, type: 'OP_A_6' },
+                { index: 7, skip: 0, type: 'OP_A_7' }
+            ]),
+            mergeOperations: buildOperations([
+                { index: 5, skip: 0, type: 'OP_B_5' },
+                { index: 7, skip: 1, type: 'OP_B_7' }
+            ])
+        }
+    ];
+
+    it.each(scenarios)('should split the operations: $title', testInput => {
+        // assumes that garbageCollect is already applied to the operations
+        const targetOperations = [
+            ...testInput.commonOperations,
+            ...testInput.targetOperations
+        ];
+        const mergeOperations = [
+            ...testInput.commonOperations,
+            ...testInput.mergeOperations
+        ];
+
+        const result = split(targetOperations, mergeOperations);
+
+        expect(result.length).toBe(3);
+        expect(result[0]).toMatchObject(testInput.commonOperations);
+        expect(result[1]).toMatchObject(testInput.targetOperations);
+        expect(result[2]).toMatchObject(testInput.mergeOperations);
+    });
+});
