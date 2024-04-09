@@ -336,3 +336,73 @@ export const groupOperationsByScope = (
 
     return result;
 };
+
+type PrepareOperationsResult = {
+    validOperations: Operation[];
+    invalidOperations: Operation[];
+    duplicatedOperations: Operation[];
+    integrityIssues: IntegrityIssue[];
+};
+
+export const prepareOperations = (
+    operationsHistory: Operation[],
+    newOperations: Operation[]
+): PrepareOperationsResult => {
+    const result: PrepareOperationsResult = {
+        integrityIssues: [],
+        validOperations: [],
+        invalidOperations: [],
+        duplicatedOperations: []
+    };
+
+    const sortedOperationsHistory = sortOperations(operationsHistory);
+    const sortedOperations = sortOperations(newOperations);
+
+    const integrityErrors = checkCleanedOperationsIntegrity([
+        ...sortedOperationsHistory,
+        ...sortedOperations
+    ]);
+
+    const missingIndexErrors = integrityErrors.filter(
+        integrityIssue =>
+            integrityIssue.category === IntegrityIssueSubType.MISSING_INDEX
+    );
+
+    // get the integrity error with the lowest index operation
+    const firstMissingIndexOperation = [...missingIndexErrors]
+        .sort((a, b) => b.operation.index - a.operation.index)
+        .pop()?.operation;
+
+    for (const newOperation of sortedOperations) {
+        // Operation is missing index or it follows an operation that is missing index
+        if (
+            firstMissingIndexOperation &&
+            newOperation.index >= firstMissingIndexOperation.index
+        ) {
+            result.invalidOperations.push(newOperation);
+            continue;
+        }
+
+        // check if operation is duplicated
+        const isDuplicatedOperation = integrityErrors.some(integrityError => {
+            return (
+                integrityError.operation.index === newOperation.index &&
+                integrityError.operation.skip === newOperation.skip &&
+                integrityError.category ===
+                    IntegrityIssueSubType.DUPLICATED_INDEX
+            );
+        });
+
+        // add to duplicated operations if it is duplicated
+        if (isDuplicatedOperation) {
+            result.duplicatedOperations.push(newOperation);
+            continue;
+        }
+
+        // otherwise, add to valid operations
+        result.validOperations.push(newOperation);
+    }
+
+    result.integrityIssues.push(...integrityErrors);
+    return result;
+};
