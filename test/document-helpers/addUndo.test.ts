@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addUndo } from '../../src/utils/document-helpers';
+import { addUndo, checkOperationsIntegrity } from '../../src/utils/document-helpers';
 import { buildOperations } from './utils';
 
 describe('addUndo', () => {
@@ -89,6 +89,8 @@ describe('addUndo', () => {
             const operations = buildOperations(testInput.operations);
 
             const result = addUndo(operations);
+            const check = checkOperationsIntegrity(result);
+            expect(check).toHaveLength(0);
 
             expect(result.length).toBe(testInput.expected.length);
             const lastOperation = result.pop();
@@ -109,6 +111,9 @@ describe('addUndo', () => {
         ]);
 
         const result = addUndo(operations);
+        const check = checkOperationsIntegrity(result);
+        expect(check).toHaveLength(0);
+
         expect(result.length).toBe(4);
         expect(result[3]).toMatchObject({
             index: 3,

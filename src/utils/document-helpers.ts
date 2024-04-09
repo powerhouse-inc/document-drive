@@ -23,7 +23,7 @@ type Reshuffle = (
 ) => Operation[];
 
 export function checkCleanedOperationsIntegrity(
-    operations: Operation[]
+    sortedOperations: Operation[]
 ): IntegrityIssue[] {
     const result: IntegrityIssue[] = [];
 
@@ -40,7 +40,7 @@ export function checkCleanedOperationsIntegrity(
     // 0:0 -> 3:2 -> 5:2
 
     let currentIndex = -1;
-    for (const nextOperation of operations) {
+    for (const nextOperation of sortedOperations) {
         if (nextOperation.index - nextOperation.skip !== currentIndex + 1) {
             result.push({
                 operation: {
@@ -73,22 +73,22 @@ export function checkCleanedOperationsIntegrity(
 // 0:0 1:0 2:0 => 0:0 1:0 2:0, removals 0, no issues
 // 0:0 1:0 2:0 => 0:0 1:0 2:0, removals 0, no issues
 
-export function garbageCollect(operations: Operation[]): Operation[] {
+export function garbageCollect(sortedOperations: Operation[]): Operation[] {
     const result: Operation[] = [];
 
-    let i = operations.length - 1;
+    let i = sortedOperations.length - 1;
 
     while (i > -1) {
-        result.unshift(operations[i]!);
+        result.unshift(sortedOperations[i]!);
 
-        let skipsToGo = operations[i]?.skip || 0;
-        let lastProcessedIndex = operations[i]?.index || 0;
+        let skipsToGo = sortedOperations[i]?.skip || 0;
+        let lastProcessedIndex = sortedOperations[i]?.index || 0;
         let j = i - 1;
 
         while (skipsToGo > 0 && j > -1) {
-            if ((operations[j]?.index || 0) !== lastProcessedIndex) {
+            if ((sortedOperations[j]?.index || 0) !== lastProcessedIndex) {
                 skipsToGo--;
-                lastProcessedIndex = operations[j]?.index || 0;
+                lastProcessedIndex = sortedOperations[j]?.index || 0;
             }
 
             j--;
@@ -100,20 +100,14 @@ export function garbageCollect(operations: Operation[]): Operation[] {
     return result;
 }
 
-export function addUndo(operations: Operation[]): Operation[] {
-    // if (last operation is noop) {
-    // add operation(NOOP, currentIndex, nextSkipNumber(operations))
-    // } else {
-    // add operation(NOOP, currentIndex+1, skip=1)
-    // }
+export function addUndo(sortedOperations: Operation[]): Operation[] {
+    const operationsCopy = [...sortedOperations];
+    const latestOperation = operationsCopy[operationsCopy.length - 1];
 
-    const sortedOperations = [...sortOperations(operations)];
-    const latestOperation = sortedOperations[sortedOperations.length - 1];
-
-    if (!latestOperation) return sortedOperations;
+    if (!latestOperation) return operationsCopy;
 
     if (latestOperation.type === 'NOOP') {
-        sortedOperations.push({
+        operationsCopy.push({
             ...latestOperation,
             index: latestOperation.index,
             type: 'NOOP',
@@ -121,17 +115,18 @@ export function addUndo(operations: Operation[]): Operation[] {
         });
 
     } else {
-        sortedOperations.push({
-            ...latestOperation,
+        operationsCopy.push({
             type: 'NOOP',
             index: latestOperation.index + 1,
             timestamp: new Date().toISOString(),
             input: {},
-            skip: 1
+            skip: 1,
+            scope: latestOperation.scope,
+            hash: latestOperation.hash
         });
     }
 
-    return sortedOperations;
+    return operationsCopy;
 }
 
 // [0:0 2:0 1:0 3:3 3:1] => [0:0 1:0 2:0 3:1 3:3]
@@ -186,20 +181,20 @@ export function operationsAreEqual(op1:Operation, op2:Operation) {
 }
 
 export function split(
-    targetOperations: Operation[],
-    mergeOperations: Operation[]
+    sortedTargetOperations: Operation[],
+    sortedMergeOperations: Operation[]
 ): [Operation[], Operation[], Operation[]] {
     const commonOperations: Operation[] = [];
     const targetDiffOperations: Operation[] = [];
     const mergeDiffOperations: Operation[] = [];
 
     // get bigger array length
-    const maxLength = Math.max(targetOperations.length, mergeOperations.length);
+    const maxLength = Math.max(sortedTargetOperations.length, sortedMergeOperations.length);
 
     let splitHappened = false;
     for (let i = 0; i < maxLength; i++) {
-        const targetOperation = targetOperations[i];
-        const mergeOperation = mergeOperations[i];
+        const targetOperation = sortedTargetOperations[i];
+        const mergeOperation = sortedMergeOperations[i];
 
         if (targetOperation && mergeOperation) {
             if (!splitHappened && operationsAreEqual(targetOperation, mergeOperation)) {
@@ -227,13 +222,13 @@ export function split(
 // Reshuffle(6:4)   => [6:4, 7:0, 8:0, 9:0, 10:0, 11:0]
 // merge            => [0:0, 1:0, 6:4, 7:0, 8:0, 9:0, 10:0, 11:0]
 export function merge(
-    targetOperations: Operation[],
-    mergeOperations: Operation[],
+    sortedTargetOperations: Operation[],
+    sortedMergeOperations: Operation[],
     reshuffle: Reshuffle
 ): Operation[] {
     const [_commonOperations, _targetOperations, _mergeOperations] = split(
-        garbageCollect(targetOperations),
-        garbageCollect(mergeOperations)
+        garbageCollect(sortedTargetOperations),
+        garbageCollect(sortedMergeOperations)
     );
 
     const maxCommonIndex = getMaxIndex(_commonOperations);
@@ -255,12 +250,12 @@ export function merge(
     return _commonOperations.concat(newOperationHistory);
 }
 
-function getMaxIndex(operations: Operation[]) {
-    if (operations.length < 1) {
+function getMaxIndex(sortedOperations: Operation[]) {
+    if (sortedOperations.length < 1) {
         return -1;
     }
 
-    return operations[operations.length - 1]?.index ?? -1;
+    return sortedOperations[sortedOperations.length - 1]?.index ?? -1;
 }
 
 // [] => -1
@@ -278,12 +273,12 @@ function getMaxIndex(operations: Operation[]) {
 // [0:0 1:1 2:0 3:3] => -1
 // [50:50 100:50 150:50 151:0 152:0 153:0 154:3] => 53
 
-export function nextSkipNumber(operations: Operation[]): number {
-    if (operations.length < 1) {
+export function nextSkipNumber(sortedOperations: Operation[]): number {
+    if (sortedOperations.length < 1) {
         return -1;
     }
 
-    const cleanedOperations = garbageCollect(operations);
+    const cleanedOperations = garbageCollect(sortedOperations);
 
     let nextSkip =
         (cleanedOperations[cleanedOperations.length - 1]?.skip || 0) + 1;
@@ -300,20 +295,6 @@ export function nextSkipNumber(operations: Operation[]): number {
 
 export const checkOperationsIntegrity = (
     operations: Operation[]
-): IntegrityIssueType[] => {
-    const issues: IntegrityIssueType[] = [];
-
-    let previousIndex: number = -1;
-    let previousSkip: number = -1;
-
-    // history = [ { index: 0, skip: 0}, { index: 0, skip: 1 } ]
-
-    // history = [ { index: 3, skip: 3 } ]
-
-    for (const nextOperation of operations) {
-        if (nextOperation.index == previousIndex) {
-        }
-    }
-
-    return issues;
+): IntegrityIssue[] => {
+    return checkCleanedOperationsIntegrity(garbageCollect(sortOperations(operations)));
 };
