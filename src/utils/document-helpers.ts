@@ -92,17 +92,10 @@ export function garbageCollect(sortedOperations: Operation[]): Operation[] {
 
     while (i > -1) {
         result.unshift(sortedOperations[i]!);
-
-        let skipsToGo = sortedOperations[i]?.skip || 0;
-        let lastProcessedIndex = sortedOperations[i]?.index || 0;
+        const skipUntil = (sortedOperations[i]?.index || 0) - (sortedOperations[i]?.skip || 0) - 1;
+        
         let j = i - 1;
-
-        while (skipsToGo > 0 && j > -1) {
-            if ((sortedOperations[j]?.index || 0) !== lastProcessedIndex) {
-                skipsToGo--;
-                lastProcessedIndex = sortedOperations[j]?.index || 0;
-            }
-
+        while (j > -1 && (sortedOperations[j]?.index || 0) > skipUntil) {
             j--;
         }
 

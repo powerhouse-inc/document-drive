@@ -6,6 +6,7 @@ import {
     garbageCollect
 } from '../../src/utils/document-helpers';
 import { buildOperation, buildOperations } from './utils';
+import { Operation } from 'document-model/document';
 
 describe('garbageCollect', () => {
     it('should return the same list of operations if there is no issues or removals', () => {
@@ -76,46 +77,6 @@ describe('garbageCollect', () => {
         expect(result).toMatchObject(operations);
     });
 
-    it('should find out of order, and unexpected index errors', () => {
-        // 1:0 0:0 2:0 => 2:0, removals 2, issues [UNEXPECTED_INDEX, INDEX_OUT_OF_ORDER]
-        const op0 = buildOperation({ index: 1, skip: 0 });
-        const op1 = buildOperation({ index: 0, skip: 0 });
-        const op2 = buildOperation({ index: 2, skip: 0 });
-
-        const operations = [op0, op1, op2];
-        const result = garbageCollect(operations);
-        const resultIssues = checkCleanedOperationsIntegrity(result);
-
-        expect(result.length).toBe(3);
-        expect(result).toMatchObject(operations);
-
-        expect(resultIssues.length).toBe(3);
-
-        for (const issue of resultIssues) {
-            expect(issue.issue).toBe(IntegrityIssueType.UNEXPECTED_INDEX);
-        }
-    });
-
-    it('should find out of order, and unexpected index errors', () => {
-        // 1:0 0:0 2:0 => 2:0, removals 2, issues [UNEXPECTED_INDEX, INDEX_OUT_OF_ORDER]
-        const op0 = buildOperation({ index: 1, skip: 0 });
-        const op1 = buildOperation({ index: 0, skip: 0 });
-        const op2 = buildOperation({ index: 2, skip: 0 });
-
-        const operations = [op0, op1, op2];
-        const result = garbageCollect(operations);
-        const resultIssues = checkCleanedOperationsIntegrity(result);
-
-        expect(result.length).toBe(3);
-        expect(result).toMatchObject(operations);
-
-        expect(resultIssues.length).toBe(3);
-
-        for (const issue of resultIssues) {
-            expect(issue.issue).toBe(IntegrityIssueType.UNEXPECTED_INDEX);
-        }
-    });
-
     it('should return an empty array if there is no operations', () => {
         const result = garbageCollect([]);
         expect(result).toMatchObject([]);
@@ -157,5 +118,56 @@ describe('garbageCollect', () => {
 
         expect(result.length).toBe(1);
         expect(result).toMatchObject([op5]);
+    });
+
+    it('should be indifferent to missing skipped operations', () => {
+        const op0_x = buildOperation({ index: 0, skip: 0 });
+        const op1_v = buildOperation({ index: 1, skip: 1 });
+        const op2_x = buildOperation({ index: 2, skip: 0 });
+        const op3_x = buildOperation({ index: 3, skip: 0 });
+        const op4_x = buildOperation({ index: 4, skip: 0 });
+        const op5_x = buildOperation({ index: 4, skip: 1 });
+        const op6_v = buildOperation({ index: 4, skip: 2 });
+    
+        const equivalentSets:Operation[][] = [
+            [op0_x, op1_v, op2_x, op3_x, op4_x, op5_x, op6_v],
+            [op1_v, op2_x, op3_x, op4_x, op5_x, op6_v],
+            [op0_x, op1_v, op3_x, op4_x, op5_x, op6_v],
+            [op0_x, op1_v, op2_x, op4_x, op5_x, op6_v],
+            [op0_x, op1_v, op2_x, op3_x, op5_x, op6_v],
+            [op0_x, op1_v, op2_x, op3_x, op4_x, op6_v],
+            [op1_v, op2_x, op4_x, op5_x, op6_v],
+            [op0_x, op1_v, op4_x, op5_x, op6_v],
+            [op0_x, op1_v, op2_x, op5_x, op6_v],
+            [op0_x, op1_v, op2_x, op4_x, op6_v],
+            [op1_v, op4_x, op5_x, op6_v],
+            [op0_x, op1_v, op5_x, op6_v],
+            [op0_x, op1_v, op4_x, op6_v],
+            [op1_v, op5_x, op6_v],
+            [op0_x, op1_v, op6_v],
+            [op1_v, op6_v],
+        ];
+    
+        for (const set of equivalentSets) {
+            expect(garbageCollect(set)).toEqual([op1_v, op6_v]);
+        }
+    });
+
+    it('should be idempotent', () => {
+        const op0 = buildOperation({ index: 0, skip: 0 });
+        const op1 = buildOperation({ index: 1, skip: 1 });
+        const op2 = buildOperation({ index: 2, skip: 0 });
+        const op3 = buildOperation({ index: 3, skip: 0 });
+        const op4 = buildOperation({ index: 4, skip: 0 });
+        const op5 = buildOperation({ index: 4, skip: 2 });
+
+        const operations = [op0, op1, op2, op3, op4, op5];
+        const result = garbageCollect(operations);
+
+        expect(result).toHaveLength(2);
+        expect(result).toEqual([op1, op5]);
+
+        const result2 = garbageCollect(result);
+        expect(result2).toEqual(result);
     });
 });
