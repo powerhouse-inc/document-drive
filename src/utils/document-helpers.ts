@@ -119,6 +119,7 @@ export function addUndo(operations: Operation[]): Operation[] {
             type: 'NOOP',
             skip: nextSkipNumber(sortedOperations)
         });
+
     } else {
         sortedOperations.push({
             ...latestOperation,
@@ -230,22 +231,36 @@ export function merge(
     mergeOperations: Operation[],
     reshuffle: Reshuffle
 ): Operation[] {
-    const [, _targetOperations, _mergeOperatios] = split(
+    const [_commonOperations, _targetOperations, _mergeOperations] = split(
         garbageCollect(targetOperations),
         garbageCollect(mergeOperations)
     );
 
-    const latestTargetOperation = [..._targetOperations].pop();
-    const newOperationHistory = reshuffle(
-        {
-            index: (latestTargetOperation?.index ?? -1) + 1,
-            skip: _targetOperations.length + (latestTargetOperation?.skip ?? 0)
-        },
-        _targetOperations,
-        _mergeOperatios
+    const maxCommonIndex = getMaxIndex(_commonOperations);
+    const nextIndex = 1 + Math.max(
+        maxCommonIndex,
+        getMaxIndex(_targetOperations),
+        getMaxIndex(_mergeOperations),
     );
 
-    return garbageCollect([...targetOperations, ...newOperationHistory]);
+    const newOperationHistory = reshuffle(
+        {
+            index: nextIndex,
+            skip: nextIndex - (maxCommonIndex + 1)
+        },
+        _targetOperations,
+        _mergeOperations
+    );
+
+    return _commonOperations.concat(newOperationHistory);
+}
+
+function getMaxIndex(operations: Operation[]) {
+    if (operations.length < 1) {
+        return -1;
+    }
+
+    return operations[operations.length - 1]?.index ?? -1;
 }
 
 // [] => -1
