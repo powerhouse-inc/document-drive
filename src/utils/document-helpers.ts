@@ -1,4 +1,4 @@
-import { Operation } from 'document-model/document';
+import { Operation, OperationScope } from 'document-model/document';
 import stringify from 'json-stringify-deterministic';
 
 type OperationIndex = {
@@ -113,7 +113,6 @@ export function addUndo(sortedOperations: Operation[]): Operation[] {
             type: 'NOOP',
             skip: nextSkipNumber(sortedOperations)
         });
-
     } else {
         operationsCopy.push({
             type: 'NOOP',
@@ -175,8 +174,8 @@ export const reshuffleByTimestampAndIndex: Reshuffle = (
         }));
 };
 
-// TODO: implement better operation equality function 
-export function operationsAreEqual(op1:Operation, op2:Operation) {
+// TODO: implement better operation equality function
+export function operationsAreEqual(op1: Operation, op2: Operation) {
     return stringify(op1) === stringify(op2);
 }
 
@@ -189,7 +188,10 @@ export function split(
     const mergeDiffOperations: Operation[] = [];
 
     // get bigger array length
-    const maxLength = Math.max(sortedTargetOperations.length, sortedMergeOperations.length);
+    const maxLength = Math.max(
+        sortedTargetOperations.length,
+        sortedMergeOperations.length
+    );
 
     let splitHappened = false;
     for (let i = 0; i < maxLength; i++) {
@@ -197,17 +199,18 @@ export function split(
         const mergeOperation = sortedMergeOperations[i];
 
         if (targetOperation && mergeOperation) {
-            if (!splitHappened && operationsAreEqual(targetOperation, mergeOperation)) {
+            if (
+                !splitHappened &&
+                operationsAreEqual(targetOperation, mergeOperation)
+            ) {
                 commonOperations.push(targetOperation);
             } else {
                 splitHappened = true;
                 targetDiffOperations.push(targetOperation);
                 mergeDiffOperations.push(mergeOperation);
             }
-
         } else if (targetOperation) {
             targetDiffOperations.push(targetOperation);
-
         } else if (mergeOperation) {
             mergeDiffOperations.push(mergeOperation);
         }
@@ -232,11 +235,13 @@ export function merge(
     );
 
     const maxCommonIndex = getMaxIndex(_commonOperations);
-    const nextIndex = 1 + Math.max(
-        maxCommonIndex,
-        getMaxIndex(_targetOperations),
-        getMaxIndex(_mergeOperations),
-    );
+    const nextIndex =
+        1 +
+        Math.max(
+            maxCommonIndex,
+            getMaxIndex(_targetOperations),
+            getMaxIndex(_mergeOperations)
+        );
 
     const newOperationHistory = reshuffle(
         {
@@ -255,7 +260,7 @@ function getMaxIndex(sortedOperations: Operation[]) {
     if (!lastElement) {
         return -1;
     }
-    
+
     return lastElement.index;
 }
 
@@ -297,5 +302,25 @@ export function nextSkipNumber(sortedOperations: Operation[]): number {
 export const checkOperationsIntegrity = (
     operations: Operation[]
 ): IntegrityIssue[] => {
-    return checkCleanedOperationsIntegrity(garbageCollect(sortOperations(operations)));
+    return checkCleanedOperationsIntegrity(
+        garbageCollect(sortOperations(operations))
+    );
+};
+
+export type OperationsByScope = Partial<Record<OperationScope, Operation[]>>;
+
+export const groupOperationsByScope = (
+    operations: Operation[]
+): OperationsByScope => {
+    const result = operations.reduce<OperationsByScope>((acc, operation) => {
+        if (!acc[operation.scope]) {
+            acc[operation.scope] = [];
+        }
+
+        acc[operation.scope]?.push(operation);
+
+        return acc;
+    }, {});
+
+    return result;
 };
