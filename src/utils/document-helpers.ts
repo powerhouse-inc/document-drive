@@ -251,11 +251,12 @@ export function merge(
 }
 
 function getMaxIndex(sortedOperations: Operation[]) {
-    if (sortedOperations.length < 1) {
+    const lastElement = sortedOperations[sortedOperations.length - 1];
+    if (!lastElement) {
         return -1;
     }
-
-    return sortedOperations[sortedOperations.length - 1]?.index ?? -1;
+    
+    return lastElement.index;
 }
 
 // [] => -1

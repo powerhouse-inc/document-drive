@@ -121,4 +121,13 @@ describe('addUndo', () => {
             type: 'NOOP'
         });
     });
+
+    it('should return an empty array unchanged', () => {
+        const operations = buildOperations([]);
+        const result = addUndo(operations);
+        const check = checkOperationsIntegrity(result);
+        
+        expect(check).toHaveLength(0);
+        expect(result.length).toBe(0);
+    });
 });
