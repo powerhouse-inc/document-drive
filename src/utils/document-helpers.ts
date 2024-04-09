@@ -10,9 +10,15 @@ export enum IntegrityIssueType {
     UNEXPECTED_INDEX = 'UNEXPECTED_INDEX'
 }
 
+export enum IntegrityIssueSubType {
+    DUPLICATED_INDEX = 'DUPLICATED_INDEX',
+    MISSING_INDEX = 'MISSING_INDEX'
+}
+
 type IntegrityIssue = {
     operation: OperationIndex;
     issue: IntegrityIssueType;
+    category: IntegrityIssueSubType;
     message: string;
 };
 
@@ -41,13 +47,19 @@ export function checkCleanedOperationsIntegrity(
 
     let currentIndex = -1;
     for (const nextOperation of sortedOperations) {
-        if (nextOperation.index - nextOperation.skip !== currentIndex + 1) {
+        const nextIndex = nextOperation.index - nextOperation.skip;
+
+        if (nextIndex !== currentIndex + 1) {
             result.push({
                 operation: {
                     index: nextOperation.index,
                     skip: nextOperation.skip
                 },
                 issue: IntegrityIssueType.UNEXPECTED_INDEX,
+                category:
+                    nextIndex > currentIndex + 1
+                        ? IntegrityIssueSubType.MISSING_INDEX
+                        : IntegrityIssueSubType.DUPLICATED_INDEX,
                 message: `Expected index ${currentIndex + 1} with skip 0 or equivalent, got index ${nextOperation.index} with skip ${nextOperation.skip}`
             });
         }
