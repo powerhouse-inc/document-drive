@@ -184,6 +184,76 @@ export function operationsAreEqual(op1: Operation, op2: Operation) {
     return stringify(op1) === stringify(op2);
 }
 
+
+// [T0:0 T1:0 T2:0 T3:0] + [B4:0 B5:0] = [T0:0 T1:0 T2:0 T3:0 B4:0 B5:0]
+// [T0:0 T1:0 T2:0 T3:0] + [B3:0 B4:0] = [T0:0 T1:0 T2:0 B3:0 B4:0]
+// [T0:0 T1:0 T2:0 T3:0] + [B2:0 B3:0] = [T0:0 T1:0 B2:0 B3:0]
+
+// [T0:0 T1:0 T2:0 T3:0] + [B4:0 B4:2] = [T0:0 T1:0 T2:0 T3:0 B4:0 B4:2]
+// [T0:0 T1:0 T2:0 T3:0] + [B3:0 B3:2] = [T0:0 T1:0 T2:0 B3:0 B3:2]
+// [T0:0 T1:0 T2:0 T3:0] + [B2:3 B3:0] = [T0:0 T1:0 B2:3 B3:0]
+
+
+export function attachBranch(
+    trunk: Operation[],
+    newBranch: Operation[]
+): [Operation[], Operation[]] {
+    const trunkCopy = garbageCollect(sortOperations(trunk.slice()));
+    const newOperations = garbageCollect(sortOperations(newBranch.slice()));
+    if (trunkCopy.length < 1) {
+        return [newOperations, []];
+    }
+    
+    const result: Operation[] = [];
+    let enteredBranch = false;
+
+    while(newOperations.length > 0) {
+        const newOperationCandidate = newOperations[0]!;
+
+        let nextTrunkOperation = trunkCopy.shift();
+        while(nextTrunkOperation && precedes(nextTrunkOperation, newOperationCandidate)) {
+            result.push(nextTrunkOperation);
+            nextTrunkOperation = trunkCopy.shift();
+        }
+
+        if (!nextTrunkOperation) {
+            enteredBranch = true;
+
+        } else if (!enteredBranch) {
+            if (operationsAreEqual(nextTrunkOperation, newOperationCandidate)) {
+                newOperations.shift();
+                result.push(nextTrunkOperation);
+
+            } else {
+                trunkCopy.unshift(nextTrunkOperation);
+                enteredBranch = true;
+            }
+        }
+        
+        if (enteredBranch) {
+            let nextAppend = newOperations.shift();
+            while (nextAppend) {
+                result.push(nextAppend);
+                nextAppend = newOperations.shift();
+            }
+        }
+    }
+
+    if (!enteredBranch) {
+        let nextAppend = trunkCopy.shift();
+        while (nextAppend) {
+            result.push(nextAppend);
+            nextAppend = trunkCopy.shift();
+        }
+    }
+
+    return [garbageCollect(result), trunkCopy];
+}
+
+function precedes(op1: Operation, op2: Operation) {
+    return (op1.index < op2.index) || (op1.index === op2.index && op1.skip < op2.skip);
+}
+
 export function split(
     sortedTargetOperations: Operation[],
     sortedMergeOperations: Operation[]
