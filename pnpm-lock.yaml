@@ -92,8 +92,8 @@ devDependencies:
     specifier: ^23.0.2
     version: 23.0.2(typescript@5.3.3)
   sequelize:
-    specifier: ^6.35.2
-    version: 6.37.0(sqlite3@5.1.7)
+    specifier: ^6.37.2
+    version: 6.37.2(sqlite3@5.1.7)
   sqlite3:
     specifier: ^5.1.7
     version: 5.1.7
@@ -8050,8 +8050,8 @@ packages:
     engines: {node: '>= 10.0.0'}
     dev: true
 
-  /sequelize@6.37.0(sqlite3@5.1.7):
-    resolution: {integrity: sha512-MS6j6aXqWzB3fe9FhmfpQMgVC16bBdYroJCqIqR0l9M2ko8pZdKoi/0PiNWgMyFQDXUHxXyAOG3K07CbnOhteQ==}
+  /sequelize@6.37.2(sqlite3@5.1.7):
+    resolution: {integrity: sha512-bnb7swGANONXCTrVyebpOOZssLwQrVkYX2tcC6qOIvH+P+OhsoMBi7c3GXI5bC+Z4b4tOl+kQy6yeqLCZ1YQAQ==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       ibm_db: '*'
