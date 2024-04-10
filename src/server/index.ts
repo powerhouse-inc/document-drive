@@ -34,6 +34,15 @@ import {
     isDocumentDrive,
     isNoopUpdate
 } from '../utils';
+import {
+    attachBranch,
+    garbageCollect,
+    groupOperationsByScope,
+    merge,
+    precedes,
+    reshuffleByTimestampAndIndex,
+    sortOperations
+} from '../utils/document-helpers';
 import { requestPublicDrive } from '../utils/graphql';
 import { logger } from '../utils/logger';
 import {
@@ -65,7 +74,6 @@ import {
     type SynchronizationUnit
 } from './types';
 import { filterOperationsByRevision } from './utils';
-import { attachBranch, garbageCollect, groupOperationsByScope, merge, precedes, reshuffleByTimestampAndIndex, sortOperations } from '../utils/document-helpers';
 
 export * from './listener';
 export type * from './types';
@@ -542,19 +550,29 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         // console.log('================================================');
 
         for (const scope of Object.keys(operationsByScope)) {
-            const trunk = garbageCollect(sortOperations(scope === 'local' ? storageDocument.operations.local : storageDocument.operations.global));
-            const branch = (scope === 'local' ? operationsByScope.local : operationsByScope.global);
+            const trunk = garbageCollect(
+                sortOperations(
+                    scope === 'local'
+                        ? storageDocument.operations.local
+                        : storageDocument.operations.global
+                )
+            );
+            const branch =
+                scope === 'local'
+                    ? operationsByScope.local
+                    : operationsByScope.global;
             const [invertedTrunk, tail] = attachBranch(trunk, branch || []);
 
-            const newHistory = 
-                tail.length < 1 ?
-                invertedTrunk:
-                merge(trunk, invertedTrunk, reshuffleByTimestampAndIndex);
+            const newHistory =
+                tail.length < 1
+                    ? invertedTrunk
+                    : merge(trunk, invertedTrunk, reshuffleByTimestampAndIndex);
 
             const lastOriginalOperation = trunk[trunk.length - 1];
-        
-            const newOperations =
-                newHistory.filter(op => (trunk.length < 1 || precedes(trunk[trunk.length - 1]!, op)));
+
+            const newOperations = newHistory.filter(
+                op => trunk.length < 1 || precedes(trunk[trunk.length - 1]!, op)
+            );
 
             const firstNewOperation = newOperations[0];
             let updatedOperationIndex = -1;
@@ -562,14 +580,16 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             if (lastOriginalOperation && firstNewOperation) {
                 if (lastOriginalOperation.index === firstNewOperation.index) {
                     if (lastOriginalOperation.skip >= firstNewOperation.skip) {
-                        console.error('Unexpected firstNewOperation.skip lower than or equal to lastOriginalOperation.skip.');
+                        console.error(
+                            'Unexpected firstNewOperation.skip lower than or equal to lastOriginalOperation.skip.'
+                        );
                     }
 
                     //console.log("Detected updated operation:", lastOriginalOperation, firstNewOperation);
                     updatedOperationIndex = firstNewOperation.index;
                 }
             }
-/* 
+            /* 
             console.log(`Processing ${scope} scope`, trunk, branch);
             console.log('Inverted trunk and tail', invertedTrunk, tail);
             console.log('New history', newHistory);
@@ -578,28 +598,31 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
  */
             for (const nextOperation of newOperations) {
                 try {
-                    const appliedResult = await this._performOperation<T, A>(drive, document, nextOperation);
+                    const appliedResult = await this._performOperation<T, A>(
+                        drive,
+                        document,
+                        nextOperation
+                    );
                     document = appliedResult.document;
                     signals.push(...appliedResult.signals);
 
                     if (nextOperation.index === updatedOperationIndex) {
-                        operationsUpdated.push(appliedResult.operation);
+                        operationsUpdated.push(...appliedResult.operation);
                     } else {
-                        operationsApplied.push(appliedResult.operation);
+                        operationsApplied.push(...appliedResult.operation);
                     }
-
                 } catch (e) {
                     error =
-                        e instanceof OperationError ? 
-                        e: 
-                        new OperationError(
-                            'ERROR',
-                            nextOperation,
-                            (e as Error).message,
-                            (e as Error).cause
-                        );
-                    
-                    // TODO: don't break on errors... 
+                        e instanceof OperationError
+                            ? e
+                            : new OperationError(
+                                  'ERROR',
+                                  nextOperation,
+                                  (e as Error).message,
+                                  (e as Error).cause
+                              );
+
+                    // TODO: don't break on errors...
                     break;
                 }
             }
@@ -806,9 +829,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             }
         }) as T;
 
-        const appliedOperation =
-            newDocument.operations[operation.scope]
-                .filter(op => (op.index == operation.index && op.skip == operation.skip));
+        const appliedOperation = newDocument.operations[operation.scope].filter(
+            op => op.index == operation.index && op.skip == operation.skip
+        );
 
         if (appliedOperation.length < 1) {
             throw new OperationError(
@@ -816,7 +839,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 operation,
                 `Operation with index ${operation.index}:${operation.skip} was not applied.`
             );
-
         } else if (appliedOperation[0]!.hash !== operation.hash) {
             throw new OperationError(
                 'CONFLICT',
