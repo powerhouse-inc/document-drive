@@ -131,7 +131,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                   operations,
                   false
               ));
-
         if (result.status === 'ERROR') {
             this.updateSyncStatus(strand.driveId, result.status, result.error);
         }
@@ -145,7 +144,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         listener: ListenerState
     ) {
         logger.error(
-            `Listener ${listener.listener.label ?? listener.listener.listenerId} error: ${error.message}`
+            `Listener ${listener.listener.label ?? listener.listener.listenerId} error:`,
+            error
         );
         this.updateSyncStatus(
             driveId,
@@ -402,14 +402,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         if (!id) {
             throw new Error('Invalid Drive Id');
         }
-        try {
-            const driveStorage = await this.storage.getDrive(id);
-            if (driveStorage) {
-                throw new Error('Drive already exists');
-            }
-        } catch {
-            // ignore error has it means drive does not exist already
+        
+        const drives = await this.storage.getDrives();
+        if (drives.includes(id)) {
+            throw new Error('Drive already exists');
         }
+
         const document = utils.createDocument({
             state: drive
         });
