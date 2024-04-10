@@ -137,6 +137,7 @@ export function addUndo(sortedOperations: Operation[]): Operation[] {
 // Sort by index _and_ skip number
 export function sortOperations(operations: Operation[]): Operation[] {
     return operations
+        .slice()
         .sort((a, b) => a.skip - b.skip)
         .sort((a, b) => a.index - b.index);
 }
@@ -250,7 +251,7 @@ export function attachBranch(
     return [garbageCollect(result), trunkCopy];
 }
 
-function precedes(op1: Operation, op2: Operation) {
+export function precedes(op1: Operation, op2: Operation) {
     return (op1.index < op2.index) || (op1.index === op2.index && op1.skip < op2.skip);
 }
 

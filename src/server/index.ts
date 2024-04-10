@@ -65,6 +65,7 @@ import {
     type SynchronizationUnit
 } from './types';
 import { filterOperationsByRevision } from './utils';
+import { attachBranch, garbageCollect, groupOperationsByScope, merge, precedes, reshuffleByTimestampAndIndex, sortOperations } from '../utils/document-helpers';
 
 export * from './listener';
 export type * from './types';
@@ -527,6 +528,94 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
     async _processOperations<T extends Document, A extends Action>(
         drive: string,
+        storageDocument: DocumentStorage<T>,
+        operations: Operation<A | BaseAction>[]
+    ) {
+        const operationsApplied: Operation<A | BaseAction>[] = [];
+        const operationsUpdated: Operation<A | BaseAction>[] = [];
+        const signals: SignalResult[] = [];
+
+        let document: T = this._buildDocument(storageDocument);
+        let error: OperationError | undefined; // TODO: replace with an array of errors/consistency issues
+        const operationsByScope = groupOperationsByScope(operations);
+
+        // console.log('================================================');
+
+        for (const scope of Object.keys(operationsByScope)) {
+            const trunk = garbageCollect(sortOperations(scope === 'local' ? storageDocument.operations.local : storageDocument.operations.global));
+            const branch = (scope === 'local' ? operationsByScope.local : operationsByScope.global);
+            const [invertedTrunk, tail] = attachBranch(trunk, branch || []);
+
+            const newHistory = 
+                tail.length < 1 ?
+                invertedTrunk:
+                merge(trunk, invertedTrunk, reshuffleByTimestampAndIndex);
+
+            const lastOriginalOperation = trunk[trunk.length - 1];
+        
+            const newOperations =
+                newHistory.filter(op => (trunk.length < 1 || precedes(trunk[trunk.length - 1]!, op)));
+
+            const firstNewOperation = newOperations[0];
+            let updatedOperationIndex = -1;
+
+            if (lastOriginalOperation && firstNewOperation) {
+                if (lastOriginalOperation.index === firstNewOperation.index) {
+                    if (lastOriginalOperation.skip >= firstNewOperation.skip) {
+                        console.error('Unexpected firstNewOperation.skip lower than or equal to lastOriginalOperation.skip.');
+                    }
+
+                    //console.log("Detected updated operation:", lastOriginalOperation, firstNewOperation);
+                    updatedOperationIndex = firstNewOperation.index;
+                }
+            }
+/* 
+            console.log(`Processing ${scope} scope`, trunk, branch);
+            console.log('Inverted trunk and tail', invertedTrunk, tail);
+            console.log('New history', newHistory);
+            console.log('New operations', newOperations);
+            console.log('Updated operation index', updatedOperationIndex);
+ */
+            for (const nextOperation of newOperations) {
+                try {
+                    const appliedResult = await this._performOperation<T, A>(drive, document, nextOperation);
+                    document = appliedResult.document;
+                    signals.push(...appliedResult.signals);
+
+                    if (nextOperation.index === updatedOperationIndex) {
+                        operationsUpdated.push(appliedResult.operation);
+                    } else {
+                        operationsApplied.push(appliedResult.operation);
+                    }
+
+                } catch (e) {
+                    error =
+                        e instanceof OperationError ? 
+                        e: 
+                        new OperationError(
+                            'ERROR',
+                            nextOperation,
+                            (e as Error).message,
+                            (e as Error).cause
+                        );
+                    
+                    // TODO: don't break on errors... 
+                    break;
+                }
+            }
+        }
+
+        return {
+            document,
+            operationsApplied,
+            signals,
+            error,
+            operationsUpdated
+        } as const;
+    }
+
+    async _processOperationsOld<T extends Document, A extends Action>(
+        drive: string,
         documentStorage: DocumentStorage<T>,
         operations: Operation<A | BaseAction>[]
     ) {
@@ -718,12 +807,21 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         }) as T;
 
         const appliedOperation =
-            newDocument.operations[operation.scope][operation.index];
-        if (!appliedOperation || appliedOperation.hash !== operation.hash) {
+            newDocument.operations[operation.scope]
+                .filter(op => (op.index == operation.index && op.skip == operation.skip));
+
+        if (appliedOperation.length < 1) {
+            throw new OperationError(
+                'ERROR',
+                operation,
+                `Operation with index ${operation.index}:${operation.skip} was not applied.`
+            );
+
+        } else if (appliedOperation[0]!.hash !== operation.hash) {
             throw new OperationError(
                 'CONFLICT',
                 operation,
-                `Operation with index ${operation.index} had different result`
+                `Operation with index ${operation.index}:${operation.skip} has unexpected result hash`
             );
         }
 

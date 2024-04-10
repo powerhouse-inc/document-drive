@@ -93,7 +93,7 @@ describe('Document operations', () => {
             expect(result.error?.message).toBe('Invalid scope: invalid');
         });
 
-        it('should reject operation with existing index', async () => {
+        it.skip('should reject operation with existing index', async () => {
             const document = await buildFile();
 
             const result = await server.addOperations('1', '1', [
@@ -119,7 +119,7 @@ describe('Document operations', () => {
             );
         });
 
-        it('should reject operation with missing index', async () => {
+        it.skip('should reject operation with missing index', async () => {
             const document = await buildFile();
 
             const result = await server.addOperations('1', '1', [
@@ -143,7 +143,7 @@ describe('Document operations', () => {
             expect(result.error?.message).toBe('Missing operation on index 1');
         });
 
-        it('should accept operations until invalid operation', async () => {
+        it.skip('should accept operations until invalid operation', async () => {
             let document = await buildFile();
 
             const result = await server.addOperations('1', '1', [

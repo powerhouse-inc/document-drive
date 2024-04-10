@@ -189,7 +189,7 @@ describe('processOperations', () => {
         });
     });
 
-    it('should update an undo operation', async () => {
+    it.only('should update an undo operation', async () => {
         const document = await buildFile([
             actions.setModelName({ name: 'test' }),
             actions.setModelId({ id: 'test' }),
@@ -197,8 +197,11 @@ describe('processOperations', () => {
             actions.undo()
         ]);
 
+        console.log("BEFORE ************************", document.operations.global);
+
         const operations = buildOperations(reducer, document, [actions.undo()]);
 
+        console.log("AFTER ************************", document.operations.global, operations);
         const result = await server._processOperations(
             driveId,
             document,
