@@ -35,6 +35,7 @@ import {
     groupOperationsByScope,
     merge,
     precedes,
+    removeExistingOperations,
     reshuffleByTimestampAndIndex,
     sortOperations
 } from '../utils/document-helpers';
@@ -539,14 +540,19 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const operationsByScope = groupOperationsByScope(operations);
 
         for (const scope of Object.keys(operationsByScope)) {
-            const trunk = garbageCollect(
-                sortOperations(
-                    storageDocument.operations[scope as OperationScope]
-                )
-            );
-            const branch = operationsByScope[scope as OperationScope];
+            const storageDocumentOperations =
+                storageDocument.operations[scope as OperationScope];
 
-            const [invertedTrunk, tail] = attachBranch(trunk, branch || []);
+            const branch = removeExistingOperations(
+                operationsByScope[scope as OperationScope] || [],
+                storageDocumentOperations
+            );
+
+            const trunk = garbageCollect(
+                sortOperations(storageDocumentOperations)
+            );
+
+            const [invertedTrunk, tail] = attachBranch(trunk, branch);
 
             const newHistory =
                 tail.length < 1

@@ -92,8 +92,11 @@ export function garbageCollect(sortedOperations: Operation[]): Operation[] {
 
     while (i > -1) {
         result.unshift(sortedOperations[i]!);
-        const skipUntil = (sortedOperations[i]?.index || 0) - (sortedOperations[i]?.skip || 0) - 1;
-        
+        const skipUntil =
+            (sortedOperations[i]?.index || 0) -
+            (sortedOperations[i]?.skip || 0) -
+            1;
+
         let j = i - 1;
         while (j > -1 && (sortedOperations[j]?.index || 0) > skipUntil) {
             j--;
@@ -185,7 +188,6 @@ export function operationsAreEqual(op1: Operation, op2: Operation) {
     return stringify(op1) === stringify(op2);
 }
 
-
 // [T0:0 T1:0 T2:0 T3:0] + [B4:0 B5:0] = [T0:0 T1:0 T2:0 T3:0 B4:0 B5:0]
 // [T0:0 T1:0 T2:0 T3:0] + [B3:0 B4:0] = [T0:0 T1:0 T2:0 B3:0 B4:0]
 // [T0:0 T1:0 T2:0 T3:0] + [B2:0 B3:0] = [T0:0 T1:0 B2:0 B3:0]
@@ -193,7 +195,6 @@ export function operationsAreEqual(op1: Operation, op2: Operation) {
 // [T0:0 T1:0 T2:0 T3:0] + [B4:0 B4:2] = [T0:0 T1:0 T2:0 T3:0 B4:0 B4:2]
 // [T0:0 T1:0 T2:0 T3:0] + [B3:0 B3:2] = [T0:0 T1:0 T2:0 B3:0 B3:2]
 // [T0:0 T1:0 T2:0 T3:0] + [B2:3 B3:0] = [T0:0 T1:0 B2:3 B3:0]
-
 
 export function attachBranch(
     trunk: Operation[],
@@ -204,33 +205,34 @@ export function attachBranch(
     if (trunkCopy.length < 1) {
         return [newOperations, []];
     }
-    
+
     const result: Operation[] = [];
     let enteredBranch = false;
 
-    while(newOperations.length > 0) {
+    while (newOperations.length > 0) {
         const newOperationCandidate = newOperations[0]!;
 
         let nextTrunkOperation = trunkCopy.shift();
-        while(nextTrunkOperation && precedes(nextTrunkOperation, newOperationCandidate)) {
+        while (
+            nextTrunkOperation &&
+            precedes(nextTrunkOperation, newOperationCandidate)
+        ) {
             result.push(nextTrunkOperation);
             nextTrunkOperation = trunkCopy.shift();
         }
 
         if (!nextTrunkOperation) {
             enteredBranch = true;
-
         } else if (!enteredBranch) {
             if (operationsAreEqual(nextTrunkOperation, newOperationCandidate)) {
                 newOperations.shift();
                 result.push(nextTrunkOperation);
-
             } else {
                 trunkCopy.unshift(nextTrunkOperation);
                 enteredBranch = true;
             }
         }
-        
+
         if (enteredBranch) {
             let nextAppend = newOperations.shift();
             while (nextAppend) {
@@ -252,7 +254,10 @@ export function attachBranch(
 }
 
 export function precedes(op1: Operation, op2: Operation) {
-    return (op1.index < op2.index) || (op1.index === op2.index && op1.skip < op2.skip);
+    return (
+        op1.index < op2.index ||
+        (op1.index === op2.index && op1.skip < op2.skip)
+    );
 }
 
 export function split(
@@ -470,3 +475,20 @@ export const prepareOperations = (
     result.integrityIssues.push(...integrityErrors);
     return result;
 };
+
+export function removeExistingOperations(
+    newOperations: Operation[],
+    operationsHistory: Operation[]
+): Operation[] {
+    return newOperations.filter(newOperation => {
+        return !operationsHistory.some(historyOperation => {
+            return (
+                newOperation.index === historyOperation.index &&
+                newOperation.skip === historyOperation.skip &&
+                newOperation.scope === historyOperation.scope &&
+                newOperation.hash === historyOperation.hash &&
+                newOperation.type === historyOperation.type
+            );
+        });
+    });
+}

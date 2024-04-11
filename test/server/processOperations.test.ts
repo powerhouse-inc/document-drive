@@ -401,4 +401,64 @@ describe('processOperations', () => {
             extension: 'test'
         });
     });
+
+    it('should not re-apply existing operations', async () => {
+        let document = await buildFile();
+
+        const operation = buildOperation(
+            reducer,
+            document,
+            actions.setModelName({ name: 'test' })
+        );
+
+        const resultOp1 = await server.addOperation(
+            driveId,
+            documentId,
+            operation
+        );
+
+        expect(resultOp1.status).toBe('SUCCESS');
+
+        document = (await server.getDocument(
+            driveId,
+            documentId
+        )) as DocumentModelDocument;
+
+        expect(document.state.global.name).toBe('test');
+        expect(document.operations.global.length).toBe(1);
+        expect(document.operations.global).toMatchObject([
+            {
+                hash: operation.hash,
+                index: operation.index,
+                input: operation.input,
+                scope: operation.scope,
+                skip: operation.skip
+            }
+        ]);
+
+        const resultOp2 = await server.addOperation(
+            driveId,
+            documentId,
+            operation
+        );
+
+        document = (await server.getDocument(
+            driveId,
+            documentId
+        )) as DocumentModelDocument;
+
+        expect(resultOp2.status).toBe('SUCCESS');
+        expect(resultOp2.operations.length).toBe(0);
+
+        expect(document.operations.global.length).toBe(1);
+        expect(document.operations.global).toMatchObject([
+            {
+                hash: operation.hash,
+                index: operation.index,
+                input: operation.input,
+                scope: operation.scope,
+                skip: operation.skip
+            }
+        ]);
+    });
 });
