@@ -28,12 +28,7 @@ import type {
     DocumentStorage,
     IDriveStorage
 } from '../storage/types';
-import {
-    generateUUID,
-    isBefore,
-    isDocumentDrive,
-    isNoopUpdate
-} from '../utils';
+import { generateUUID, isBefore, isDocumentDrive } from '../utils';
 import {
     attachBranch,
     garbageCollect,
@@ -45,11 +40,7 @@ import {
 } from '../utils/document-helpers';
 import { requestPublicDrive } from '../utils/graphql';
 import { logger } from '../utils/logger';
-import {
-    ConflictOperationError,
-    MissingOperationError,
-    OperationError
-} from './error';
+import { OperationError } from './error';
 import { ListenerManager } from './listener/manager';
 import {
     CancelPullLoop,
@@ -547,20 +538,14 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         let error: OperationError | undefined; // TODO: replace with an array of errors/consistency issues
         const operationsByScope = groupOperationsByScope(operations);
 
-        // console.log('================================================');
-
         for (const scope of Object.keys(operationsByScope)) {
             const trunk = garbageCollect(
                 sortOperations(
-                    scope === 'local'
-                        ? storageDocument.operations.local
-                        : storageDocument.operations.global
+                    storageDocument.operations[scope as OperationScope]
                 )
             );
-            const branch =
-                scope === 'local'
-                    ? operationsByScope.local
-                    : operationsByScope.global;
+            const branch = operationsByScope[scope as OperationScope];
+
             const [invertedTrunk, tail] = attachBranch(trunk, branch || []);
 
             const newHistory =
@@ -585,17 +570,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                         );
                     }
 
-                    //console.log("Detected updated operation:", lastOriginalOperation, firstNewOperation);
                     updatedOperationIndex = firstNewOperation.index;
                 }
             }
-            /* 
-            console.log(`Processing ${scope} scope`, trunk, branch);
-            console.log('Inverted trunk and tail', invertedTrunk, tail);
-            console.log('New history', newHistory);
-            console.log('New operations', newOperations);
-            console.log('Updated operation index', updatedOperationIndex);
- */
 
             for (const nextOperation of newOperations) {
                 try {
@@ -636,139 +613,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             error,
             operationsUpdated
         } as const;
-    }
-
-    async _processOperationsOld<T extends Document, A extends Action>(
-        drive: string,
-        documentStorage: DocumentStorage<T>,
-        operations: Operation<A | BaseAction>[]
-    ) {
-        const operationsApplied: Operation<A | BaseAction>[] = [];
-        const operationsUpdated: Operation<A | BaseAction>[] = [];
-        let document: T | undefined;
-        const signals: SignalResult[] = [];
-
-        // eslint-disable-next-line prefer-const
-        let [operationsToApply, error, updatedOperations] =
-            this._validateOperations(operations, documentStorage);
-
-        const unregisteredOps = [
-            ...operationsToApply.map(operation => ({ operation, type: 'new' })),
-            ...updatedOperations.map(operation => ({
-                operation,
-                type: 'update'
-            }))
-        ].sort((a, b) => a.operation.index - b.operation.index);
-
-        // retrieves the document's document model and
-        // applies the operations using its reducer
-        for (const unregisteredOp of unregisteredOps) {
-            const { operation, type } = unregisteredOp;
-
-            try {
-                const {
-                    document: newDocument,
-                    signals,
-                    operation: appliedOperation
-                } = await this._performOperation(
-                    drive,
-                    document ?? documentStorage,
-                    operation
-                );
-                document = newDocument;
-
-                if (type === 'new') {
-                    operationsApplied.push(appliedOperation);
-                } else {
-                    operationsUpdated.push(appliedOperation);
-                }
-
-                signals.push(...signals);
-            } catch (e) {
-                if (!error) {
-                    error =
-                        e instanceof OperationError
-                            ? e
-                            : new OperationError(
-                                  'ERROR',
-                                  operation,
-                                  (e as Error).message,
-                                  (e as Error).cause
-                              );
-                }
-                break;
-            }
-        }
-
-        if (!document) {
-            document = this._buildDocument(documentStorage);
-        }
-
-        return {
-            document,
-            operationsApplied,
-            signals,
-            error,
-            operationsUpdated
-        } as const;
-    }
-
-    private _validateOperations<T extends Document, A extends Action>(
-        operations: Operation<A | BaseAction>[],
-        documentStorage: DocumentStorage<T>
-    ) {
-        const operationsToApply: Operation<A | BaseAction>[] = [];
-        const updatedOperations: Operation<A | BaseAction>[] = [];
-        let error: OperationError | undefined;
-
-        // sort operations so from smaller index to biggest
-        operations = operations.sort((a, b) => a.index - b.index);
-
-        for (let i = 0; i < operations.length; i++) {
-            const op = operations[i]!;
-            const pastOperations = operationsToApply
-                .filter(appliedOperation => appliedOperation.scope === op.scope)
-                .slice(0, i);
-            const scopeOperations = documentStorage.operations[op.scope];
-
-            // get latest operation
-            const ops = [...scopeOperations, ...pastOperations];
-            const latestOperation = ops.slice().pop();
-
-            const noopUpdate = isNoopUpdate(op, latestOperation);
-
-            let nextIndex = scopeOperations.length + pastOperations.length;
-            if (noopUpdate) {
-                nextIndex = nextIndex - 1;
-            }
-
-            if (op.index > nextIndex) {
-                error = new MissingOperationError(nextIndex, op);
-                continue;
-            } else if (op.index < nextIndex) {
-                const existingOperation = scopeOperations
-                    .concat(pastOperations)
-                    .find(
-                        existingOperation =>
-                            existingOperation.index === op.index
-                    );
-                if (existingOperation && existingOperation.hash !== op.hash) {
-                    error = new ConflictOperationError(existingOperation, op);
-                    continue;
-                } else if (!existingOperation) {
-                    error = new MissingOperationError(nextIndex, op);
-                    continue;
-                }
-            } else {
-                if (noopUpdate) {
-                    updatedOperations.push(op);
-                } else {
-                    operationsToApply.push(op);
-                }
-            }
-        }
-
-        return [operationsToApply, error, updatedOperations] as const;
     }
 
     private _buildDocument<T extends Document>(
