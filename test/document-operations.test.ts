@@ -93,33 +93,7 @@ describe('Document operations', () => {
             expect(result.error?.message).toBe('Invalid scope: invalid');
         });
 
-        it.skip('should reject operation with existing index', async () => {
-            const document = await buildFile();
-
-            const result = await server.addOperations('1', '1', [
-                buildOperation(
-                    reducer,
-                    document,
-                    actions.setModelName({
-                        name: 'test'
-                    })
-                ),
-                buildOperation(
-                    reducer,
-                    document,
-                    actions.setModelName({
-                        name: 'test 2'
-                    }),
-                    0
-                )
-            ]);
-            expect(result.status).toBe('CONFLICT');
-            expect(result.error?.message).toBe(
-                'Conflicting operation on index 0'
-            );
-        });
-
-        it.skip('should reject operation with missing index', async () => {
+        it('should reject operation with missing index', async () => {
             const document = await buildFile();
 
             const result = await server.addOperations('1', '1', [
@@ -139,11 +113,13 @@ describe('Document operations', () => {
                     2
                 )
             ]);
-            expect(result.status).toBe('MISSING');
-            expect(result.error?.message).toBe('Missing operation on index 1');
+            expect(result.status).toBe('ERROR');
+            expect(result.error?.message).toBe(
+                'Missing operations: expected 1 with skip 0 or equivalent, got index 2 with skip 0'
+            );
         });
 
-        it.skip('should accept operations until invalid operation', async () => {
+        it('should accept operations until invalid operation', async () => {
             let document = await buildFile();
 
             const result = await server.addOperations('1', '1', [
@@ -164,11 +140,14 @@ describe('Document operations', () => {
                     actions.setModelName({
                         name: 'test 2'
                     }),
-                    2
+                    4
                 )
             ]);
 
-            expect(result.status).toBe('CONFLICT');
+            expect(result.status).toBe('ERROR');
+            expect(result.error?.message).toBe(
+                'Missing operations: expected 3 with skip 0 or equivalent, got index 4 with skip 0'
+            );
             expect(result.operations.length).toBe(3);
 
             document = (await server.getDocument(
