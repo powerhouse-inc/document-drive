@@ -839,7 +839,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 operation,
                 `Operation with index ${operation.index}:${operation.skip} was not applied.`
             );
-        } else if (appliedOperation[0]!.hash !== operation.hash) {
+        } else if (
+            operation.type !== 'NOOP' &&
+            appliedOperation[0]!.hash !== operation.hash
+        ) {
             throw new OperationError(
                 'CONFLICT',
                 operation,

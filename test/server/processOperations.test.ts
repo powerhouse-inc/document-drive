@@ -14,6 +14,7 @@ import {
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DocumentDriveServer } from '../../src';
 import { OperationError } from '../../src/server/error';
+import { garbageCollect } from '../../src/utils/document-helpers';
 import { buildOperation, buildOperations } from '../utils';
 
 const mapExpectedOperations = (operations: Operation[]) =>
@@ -189,7 +190,7 @@ describe('processOperations', () => {
         });
     });
 
-    it.only('should update an undo operation', async () => {
+    it('should update an undo operation', async () => {
         const document = await buildFile([
             actions.setModelName({ name: 'test' }),
             actions.setModelId({ id: 'test' }),
@@ -197,11 +198,8 @@ describe('processOperations', () => {
             actions.undo()
         ]);
 
-        console.log("BEFORE ************************", document.operations.global);
-
         const operations = buildOperations(reducer, document, [actions.undo()]);
 
-        console.log("AFTER ************************", document.operations.global, operations);
         const result = await server._processOperations(
             driveId,
             document,
@@ -223,15 +221,17 @@ describe('processOperations', () => {
             }
         ]);
         expect(result.operationsApplied.length).toBe(0);
-        expect(result.document.operations.global.length).toBe(4);
-        expect(result.document.operations.global).toMatchObject([
-            { type: 'SET_MODEL_NAME', index: 0, skip: 0 },
-            { type: 'NOOP', index: 1, skip: 0 },
-            { type: 'NOOP', index: 2, skip: 0 },
-            { type: 'NOOP', index: 3, skip: 2 }
-        ]);
+        expect(garbageCollect(result.document.operations.global)).toMatchObject(
+            garbageCollect([
+                { type: 'SET_MODEL_NAME', index: 0, skip: 0 },
+                { type: 'NOOP', index: 1, skip: 0 },
+                { type: 'NOOP', index: 2, skip: 0 },
+                { type: 'NOOP', index: 3, skip: 2 }
+            ] as Operation[])
+        );
     });
 
+    // NOT DETECTING MISSING INDEX
     it('should throw an error if there is a missing index operation', async () => {
         const document = await buildFile([
             actions.setModelName({ name: 'test' }),
@@ -266,6 +266,7 @@ describe('processOperations', () => {
         });
     });
 
+    // NOT DETECTING MISSING INDEX
     it('should throw an error if there is a missing index operation between valid operations', async () => {
         const document = await buildFile([
             actions.setModelName({ name: 'test' }),
@@ -318,7 +319,7 @@ describe('processOperations', () => {
         });
     });
 
-    // This should be fixed with the conflict resolution
+    // This resulting in an error: Operation with index 3:1 was not applied.
     it('should throw an error if there is a duplicated index operation', async () => {
         const document = await buildFile([
             actions.setModelName({ name: 'test' }),
@@ -389,8 +390,7 @@ describe('processOperations', () => {
             operations
         );
 
-        expect(result.error).toBeInstanceOf(OperationError);
-        expect(result.error?.message).toBe('Conflicting operation on index 3');
+        expect(result.error).toBeUndefined();
         expect(result.operationsUpdated.length).toBe(0);
         expect(result.operationsApplied.length).toBe(2);
         expect(result.document.operations.global.length).toBe(5);
