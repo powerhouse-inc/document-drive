@@ -596,6 +596,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             console.log('New operations', newOperations);
             console.log('Updated operation index', updatedOperationIndex);
  */
+
             for (const nextOperation of newOperations) {
                 try {
                     const appliedResult = await this._performOperation<T, A>(
@@ -799,35 +800,43 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         let newDocument = document;
 
         const operationSignals: (() => Promise<SignalResult>)[] = [];
-        newDocument = documentModel.reducer(newDocument, operation, signal => {
-            let handler: (() => Promise<unknown>) | undefined = undefined;
-            switch (signal.type) {
-                case 'CREATE_CHILD_DOCUMENT':
-                    handler = () => this.createDocument(drive, signal.input);
-                    break;
-                case 'DELETE_CHILD_DOCUMENT':
-                    handler = () => this.deleteDocument(drive, signal.input.id);
-                    break;
-                case 'COPY_CHILD_DOCUMENT':
-                    handler = () =>
-                        this.getDocument(drive, signal.input.id).then(
-                            documentToCopy =>
-                                this.createDocument(drive, {
-                                    id: signal.input.newId,
-                                    documentType: documentToCopy.documentType,
-                                    document: documentToCopy,
-                                    synchronizationUnits:
-                                        signal.input.synchronizationUnits
-                                })
-                        );
-                    break;
-            }
-            if (handler) {
-                operationSignals.push(() =>
-                    handler().then(result => ({ signal, result }))
-                );
-            }
-        }) as T;
+        newDocument = documentModel.reducer(
+            newDocument,
+            operation,
+            signal => {
+                let handler: (() => Promise<unknown>) | undefined = undefined;
+                switch (signal.type) {
+                    case 'CREATE_CHILD_DOCUMENT':
+                        handler = () =>
+                            this.createDocument(drive, signal.input);
+                        break;
+                    case 'DELETE_CHILD_DOCUMENT':
+                        handler = () =>
+                            this.deleteDocument(drive, signal.input.id);
+                        break;
+                    case 'COPY_CHILD_DOCUMENT':
+                        handler = () =>
+                            this.getDocument(drive, signal.input.id).then(
+                                documentToCopy =>
+                                    this.createDocument(drive, {
+                                        id: signal.input.newId,
+                                        documentType:
+                                            documentToCopy.documentType,
+                                        document: documentToCopy,
+                                        synchronizationUnits:
+                                            signal.input.synchronizationUnits
+                                    })
+                            );
+                        break;
+                }
+                if (handler) {
+                    operationSignals.push(() =>
+                        handler().then(result => ({ signal, result }))
+                    );
+                }
+            },
+            { skip: operation.skip }
+        ) as T;
 
         const appliedOperation = newDocument.operations[operation.scope].filter(
             op => op.index == operation.index && op.skip == operation.skip

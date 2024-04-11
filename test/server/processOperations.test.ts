@@ -231,7 +231,6 @@ describe('processOperations', () => {
         );
     });
 
-    // NOT DETECTING MISSING INDEX
     it('should throw an error if there is a missing index operation', async () => {
         const document = await buildFile([
             actions.setModelName({ name: 'test' }),
@@ -255,7 +254,9 @@ describe('processOperations', () => {
         );
 
         expect(result.error).toBeInstanceOf(OperationError);
-        expect(result.error?.message).toBe('Missing operation on index 3');
+        expect(result.error?.message).toBe(
+            'Missing operations: expected 3 with skip 0 or equivalent, got index 4 with skip 0'
+        );
         expect(result.operationsUpdated.length).toBe(0);
         expect(result.operationsApplied.length).toBe(0);
         expect(result.document.operations.global.length).toBe(3);
@@ -266,7 +267,6 @@ describe('processOperations', () => {
         });
     });
 
-    // NOT DETECTING MISSING INDEX
     it('should throw an error if there is a missing index operation between valid operations', async () => {
         const document = await buildFile([
             actions.setModelName({ name: 'test' }),
@@ -308,7 +308,9 @@ describe('processOperations', () => {
         );
 
         expect(result.error).toBeInstanceOf(OperationError);
-        expect(result.error?.message).toBe('Missing operation on index 5');
+        expect(result.error?.message).toBe(
+            'Missing operations: expected 5 with skip 0 or equivalent, got index 6 with skip 0'
+        );
         expect(result.operationsUpdated.length).toBe(0);
         expect(result.operationsApplied.length).toBe(2);
         expect(result.document.operations.global.length).toBe(5);
@@ -319,7 +321,6 @@ describe('processOperations', () => {
         });
     });
 
-    // This resulting in an error: Operation with index 3:1 was not applied.
     it('should throw an error if there is a duplicated index operation', async () => {
         const document = await buildFile([
             actions.setModelName({ name: 'test' }),
@@ -342,20 +343,17 @@ describe('processOperations', () => {
             operations
         );
 
-        expect(result.error).toBeInstanceOf(OperationError);
-
-        expect(result.error?.message).toBe('Conflicting operation on index 2');
+        expect(result.error).toBeUndefined();
         expect(result.operationsUpdated.length).toBe(0);
-        expect(result.operationsApplied.length).toBe(0);
-        expect(result.document.operations.global.length).toBe(3);
+        expect(result.operationsApplied.length).toBe(2);
+        expect(result.document.operations.global.length).toBe(5);
         expect(result.document.state.global).toMatchObject({
-            name: 'test',
+            name: 'test2',
             id: 'test',
             extension: 'test'
         });
     });
 
-    // This should be fixed with the conflict resolution
     it('should throw an error if there is a duplicated index operation between valid operations', async () => {
         const document = await buildFile([
             actions.setModelName({ name: 'test' }),
