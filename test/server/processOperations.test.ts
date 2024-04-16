@@ -581,7 +581,7 @@ describe('processOperations', () => {
 
     it('should resolve conflicts using the right order for merge operations (simulate clients conflict)', async () => {
         const initialDocument = await buildFile();
-        let pushOpreationResult: IOperationResult;
+        let pushOperationResult: IOperationResult;
 
         const client1 = new BasicClient(
             server,
@@ -600,20 +600,20 @@ describe('processOperations', () => {
         );
 
         client1.dispatchDocumentAction(actions.setModelName({ name: '1' }));
-        pushOpreationResult = await client1.pushOperationsToServer();
-        expect(pushOpreationResult.status).toBe('SUCCESS');
+        pushOperationResult = await client1.pushOperationsToServer();
+        expect(pushOperationResult.status).toBe('SUCCESS');
 
         client2.dispatchDocumentAction(actions.setModelName({ name: '2' }));
-        pushOpreationResult = await client2.pushOperationsToServer();
-        expect(pushOpreationResult.status).toBe('SUCCESS');
+        pushOperationResult = await client2.pushOperationsToServer();
+        expect(pushOperationResult.status).toBe('SUCCESS');
 
         client2.dispatchDocumentAction(actions.setModelId({ id: '3' }));
-        pushOpreationResult = await client2.pushOperationsToServer();
-        expect(pushOpreationResult.status).toBe('SUCCESS');
+        pushOperationResult = await client2.pushOperationsToServer();
+        expect(pushOperationResult.status).toBe('SUCCESS');
 
         client1.dispatchDocumentAction(actions.setModelId({ id: '4' }));
-        pushOpreationResult = await client1.pushOperationsToServer();
-        expect(pushOpreationResult.status).toBe('SUCCESS');
+        pushOperationResult = await client1.pushOperationsToServer();
+        expect(pushOperationResult.status).toBe('SUCCESS');
 
         // Check the final state of the document
         const finalDocument = (await server.getDocument(
@@ -657,7 +657,7 @@ describe('processOperations', () => {
 
     it('should produce the same operations result for a local document (simulate sync: pull)', async () => {
         const initialDocument = await buildFile();
-        let pushOpreationResult: IOperationResult;
+        let pushOperationResult: IOperationResult;
 
         const client1 = new BasicClient(
             server,
@@ -676,12 +676,12 @@ describe('processOperations', () => {
         );
 
         client1.dispatchDocumentAction(actions.setModelName({ name: '1' }));
-        pushOpreationResult = await client1.pushOperationsToServer();
-        expect(pushOpreationResult.status).toBe('SUCCESS');
+        pushOperationResult = await client1.pushOperationsToServer();
+        expect(pushOperationResult.status).toBe('SUCCESS');
 
         client2.dispatchDocumentAction(actions.setModelName({ name: '2' }));
-        pushOpreationResult = await client2.pushOperationsToServer();
-        expect(pushOpreationResult.status).toBe('SUCCESS');
+        pushOperationResult = await client2.pushOperationsToServer();
+        expect(pushOperationResult.status).toBe('SUCCESS');
 
         const finalDocument = (await server.getDocument(
             driveId,
