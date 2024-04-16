@@ -5,6 +5,13 @@ import {
     Operation,
     Reducer
 } from 'document-model/document';
+import { ExpectStatic } from 'vitest';
+
+export function expectUUID(expect: ExpectStatic): unknown {
+    return expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    );
+}
 
 export function buildOperation(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
