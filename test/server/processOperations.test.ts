@@ -579,7 +579,7 @@ describe('processOperations', () => {
         ]);
     });
 
-    it('should resolve conlficts suign the right order for merge oprations (simulate clients conflict)', async () => {
+    it('should resolve conflicts using the right order for merge operations (simulate clients conflict)', async () => {
         const initialDocument = await buildFile();
         let pushOpreationResult: IOperationResult;
 
