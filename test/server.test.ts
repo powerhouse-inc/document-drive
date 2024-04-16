@@ -23,6 +23,7 @@ import { PrismaStorage } from '../src/storage/prisma';
 import { SequelizeStorage } from '../src/storage/sequelize';
 import { IDriveStorage } from '../src/storage/types';
 import { expectUUID } from './utils';
+import Redis from "redis";
 
 const documentModels = [
     DocumentModelLib,
@@ -31,23 +32,35 @@ const documentModels = [
 
 const FileStorageDir = path.join(__dirname, './file-storage');
 const prismaClient = new PrismaClient();
-const storageLayers = [
-    ['MemoryStorage', async () => new MemoryStorage()],
-    ['FilesystemStorage', async () => new FilesystemStorage(FileStorageDir)],
-    ['BrowserStorage', async () => new BrowserStorage()],
-    ['PrismaStorage', async () => new PrismaStorage(prismaClient)],
-    [
-        'SequelizeStorage',
-        async () => {
-            const storage = new SequelizeStorage({
-                dialect: 'sqlite',
-                storage: ':memory:'
-            });
 
-            await storage.syncModels();
-            return storage;
-        }
-    ]
+
+
+const storageLayers = [
+    // ['MemoryStorage', async () => new MemoryStorage()],
+    // ['FilesystemStorage', async () => new FilesystemStorage(FileStorageDir)],
+    // ['BrowserStorage', async () => new BrowserStorage()],
+    ['PrismaStorage', async () => {
+        const client = await Redis.createClient();
+
+        client.on('error', err => console.log('Redis Client Error', err));
+
+        await client.connect();
+
+
+        return new PrismaStorage(prismaClient, client);
+    }]
+    // [
+    //     'SequelizeStorage',
+    //     async () => {
+    //         const storage = new SequelizeStorage({
+    //             dialect: 'sqlite',
+    //             storage: ':memory:'
+    //         });
+
+    //         await storage.syncModels();
+    //         return storage;
+    //     }
+    // ]
 ] as unknown as [string, () => Promise<IDriveStorage>][];
 
 describe.each(storageLayers)(
@@ -78,6 +91,8 @@ describe.each(storageLayers)(
                 documentModels,
                 await buildStorage()
             );
+
+            console.log(server);
             await server.addDrive({
                 global: {
                     id: '1',

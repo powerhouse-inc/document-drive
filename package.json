@@ -42,6 +42,7 @@
         "graphql-request": "^6.1.0",
         "json-stringify-deterministic": "^1.0.12",
         "nanoevents": "^9.0.0",
+        "redis": "^4.6.13",
         "sanitize-filename": "^1.6.3"
     },
     "devDependencies": {

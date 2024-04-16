@@ -15,6 +15,7 @@ import type {
 import { ConflictOperationError } from '../server/error';
 import { logger } from '../utils/logger';
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
+import Redis from "redis";
 
 type Transaction = Omit<
     PrismaClient<Prisma.PrismaClientOptions, never>,
@@ -38,9 +39,33 @@ function storageToOperation(
 
 export class PrismaStorage implements IDriveStorage {
     private db: PrismaClient;
+    private redis: Redis.RedisClientType | null;
 
-    constructor(db: PrismaClient) {
+    constructor(db: PrismaClient, redis: Redis.RedisClientType | null = null) {
         this.db = db;
+        this.redis = redis;
+    }
+
+    async storeDocumentInCache(driveId: string, documentId: string, value: string) {
+        if (this.redis) {
+            this.redis.hSet(driveId, documentId, value);
+        }
+    }
+
+    async retrieveDocumentFromCache(driveId: string, documentId: string) {
+        if (this.redis) {
+            const value = await this.redis.hGet(driveId, documentId)
+            if (value) {
+                return JSON.parse(value);
+            }
+        }
+        return null;
+    }
+
+    async removeDocumentFromCache(driveId: string, documentId: string) {
+        if (this.redis) {
+            this.redis.hDel(driveId, documentId);
+        }
     }
 
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
@@ -278,6 +303,13 @@ export class PrismaStorage implements IDriveStorage {
     }
 
     async getDocument(driveId: string, id: string, tx?: Transaction) {
+        // retrieve from cache
+        const cachedDoc = await this.retrieveDocumentFromCache(driveId, id);
+        if (cachedDoc) {
+            return cachedDoc;
+        }
+
+        // lookup in database
         const result = await (tx ?? this.db).document.findFirst({
             where: {
                 id: id,
@@ -299,30 +331,31 @@ export class PrismaStorage implements IDriveStorage {
             throw new Error(`Document with id ${id} not found`);
         }
 
-        const dbDoc = result;
         const doc = {
-            created: dbDoc.created.toISOString(),
-            name: dbDoc.name ? dbDoc.name : '',
-            documentType: dbDoc.documentType,
-            initialState: dbDoc.initialState as ExtendedState<
+            created: result.created.toISOString(),
+            name: result.name ? result.name : '',
+            documentType: result.documentType,
+            initialState: result.initialState as ExtendedState<
                 DocumentDriveState,
                 DocumentDriveLocalState
             >,
-            lastModified: new Date(dbDoc.lastModified).toISOString(),
+            lastModified: new Date(result.lastModified).toISOString(),
             operations: {
-                global: dbDoc.operations
+                global: result.operations
                     .filter(op => op.scope === 'global' && !op.clipboard)
                     .map(storageToOperation),
-                local: dbDoc.operations
+                local: result.operations
                     .filter(op => op.scope === 'local' && !op.clipboard)
                     .map(storageToOperation)
             },
-            clipboard: dbDoc.operations
+            clipboard: result.operations
                 .filter(op => op.clipboard)
                 .map(storageToOperation),
-            revision: dbDoc.revision as Record<OperationScope, number>
+            revision: result.revision as Record<OperationScope, number>
         };
 
+        // store in cache
+        await this.storeDocumentInCache(driveId, id, JSON.stringify(doc));
         return doc;
     }
 
