@@ -169,6 +169,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     }
 
     private async startSyncRemoteDrive(driveId: string) {
+        return;
         const drive = await this.getDrive(driveId);
         let driveTriggers = this.triggerMap.get(driveId);
 
@@ -222,6 +223,21 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const drives = await this.getDrives();
         for (const drive of drives) {
             await this._initializeDrive(drive);
+        }
+
+        // if network connect comes online then
+        // triggers the listeners update
+        if (typeof window !== "undefined") {
+            window.addEventListener('online', () => {
+                this.listenerStateManager.triggerUpdate(false,
+                    this.handleListenerError.bind(this)).catch(error => {
+                        logger.error(
+                            'Non handled error updating listeners',
+                            error
+                        );
+                    });
+
+            });
         }
     }
 
@@ -556,8 +572,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const operationsApplied: Operation<A | BaseAction>[] = [];
         const operationsUpdated: Operation<A | BaseAction>[] = [];
         const signals: SignalResult[] = [];
-
         let document: T = this._buildDocument(storageDocument);
+
         let error: OperationError | undefined; // TODO: replace with an array of errors/consistency issues
         const operationsByScope = groupOperationsByScope(operations);
 
@@ -601,7 +617,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     updatedOperationIndex = firstNewOperation.index;
                 }
             }
-
             for (const nextOperation of newOperations) {
                 let skipHashValidation = false;
 
@@ -661,13 +676,16 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const documentModel = this._getDocumentModel(
             documentStorage.documentType
         );
-        return baseUtils.replayDocument(
+        console.time("baseUtils.replayDocument")
+        const test = baseUtils.replayDocument(
             documentStorage.initialState,
             documentStorage.operations,
             documentModel.reducer,
             undefined,
             documentStorage
         ) as T;
+        console.timeEnd("baseUtils.replayDocument")
+        return test;
     }
 
     private async _performOperation<T extends Document, A extends Action>(
@@ -788,6 +806,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 );
             }
         } else {
+            console.log("ADDDING", drive, id)
             await this.storage.addDocumentOperationsWithTransaction(
                 drive,
                 id,
@@ -855,26 +874,26 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 branches
             );
             // update listener cache
-            this.listenerStateManager
-                .updateSynchronizationRevisions(
-                    drive,
-                    syncUnits,
-                    () => this.updateSyncStatus(drive, 'SYNCING'),
-                    this.handleListenerError.bind(this),
-                    forceSync
-                )
-                .then(
-                    updates =>
-                        updates.length &&
-                        this.updateSyncStatus(drive, 'SUCCESS')
-                )
-                .catch(error => {
-                    logger.error(
-                        'Non handled error updating sync revision',
-                        error
-                    );
-                    this.updateSyncStatus(drive, 'ERROR', error as Error);
-                });
+            // this.listenerStateManager
+            //     .updateSynchronizationRevisions(
+            //         drive,
+            //         syncUnits,
+            //         () => this.updateSyncStatus(drive, 'SYNCING'),
+            //         this.handleListenerError.bind(this),
+            //         forceSync
+            //     )
+            //     .then(
+            //         updates =>
+            //             updates.length &&
+            //             this.updateSyncStatus(drive, 'SUCCESS')
+            //     )
+            //     .catch(error => {
+            //         logger.error(
+            //             'Non handled error updating sync revision',
+            //             error
+            //         );
+            //         this.updateSyncStatus(drive, 'ERROR', error as Error);
+            //     });
 
             // after applying all the valid operations,throws
             // an error if there was an invalid operation
@@ -975,7 +994,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     DocumentDriveDocument,
                     DocumentDriveAction
                 >(drive, documentStorage, operations.slice());
-
                 document = result.document;
                 operationsApplied.push(...result.operationsApplied);
                 signals.push(...result.signals);
@@ -1010,39 +1028,39 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 .filter(op => op.scope === 'global')
                 .slice()
                 .pop();
-            if (lastOperation) {
-                this.listenerStateManager
-                    .updateSynchronizationRevisions(
-                        drive,
-                        [
-                            {
-                                syncId: '0',
-                                driveId: drive,
-                                documentId: '',
-                                scope: 'global',
-                                branch: 'main',
-                                documentType: 'powerhouse/document-drive',
-                                lastUpdated: lastOperation.timestamp,
-                                revision: lastOperation.index
-                            }
-                        ],
-                        () => this.updateSyncStatus(drive, 'SYNCING'),
-                        this.handleListenerError.bind(this),
-                        forceSync
-                    )
-                    .then(
-                        updates =>
-                            updates.length &&
-                            this.updateSyncStatus(drive, 'SUCCESS')
-                    )
-                    .catch(error => {
-                        logger.error(
-                            'Non handled error updating sync revision',
-                            error
-                        );
-                        this.updateSyncStatus(drive, 'ERROR', error as Error);
-                    });
-            }
+            // if (lastOperation) {
+            //     this.listenerStateManager
+            //         .updateSynchronizationRevisions(
+            //             drive,
+            //             [
+            //                 {
+            //                     syncId: '0',
+            //                     driveId: drive,
+            //                     documentId: '',
+            //                     scope: 'global',
+            //                     branch: 'main',
+            //                     documentType: 'powerhouse/document-drive',
+            //                     lastUpdated: lastOperation.timestamp,
+            //                     revision: lastOperation.index
+            //                 }
+            //             ],
+            //             () => this.updateSyncStatus(drive, 'SYNCING'),
+            //             this.handleListenerError.bind(this),
+            //             forceSync
+            //         )
+            //         .then(
+            //             updates =>
+            //                 updates.length &&
+            //                 this.updateSyncStatus(drive, 'SUCCESS')
+            //         )
+            //         .catch(error => {
+            //             logger.error(
+            //                 'Non handled error updating sync revision',
+            //                 error
+            //             );
+            //             this.updateSyncStatus(drive, 'ERROR', error as Error);
+            //         });
+            // }
 
             if (this.shouldSyncRemoteDrive(document)) {
                 this.startSyncRemoteDrive(document.state.global.id);

@@ -215,19 +215,25 @@ export class PrismaStorage implements IDriveStorage {
             header: DocumentHeader;
             updatedOperations?: Operation[] | undefined;
         } | null = null;
-
+        console.time("transaction");
+        console.time("transaction start");
         await this.db.$transaction(async tx => {
+            console.timeEnd("transaction start");
+            console.time("get document");
             const document = await this.getDocument(drive, id, tx);
-
             if (!document) {
                 throw new Error(`Document with id ${id} not found`);
             }
-
+            console.timeEnd("get document");
+            console.time("callback");
             result = await callback(document);
+            console.timeEnd("callback");
 
             const { operations, header, updatedOperations } = result;
 
-            return this._addDocumentOperations(
+
+            console.time("_addDocumentOperations");
+            const temp = this._addDocumentOperations(
                 tx,
                 drive,
                 id,
@@ -235,7 +241,12 @@ export class PrismaStorage implements IDriveStorage {
                 header,
                 updatedOperations
             );
+            console.timeEnd("_addDocumentOperations");
+
+            return temp;
         });
+        console.timeEnd("transaction");
+
 
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (!result) {
