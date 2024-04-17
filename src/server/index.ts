@@ -326,7 +326,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     ): Promise<SynchronizationUnit> {
         const drive = await this.getDrive(driveId);
         const node = drive.state.global.nodes.find(
-            node =>
+            (node: Node) =>
                 isFileNode(node) &&
                 node.synchronizationUnits.find(unit => unit.syncId === syncId)
         );
@@ -376,7 +376,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
         const operations = document.operations[scope as OperationScope] ?? []; // TODO filter by branch also
         const filteredOperations = operations.filter(
-            operation =>
+            (operation: Operation) =>
                 Object.keys(filter).length === 0 ||
                 ((filter.since === undefined ||
                     isBefore(filter.since, operation.timestamp)) &&
@@ -384,7 +384,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                         operation.index > filter.fromRevision))
         );
 
-        return filteredOperations.map(operation => ({
+        return filteredOperations.map((operation: Operation) => ({
             hash: operation.hash,
             index: operation.index,
             timestamp: operation.timestamp,
