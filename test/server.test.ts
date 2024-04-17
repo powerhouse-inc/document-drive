@@ -21,9 +21,10 @@ import { FilesystemStorage } from '../src/storage/filesystem';
 import { MemoryStorage } from '../src/storage/memory';
 import { PrismaStorage } from '../src/storage/prisma';
 import { SequelizeStorage } from '../src/storage/sequelize';
+import { CloudStorage } from '../src/storage/cloud';
 import { IDriveStorage } from '../src/storage/types';
 import { expectUUID } from './utils';
-import Redis from "redis";
+import Redis, { createClient, RedisClientType } from "redis";
 
 const documentModels = [
     DocumentModelLib,
@@ -40,14 +41,18 @@ const storageLayers = [
     // ['FilesystemStorage', async () => new FilesystemStorage(FileStorageDir)],
     // ['BrowserStorage', async () => new BrowserStorage()],
     ['PrismaStorage', async () => {
-        const client = await Redis.createClient();
+        const client = await createClient({
+            url: process.env.REDIS_URL,
+            socket: {
+                tls: true,
+                rejectUnauthorized: false,
+            }
+        }).on('error', (err: string) => console.log('Redis Client Error', err))
+            .connect();
 
-        client.on('error', err => console.log('Redis Client Error', err));
+        console.log('client', client);
 
-        await client.connect();
-
-
-        return new PrismaStorage(prismaClient, client);
+        return new CloudStorage(new PrismaStorage(prismaClient), client as RedisClientType);
     }]
     // [
     //     'SequelizeStorage',

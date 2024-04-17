@@ -15,9 +15,8 @@ import type {
 import { ConflictOperationError } from '../server/error';
 import { logger } from '../utils/logger';
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
-import Redis from "redis";
 
-type Transaction = Omit<
+export type Transaction = Omit<
     PrismaClient<Prisma.PrismaClientOptions, never>,
     '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
 >;
@@ -39,33 +38,9 @@ function storageToOperation(
 
 export class PrismaStorage implements IDriveStorage {
     private db: PrismaClient;
-    private redis: Redis.RedisClientType | null;
 
-    constructor(db: PrismaClient, redis: Redis.RedisClientType | null = null) {
+    constructor(db: PrismaClient) {
         this.db = db;
-        this.redis = redis;
-    }
-
-    async storeDocumentInCache(driveId: string, documentId: string, value: string) {
-        if (this.redis) {
-            this.redis.hSet(driveId, documentId, value);
-        }
-    }
-
-    async retrieveDocumentFromCache(driveId: string, documentId: string) {
-        if (this.redis) {
-            const value = await this.redis.hGet(driveId, documentId)
-            if (value) {
-                return JSON.parse(value);
-            }
-        }
-        return null;
-    }
-
-    async removeDocumentFromCache(driveId: string, documentId: string) {
-        if (this.redis) {
-            this.redis.hDel(driveId, documentId);
-        }
     }
 
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
@@ -303,13 +278,6 @@ export class PrismaStorage implements IDriveStorage {
     }
 
     async getDocument(driveId: string, id: string, tx?: Transaction) {
-        // retrieve from cache
-        const cachedDoc = await this.retrieveDocumentFromCache(driveId, id);
-        if (cachedDoc) {
-            return cachedDoc;
-        }
-
-        // lookup in database
         const result = await (tx ?? this.db).document.findFirst({
             where: {
                 id: id,
@@ -354,8 +322,6 @@ export class PrismaStorage implements IDriveStorage {
             revision: result.revision as Record<OperationScope, number>
         };
 
-        // store in cache
-        await this.storeDocumentInCache(driveId, id, JSON.stringify(doc));
         return doc;
     }
 
