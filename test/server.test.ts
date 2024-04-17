@@ -24,7 +24,6 @@ import { SequelizeStorage } from '../src/storage/sequelize';
 import { CloudStorage } from '../src/storage/cloud';
 import { IDriveStorage } from '../src/storage/types';
 import { expectUUID } from './utils';
-import Redis, { createClient, RedisClientType } from "redis";
 
 const documentModels = [
     DocumentModelLib,
@@ -37,35 +36,24 @@ const prismaClient = new PrismaClient();
 
 
 const storageLayers = [
-    // ['MemoryStorage', async () => new MemoryStorage()],
-    // ['FilesystemStorage', async () => new FilesystemStorage(FileStorageDir)],
-    // ['BrowserStorage', async () => new BrowserStorage()],
+    ['MemoryStorage', async () => new MemoryStorage()],
+    ['FilesystemStorage', async () => new FilesystemStorage(FileStorageDir)],
+    ['BrowserStorage', async () => new BrowserStorage()],
     ['PrismaStorage', async () => {
-        const client = await createClient({
-            url: process.env.REDIS_URL,
-            socket: {
-                tls: true,
-                rejectUnauthorized: false,
-            }
-        }).on('error', (err: string) => console.log('Redis Client Error', err))
-            .connect();
+        return new PrismaStorage(prismaClient);
+    }],
+    [
+        'SequelizeStorage',
+        async () => {
+            const storage = new SequelizeStorage({
+                dialect: 'sqlite',
+                storage: ':memory:'
+            });
 
-        console.log('client', client);
-
-        return new CloudStorage(new PrismaStorage(prismaClient), client as RedisClientType);
-    }]
-    // [
-    //     'SequelizeStorage',
-    //     async () => {
-    //         const storage = new SequelizeStorage({
-    //             dialect: 'sqlite',
-    //             storage: ':memory:'
-    //         });
-
-    //         await storage.syncModels();
-    //         return storage;
-    //     }
-    // ]
+            await storage.syncModels();
+            return storage;
+        }
+    ]
 ] as unknown as [string, () => Promise<IDriveStorage>][];
 
 describe.each(storageLayers)(
