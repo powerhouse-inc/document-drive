@@ -11,13 +11,21 @@ export class Queue {
     private queue = new Array<string>();
     private queueState = new Map<string, Operation[]>();
     private resultState = new Map<string, any>();
+    private queueInterval: any;
 
     constructor(driveId: string, documentId: string, processOperationsFn: Function, processDriveOperationsFn: Function) {
         this.driveId = driveId;
         this.documentId = documentId;
         this.processOperationsFn = processOperationsFn;
         this.processDriveOperationsFn = processDriveOperationsFn;
-        this.process();
+    }
+
+    start() {
+        this.queueInterval = setInterval(this.process.bind(this), 100);
+    }
+
+    stop() {
+        clearInterval(this.queueInterval);
     }
 
     addOperations(operations: Operation[]): string {
@@ -39,10 +47,9 @@ export class Queue {
     }
 
     async process() {
+        console.log("this is not getting called :-((((")
         const jobId = this.queue.shift();
         if (!jobId) {
-            await delay(100);
-            this.process();
             return;
         }
 

@@ -92,10 +92,7 @@ describe.each(storageLayers)(
                     triggers: []
                 }
             });
-
-            console.log("added drive")
             const drive = await server.getDrive('1');
-            console.log("got drive")
             expect(drive.state).toStrictEqual(
                 DocumentDriveUtils.createState({
                     global: {

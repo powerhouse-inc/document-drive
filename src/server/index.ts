@@ -434,26 +434,18 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             throw new Error('Invalid Drive Id');
         }
 
-        console.log(id);
-
         const drives = await this.storage.getDrives();
         if (drives.includes(id)) {
             throw new Error('Drive already exists');
         }
-
-        console.log(id, id);
 
         const document = utils.createDocument({
             state: drive
         });
 
         await this.storage.createDrive(id, document);
-
-        console.log(id);
-
         await this._initializeDrive(id);
 
-        console.log(id, id);
         return document;
     }
 

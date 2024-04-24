@@ -7,7 +7,6 @@ export class QueueManager {
     private queues = new Map<string, Queue>
 
     constructor(processOperationsFn: Function, processDriveOperationsFn: Function) {
-        console.log("QueueManager intiated");
         this.processOperationsFn = processOperationsFn;
         this.processDriveOperationsFn = processDriveOperationsFn;
     }
@@ -17,10 +16,10 @@ export class QueueManager {
         let queue = this.queues.get(id);
         if (!queue) {
             queue = new Queue(driveId, documentId, this.processOperationsFn, this.processDriveOperationsFn);
+            queue.start();
             this.queues.set(id, queue);
         }
 
-        console.log("Getting Queue ", id);
         return queue;
     }
 
