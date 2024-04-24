@@ -15,7 +15,7 @@ import type {
 import { ConflictOperationError } from '../server/error';
 import { logger } from '../utils/logger';
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
-import { InMemoryQueue, OperationsJob } from '../queue/memory';
+import { sleep } from '../utils';
 
 type Transaction = Omit<
     PrismaClient<Prisma.PrismaClientOptions, never>,
@@ -39,14 +39,9 @@ function storageToOperation(
 
 export class PrismaStorage implements IDriveStorage {
     private db: PrismaClient;
-    private queue: InMemoryQueue;
 
     constructor(db: PrismaClient) {
         this.db = db;
-        this.queue = new InMemoryQueue(db, async (job: OperationsJob) => {
-            await this._addDocumentOperations(this.db, job.drive, job.id, job.operations, job.header, job.updatedOperations);
-        });
-        this.queue.process();
     }
 
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
