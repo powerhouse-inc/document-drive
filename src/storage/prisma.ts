@@ -15,7 +15,6 @@ import type {
 import { ConflictOperationError } from '../server/error';
 import { logger } from '../utils/logger';
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
-import { sleep } from '../utils';
 
 type Transaction = Omit<
     PrismaClient<Prisma.PrismaClientOptions, never>,
