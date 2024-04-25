@@ -69,6 +69,7 @@ import {
 } from './types';
 import { filterOperationsByRevision } from './utils';
 import { QueueManager } from '../queue/manager';
+import { unescape } from 'querystring';
 
 export * from './listener';
 export type * from './types';
@@ -87,7 +88,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     >();
     private syncStatus = new Map<DocumentDriveState['id'], SyncStatus>();
 
-    private queueManager = new QueueManager(this.processAddOperations.bind(this), this.processAddDriveOperations.bind(this));
+    private queueManager = new QueueManager(this);
 
     constructor(
         documentModels: DocumentModel[],
@@ -834,17 +835,17 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     }
 
 
-    async addOperations(drive: string,
+    async queueOperations(drive: string,
         id: string,
         operations: Operation[],
         forceSync = true) {
         const queue = this.queueManager.getQueue(drive, id);
-        const jobId = queue.addOperations(operations);
-        const result = await queue.wait(jobId);
+        const jobId = await queue.addOperations(operations, forceSync);
+        const result = queue.getResults(jobId);
         return result;
     }
 
-    async processAddOperations(
+    async addOperations(
         drive: string,
         id: string,
         operations: Operation[],
@@ -1004,19 +1005,18 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         }
     }
 
-    async addDriveOperations(
+    async queueDriveOperations(
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[],
         forceSync = true
     ) {
         const queue = this.queueManager.getQueue("drives", drive);
-        const jobId = queue.addOperations(operations);
-        const result = await queue.wait(jobId);
+        const jobId = await queue.addOperations(operations, forceSync);
+        const result = queue.getResults(jobId);
         return result;
-        // return this.processAddDriveOperations(drive, operations, forceSync);
     }
 
-    async processAddDriveOperations(
+    async addDriveOperations(
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[],
         forceSync = true

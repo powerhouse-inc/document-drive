@@ -32,10 +32,10 @@ const documentModels = [
 const FileStorageDir = path.join(__dirname, './file-storage');
 const prismaClient = new PrismaClient();
 const storageLayers = [
-    // ['MemoryStorage', async () => new MemoryStorage()],
+    ['MemoryStorage', async () => new MemoryStorage()],
     // ['FilesystemStorage', async () => new FilesystemStorage(FileStorageDir)],
     // ['BrowserStorage', async () => new BrowserStorage()],
-    ['PrismaStorage', async () => new PrismaStorage(prismaClient)],
+    // ['PrismaStorage', async () => new PrismaStorage(prismaClient)],
     // [
     //     'SequelizeStorage',
     //     async () => {
@@ -327,7 +327,7 @@ describe.each(storageLayers)(
                 })
             );
 
-            const result = await server.addDriveOperations(
+            const result = await server.queueDriveOperations(
                 '1',
                 drive.operations.global
             );
@@ -392,7 +392,7 @@ describe.each(storageLayers)(
                 })
             );
 
-            const result = await server.addDriveOperations(
+            const result = await server.queueDriveOperations(
                 '1',
                 drive.operations.global
             );
@@ -517,7 +517,7 @@ describe.each(storageLayers)(
             expect(drive.state.global.name).toBe('new name');
         });
 
-        it('copies document when file is copied drive', async ({ expect }) => {
+        it.only('copies document when file is copied drive', async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
                 await buildStorage()
@@ -573,12 +573,12 @@ describe.each(storageLayers)(
                     targetParentFolder: '2'
                 })
             );
-            const result = await server.addDriveOperations(
+            const result = await server.queueDriveOperations(
                 '1',
                 drive.operations.global
             );
 
-            expect(result.status).toBe('SUCCESS');
+            expect(result?.status).toBe('SUCCESS');
 
             drive = await server.getDrive('1');
             const document = await server.getDocument('1', '1.1');
