@@ -70,6 +70,7 @@ import {
 import { filterOperationsByRevision } from './utils';
 import { QueueManager } from '../queue/manager';
 import { unescape } from 'querystring';
+import { Queue } from '../queue/queue';
 
 export * from './listener';
 export type * from './types';
@@ -1011,9 +1012,21 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         forceSync = true
     ) {
         const queue = this.queueManager.getQueue("drives", drive);
-        const jobId = await queue.addOperations(operations, forceSync);
-        const result = queue.getResults(jobId);
+        const jobId = queue.addOperations(operations, forceSync);
+        const result = await this._fetchResults(queue, jobId);
         return result;
+    }
+
+    private async _fetchResults(queue: Queue, jobId: string): Promise<IOperationResult> {
+        return new Promise((resolve) => {
+            const interval = setInterval(() => {
+                const result = queue.getResults(jobId);
+                if (result) {
+                    clearInterval(interval);
+                    resolve(result);
+                }
+            }, 100);
+        })
     }
 
     async addDriveOperations(

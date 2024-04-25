@@ -573,6 +573,7 @@ describe.each(storageLayers)(
                     targetParentFolder: '2'
                 })
             );
+            vi.useRealTimers();
             const result = await server.queueDriveOperations(
                 '1',
                 drive.operations.global
