@@ -67,6 +67,7 @@ export class RedisQueueManager extends EventEmitter implements IQueueManager {
         super();
         this.workers = workers;
         this.processFn = processFn;
+        this.client = client;
     }
     async getResults(driveId: string, documentId: string, jobId: string): Promise<any> {
         if (!this.client) {
