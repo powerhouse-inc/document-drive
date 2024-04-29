@@ -1,6 +1,7 @@
 import { Operation } from "document-model/document";
+import { EventEmitter } from "stream";
 
-export interface IQueueManager {
+export interface IQueueManager extends EventEmitter {
     addJob(driveId: string, documentId: string, operations: Operation[], forceSync: boolean): Promise<string>;
     getResults(driveId: string, documentId: string, jobId: string): Promise<any>;
 }

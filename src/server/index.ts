@@ -68,9 +68,10 @@ import {
     type SynchronizationUnit
 } from './types';
 import { filterOperationsByRevision } from './utils';
-import { QueueManager } from '../queue/manager';
-import { unescape } from 'querystring';
-import { Queue } from '../queue/queue';
+import { RedisQueueManager } from '../queue/redis';
+import { RedisClientType } from 'redis';
+import { MemoryQueueManager } from '../queue/memory';
+import { IQueueManager } from '../queue/types';
 
 export * from './listener';
 export type * from './types';
@@ -89,18 +90,32 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     >();
     private syncStatus = new Map<DocumentDriveState['id'], SyncStatus>();
 
-    private queueManager = new QueueManager(this);
+    private queueManager: IQueueManager;
 
     constructor(
         documentModels: DocumentModel[],
         storage: IDriveStorage = new MemoryStorage(),
-        cache: ICache = new InMemoryCache()
+        cache: ICache = new InMemoryCache(),
+        redis?: RedisClientType
     ) {
         super();
         this.listenerStateManager = new ListenerManager(this);
         this.documentModels = documentModels;
         this.storage = storage;
         this.cache = cache;
+
+        if (redis) {
+            this.queueManager = new RedisQueueManager(
+                (driveId: string, documentId: string, operations: Operation[], forceSync: boolean) => driveId !== "drives" ?
+                    this.addOperations(driveId, documentId, operations, forceSync)
+                    : this.addDriveOperations(driveId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync), redis, 3);
+        } else {
+            this.queueManager = new MemoryQueueManager(
+                (driveId: string, documentId: string, operations: Operation[], forceSync: boolean) => driveId !== "drives" ?
+                    this.addOperations(driveId, documentId, operations, forceSync)
+                    : this.addDriveOperations(driveId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync), 3);
+        }
+
     }
 
     private updateSyncStatus(
@@ -840,10 +855,14 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         id: string,
         operations: Operation[],
         forceSync = true) {
-        const queue = this.queueManager.getQueue(drive, id);
-        const jobId = await queue.addOperations(operations, forceSync);
-        const result = queue.getResults(jobId);
-        return result;
+        const job = await this.queueManager.addJob(drive, id, operations, forceSync);
+        return new Promise((resolve) => {
+            this.queueManager.on('result', (result) => {
+                if (result.jobId === job) {
+                    resolve(result.result);
+                }
+            });
+        })
     }
 
     async addOperations(
@@ -1011,21 +1030,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         operations: Operation<DocumentDriveAction | BaseAction>[],
         forceSync = true
     ) {
-        const queue = this.queueManager.getQueue("drives", drive);
-        const jobId = queue.addOperations(operations, forceSync);
-        const result = await this._fetchResults(queue, jobId);
-        return result;
-    }
-
-    private async _fetchResults(queue: Queue, jobId: string): Promise<IOperationResult> {
+        const job = await this.queueManager.addJob("drives", drive, operations, forceSync);
         return new Promise((resolve) => {
-            const interval = setInterval(() => {
-                const result = queue.getResults(jobId);
-                if (result) {
-                    clearInterval(interval);
-                    resolve(result);
+            this.queueManager.on('result', (result) => {
+                if (result.jobId === job) {
+                    resolve(result.result);
                 }
-            }, 100);
+            });
         })
     }
 
