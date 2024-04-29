@@ -101,8 +101,11 @@ export class MemoryQueueManager extends EventEmitter implements IQueueManager {
     }
 
     async processNextJob() {
+        const that = this;
         if (this.queues.length === 0) {
-            setTimeout(() => this.processNextJob(), 5000);
+            setTimeout(() => {
+                that.processNextJob()
+            }, 1000);
             return;
         }
 
@@ -110,23 +113,23 @@ export class MemoryQueueManager extends EventEmitter implements IQueueManager {
         this.ticker = this.ticker === this.queues.length ? 0 : this.ticker + 1;
         if (!queue) {
             this.ticker = 0;
-            setTimeout(() => this.processNextJob(), 1000);
+            setTimeout(() => that.processNextJob(), 1000);
             return;
         }
 
         if (await queue.amountOfJobs() === 0 || await queue.isBlocked()) {
-            setTimeout(() => this.processNextJob(), 1000);
+            setTimeout(() => that.processNextJob(), 1000);
             return;
         }
 
         queue.setBlocked(true);
         const nextJob = await queue.getNextJob();
         if (!nextJob) {
-            setTimeout(() => this.processNextJob(), 1000);
+            setTimeout(() => that.processNextJob(), 1000);
             return;
         }
 
-        const [status, driveId, documentId] = queue.getName().split(":");
+        const [driveId, documentId] = queue.getName().split(":");
         const { jobId, operations, forceSync } = nextJob;
         try {
             const result = await this.processFn(driveId!, documentId!, operations, forceSync);

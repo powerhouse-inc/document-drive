@@ -33,21 +33,21 @@ const FileStorageDir = path.join(__dirname, './file-storage');
 const prismaClient = new PrismaClient();
 const storageLayers = [
     ['MemoryStorage', async () => new MemoryStorage()],
-    // ['FilesystemStorage', async () => new FilesystemStorage(FileStorageDir)],
-    // ['BrowserStorage', async () => new BrowserStorage()],
-    // ['PrismaStorage', async () => new PrismaStorage(prismaClient)],
-    // [
-    //     'SequelizeStorage',
-    //     async () => {
-    //         const storage = new SequelizeStorage({
-    //             dialect: 'sqlite',
-    //             storage: ':memory:'
-    //         });
+    ['FilesystemStorage', async () => new FilesystemStorage(FileStorageDir)],
+    ['BrowserStorage', async () => new BrowserStorage()],
+    ['PrismaStorage', async () => new PrismaStorage(prismaClient)],
+    [
+        'SequelizeStorage',
+        async () => {
+            const storage = new SequelizeStorage({
+                dialect: 'sqlite',
+                storage: ':memory:'
+            });
 
-    //         await storage.syncModels();
-    //         return storage;
-    //     }
-    // ]
+            await storage.syncModels();
+            return storage;
+        }
+    ]
 ] as unknown as [string, () => Promise<IDriveStorage>][];
 
 describe.each(storageLayers)(
@@ -327,7 +327,7 @@ describe.each(storageLayers)(
                 })
             );
 
-            const result = await server.queueDriveOperations(
+            const result = await server.addDriveOperations(
                 '1',
                 drive.operations.global
             );
@@ -392,7 +392,7 @@ describe.each(storageLayers)(
                 })
             );
 
-            const result = await server.queueDriveOperations(
+            const result = await server.addDriveOperations(
                 '1',
                 drive.operations.global
             );
@@ -517,7 +517,7 @@ describe.each(storageLayers)(
             expect(drive.state.global.name).toBe('new name');
         });
 
-        it.only('copies document when file is copied drive', async ({ expect }) => {
+        it('copies document when file is copied drive', async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
                 await buildStorage()
@@ -574,7 +574,7 @@ describe.each(storageLayers)(
                 })
             );
             vi.useRealTimers();
-            const result = await server.queueDriveOperations(
+            const result = await server.addDriveOperations(
                 '1',
                 drive.operations.global
             );

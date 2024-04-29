@@ -108,12 +108,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             this.queueManager = new RedisQueueManager(
                 (driveId: string, documentId: string, operations: Operation[], forceSync: boolean) => driveId !== "drives" ?
                     this.addOperations(driveId, documentId, operations, forceSync)
-                    : this.addDriveOperations(driveId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync), redis, 3);
+                    : this.addDriveOperations(documentId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync), redis, 3);
         } else {
             this.queueManager = new MemoryQueueManager(
                 (driveId: string, documentId: string, operations: Operation[], forceSync: boolean) => driveId !== "drives" ?
                     this.addOperations(driveId, documentId, operations, forceSync)
-                    : this.addDriveOperations(driveId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync), 3);
+                    : this.addDriveOperations(documentId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync), 3);
         }
 
     }
@@ -241,6 +241,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     async initialize() {
         const errors: Error[] = [];
         const drives = await this.getDrives();
+        this.queueManager.init();
         for (const drive of drives) {
             await this._initializeDrive(drive).catch(error => {
                 logger.error(`Error initializing drive ${drive}`, error);
@@ -1032,7 +1033,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     ) {
         const job = await this.queueManager.addJob("drives", drive, operations, forceSync);
         return new Promise((resolve) => {
-            this.queueManager.on('result', (result) => {
+            this.queueManager.on('jobCompleted', (result) => {
                 if (result.jobId === job) {
                     resolve(result.result);
                 }
