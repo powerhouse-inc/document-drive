@@ -8,7 +8,7 @@ export class RedisQueue implements IQueue {
 
     private client: RedisClientType;
     private name: string;
-    private blocked: boolean = false;
+    private blocked = false;
 
     constructor(name: string, client: RedisClientType) {
         this.client = client;
@@ -58,12 +58,12 @@ export class RedisQueue implements IQueue {
 export class RedisQueueManager extends EventEmitter implements IQueueManager {
 
     private client: RedisClientType | null = null;
-    private ticker: number = 0;
-    private workers: number = 3;
+    private ticker = 0;
+    private workers = 3;
     private queues: IQueue[] = [];
     private processFn: (driveId: string, documentId: string, operations: Operation[], forceSync: boolean) => Promise<void>;
 
-    constructor(processFn: (driveId: string, documentId: string, operations: Operation[], forceSync: boolean) => Promise<any>, client: RedisClientType | null = null, workers: number = 3) {
+    constructor(processFn: (driveId: string, documentId: string, operations: Operation[], forceSync: boolean) => Promise<any>, client: RedisClientType | null = null, workers = 3) {
         super();
         this.workers = workers;
         this.processFn = processFn;
@@ -90,7 +90,7 @@ export class RedisQueueManager extends EventEmitter implements IQueueManager {
                 }
             });
 
-            await this.client?.connect();
+            await this.client.connect();
         }
 
         const queues = await this.client.lRange("queues", 0, -1);

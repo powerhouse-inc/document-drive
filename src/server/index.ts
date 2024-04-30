@@ -69,7 +69,6 @@ import {
 } from './types';
 import { filterOperationsByRevision } from './utils';
 import { RedisQueueManager } from '../queue/redis';
-import { RedisClientType } from 'redis';
 import { MemoryQueueManager } from '../queue/memory';
 import { IQueueManager } from '../queue/types';
 
@@ -96,26 +95,14 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         documentModels: DocumentModel[],
         storage: IDriveStorage = new MemoryStorage(),
         cache: ICache = new InMemoryCache(),
-        redis?: RedisClientType
+        queueManager: IQueueManager = new MemoryQueueManager(),
     ) {
         super();
         this.listenerStateManager = new ListenerManager(this);
         this.documentModels = documentModels;
         this.storage = storage;
         this.cache = cache;
-
-        if (redis) {
-            this.queueManager = new RedisQueueManager(
-                (driveId: string, documentId: string, operations: Operation[], forceSync: boolean) => driveId !== "drives" ?
-                    this.addOperations(driveId, documentId, operations, forceSync)
-                    : this.addDriveOperations(documentId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync), redis, 3);
-        } else {
-            this.queueManager = new MemoryQueueManager(
-                (driveId: string, documentId: string, operations: Operation[], forceSync: boolean) => driveId !== "drives" ?
-                    this.addOperations(driveId, documentId, operations, forceSync)
-                    : this.addDriveOperations(documentId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync), 3);
-        }
-
+        this.queueManager = queueManager;
     }
 
     private updateSyncStatus(
@@ -241,13 +228,19 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     async initialize() {
         const errors: Error[] = [];
         const drives = await this.getDrives();
-        this.queueManager.init();
         for (const drive of drives) {
             await this._initializeDrive(drive).catch(error => {
                 logger.error(`Error initializing drive ${drive}`, error);
                 errors.push(error as Error);
             });
         }
+
+        await this.queueManager.init(({ driveId, documentId, operations, forceSync }) => documentId ?
+            this.addOperations(driveId, documentId, operations, forceSync)
+            : this.addDriveOperations(driveId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync), error => {
+                logger.error(`Error initializing queue manager`, error);
+                errors.push(error);
+            })
 
         // if network connect comes online then
         // triggers the listeners update
@@ -856,9 +849,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         id: string,
         operations: Operation[],
         forceSync = true) {
-        const job = await this.queueManager.addJob(drive, id, operations, forceSync);
+        const job = await this.queueManager.addJob({ driveId: drive, documentId: id, operations, forceSync });
         return new Promise((resolve) => {
-            this.queueManager.on('result', (result) => {
+            this.queueManager.on('jobCompleted', (result) => {
+                console.log("OLAAA");
                 if (result.jobId === job) {
                     resolve(result.result);
                 }
@@ -1031,11 +1025,20 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         operations: Operation<DocumentDriveAction | BaseAction>[],
         forceSync = true
     ) {
-        const job = await this.queueManager.addJob("drives", drive, operations, forceSync);
-        return new Promise((resolve) => {
-            this.queueManager.on('jobCompleted', (result) => {
-                if (result.jobId === job) {
-                    resolve(result.result);
+        const jobId = await this.queueManager.addJob({ driveId: drive, operations, forceSync });
+        return new Promise((resolve, reject) => {
+            const unsubscribe = this.queueManager.on('jobCompleted', (job, result) => {
+                if (job.jobId === jobId) {
+                    unsubscribe();
+                    unsubscribeError();
+                    resolve(result);
+                }
+            });
+            const unsubscribeError = this.queueManager.on('jobFailed', (job, error) => {
+                if (job.jobId === jobId) {
+                    unsubscribe();
+                    unsubscribeError();
+                    reject(error);
                 }
             });
         })
