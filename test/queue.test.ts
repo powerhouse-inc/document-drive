@@ -1,9 +1,12 @@
 import {
+    DocumentDriveAction,
+    DocumentDriveDocument,
+    DocumentDriveState,
     utils as DocumentDriveUtils,
     reducer
 } from 'document-model-libs/document-drive';
 import * as DocumentModelsLibs from 'document-model-libs/document-models';
-import { DocumentModel } from 'document-model/document';
+import { Document, DocumentModel } from 'document-model/document';
 import {
     module as DocumentModelLib,
 } from 'document-model/document-model';
@@ -11,6 +14,7 @@ import { afterEach, beforeEach, describe, it, vi } from 'vitest';
 import { DocumentDriveServer } from '../src/server';
 import { MemoryStorage } from '../src/storage/memory';
 import { expectUUID } from './utils';
+import { generateUUID } from '../src';
 
 const documentModels = [
     DocumentModelLib,
@@ -20,17 +24,14 @@ const documentModels = [
 
 describe("Document Drive Server queuing", () => {
 
-    it('adds file to server', async ({ expect }) => {
-        vi.useRealTimers();
-        const server = new DocumentDriveServer(
-            documentModels,
-            new MemoryStorage()
-        );
+    let CREATE_DRIVES = 10;
+    let ADD_OPERATIONS_TO_DRIVE = 10;
 
-        await server.initialize();
-        await server.addDrive({
+
+    const createDrive = async (server: DocumentDriveServer) => {
+        const driveState = await server.addDrive({
             global: {
-                id: '1',
+                id: generateUUID(),
                 name: 'name',
                 icon: 'icon',
                 slug: 'slug'
@@ -42,60 +43,71 @@ describe("Document Drive Server queuing", () => {
                 triggers: []
             }
         });
-        let drive = await server.getDrive('1');
-        // performs ADD_FILE operation locally
-        drive = reducer(
-            drive,
-            DocumentDriveUtils.generateAddNodeAction(
-                drive.state.global,
-                {
-                    id: '1.1',
-                    name: 'document 1',
-                    documentType: 'powerhouse/document-model'
-                },
-                ['global', 'local']
-            )
+
+        const drive = await server.getDrive(driveState.state.global.id);
+        return drive;
+    }
+
+
+    const addOperationsToDrive = async (server: DocumentDriveServer, drive: DocumentDriveDocument, queue = true) => {
+        const promisses = [];
+        for (let i = 0; i < ADD_OPERATIONS_TO_DRIVE; i++) {
+            const id = generateUUID();
+            drive = reducer(
+                drive,
+                DocumentDriveUtils.generateAddNodeAction(
+                    drive.state.global,
+                    {
+                        id,
+                        name: id,
+                        documentType: 'powerhouse/budget-statement',
+                    },
+                    ['global', 'local'],
+                )
+            );
+
+            promisses.push(queue ? server.queueDriveOperations(drive.state.global.id, drive.operations.global) : server.addDriveOperations(drive.state.global.id, drive.operations.global));
+        }
+
+        return Promise.all(promisses);
+
+    }
+
+
+
+    it('shouldnt create conflicts with the queue where it creates conflicts with traditional add operations', async ({ expect }) => {
+        // without queue
+        const server1 = new DocumentDriveServer(
+            documentModels,
+            new MemoryStorage()
         );
+        await server1.initialize();
+        const drives1 = await Promise.all(new Array(CREATE_DRIVES).fill(0).map(async (_, i) => {
+            return createDrive(server1);
+        }));
+        const driveResults1 = await Promise.all(drives1.map((drive) => {
+            expect(drive).toBeDefined();
+            return addOperationsToDrive(server1, drive!, false);
+        }))
+        expect(driveResults1.flat().filter((f: any) => f.status === "CONFLICT").length).toBeGreaterThan(0);
 
-        drive = reducer(
-            drive,
-            DocumentDriveUtils.generateAddNodeAction(
-                drive.state.global,
-                {
-                    id: '1.2',
-                    name: 'document 2',
-                    documentType: 'powerhouse/document-model'
-                },
-                ['global', 'local']
-            )
+
+        // with the queue
+        const server = new DocumentDriveServer(
+            documentModels,
+            new MemoryStorage()
         );
-
-        drive = reducer(
-            drive,
-            DocumentDriveUtils.generateAddNodeAction(
-                drive.state.global,
-                {
-                    id: '1.3',
-                    name: 'document 1',
-                    documentType: 'powerhouse/document-model'
-                },
-                ['global', 'local']
-            )
-        );
-
-        // dispatches operation to server
-        const operation = drive.operations.global[0]!;
-
-        const results = await Promise.all([
-            server.queueDriveOperations('1', [operation]),
-            server.queueDriveOperations('1', [drive.operations.global[1]!]),
-            server.queueDriveOperations('1', [drive.operations.global[2]!]),
-        ]);
-
-        const [result1, result2, result3] = results;
-        expect(result1.status).toBe('SUCCESS');
-        expect(result2.status).toBe('SUCCESS');
-        expect(result3.status).toBe('SUCCESS');
+        await server.initialize();
+        const drives = await Promise.all(new Array(CREATE_DRIVES).fill(0).map(async (_, i) => {
+            return createDrive(server);
+        }));
+        const driveResults = await Promise.all(drives.map((drive) => {
+            expect(drive).toBeDefined();
+            return addOperationsToDrive(server, drive!);
+        }))
+        expect(driveResults.flat().filter((f: any) => f.status === "CONFLICT").length).toBe(0);
     });
+
+
 }
 );
