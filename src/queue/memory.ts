@@ -53,11 +53,11 @@ export class MemoryQueueManager implements IQueueManager {
     private emitter = createNanoEvents<QueueEvents>();
     private ticker = 0;
     private queues: IJobQueue[] = [];
-    private workers = 3;
-    private timeout = 100;
+    private workers: number;
+    private timeout: number;
     private processFn: OperationJobProcessor | undefined;
 
-    constructor(workers = 3, timeout = 100) {
+    constructor(workers = 3, timeout = 0) {
         this.workers = workers;
         this.timeout = timeout;
     }
@@ -95,13 +95,18 @@ export class MemoryQueueManager implements IQueueManager {
         return queue;
     }
 
-    async processNextJob() {
+    private retryNextJob() {
+        const retry = this.timeout === 0 && typeof setImmediate !== "undefined" ? setImmediate : (fn: () => void) => setTimeout(fn, this.timeout);
+        return retry(() => this.processNextJob());
+    }
+
+    private async processNextJob() {
         if (!this.processFn) {
             throw new Error("No job processor defined");
         }
 
         if (this.queues.length === 0) {
-            setTimeout(() => this.processNextJob(), this.timeout);
+            this.retryNextJob();
             return;
         }
 
@@ -109,19 +114,19 @@ export class MemoryQueueManager implements IQueueManager {
         this.ticker = this.ticker === this.queues.length ? 0 : this.ticker + 1;
         if (!queue) {
             this.ticker = 0;
-            setTimeout(() => this.processNextJob(), this.timeout);
+            this.retryNextJob();
             return;
         }
 
         if (queue.isBlocked() || await queue.amountOfJobs() === 0) {
-            setTimeout(() => this.processNextJob(), this.timeout);
+            this.retryNextJob();
             return;
         }
 
         queue.setBlocked(true);
         const nextJob = await queue.getNextJob();
         if (!nextJob) {
-            setTimeout(() => this.processNextJob(), this.timeout);
+            this.retryNextJob();
             return;
         }
 
