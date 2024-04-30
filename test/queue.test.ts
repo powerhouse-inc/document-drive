@@ -10,10 +10,9 @@ import { Document, DocumentModel } from 'document-model/document';
 import {
     module as DocumentModelLib,
 } from 'document-model/document-model';
-import { afterEach, beforeEach, describe, it, vi } from 'vitest';
+import { describe, it, vi } from 'vitest';
 import { DocumentDriveServer } from '../src/server';
 import { MemoryStorage } from '../src/storage/memory';
-import { expectUUID } from './utils';
 import { generateUUID } from '../src';
 
 const documentModels = [
@@ -26,7 +25,6 @@ describe("Document Drive Server queuing", () => {
 
     let CREATE_DRIVES = 10;
     let ADD_OPERATIONS_TO_DRIVE = 10;
-
 
     const createDrive = async (server: DocumentDriveServer) => {
         const driveState = await server.addDrive({
@@ -48,7 +46,6 @@ describe("Document Drive Server queuing", () => {
         return drive;
     }
 
-
     const addOperationsToDrive = async (server: DocumentDriveServer, drive: DocumentDriveDocument, queue = true) => {
         const promisses = [];
         for (let i = 0; i < ADD_OPERATIONS_TO_DRIVE; i++) {
@@ -65,34 +62,28 @@ describe("Document Drive Server queuing", () => {
                     ['global', 'local'],
                 )
             );
-
             promisses.push(queue ? server.queueDriveOperations(drive.state.global.id, drive.operations.global) : server.addDriveOperations(drive.state.global.id, drive.operations.global));
         }
-
         return Promise.all(promisses);
-
     }
 
-
-
-    it('shouldnt create conflicts with the queue where it creates conflicts with traditional add operations', async ({ expect }) => {
-        // without queue
-        const server1 = new DocumentDriveServer(
+    it("produces conflicts on addDriveOperations", async ({ expect }) => {
+        const server = new DocumentDriveServer(
             documentModels,
             new MemoryStorage()
         );
-        await server1.initialize();
-        const drives1 = await Promise.all(new Array(CREATE_DRIVES).fill(0).map(async (_, i) => {
-            return createDrive(server1);
+        await server.initialize();
+        const drives = await Promise.all(new Array(CREATE_DRIVES).fill(0).map(async (_, i) => {
+            return createDrive(server);
         }));
-        const driveResults1 = await Promise.all(drives1.map((drive) => {
+        const driveResults = await Promise.all(drives.map((drive) => {
             expect(drive).toBeDefined();
-            return addOperationsToDrive(server1, drive!, false);
+            return addOperationsToDrive(server, drive!, false);
         }))
-        expect(driveResults1.flat().filter((f: any) => f.status === "CONFLICT").length).toBeGreaterThan(0);
+        expect(driveResults.flat().filter((f: any) => f.status === "CONFLICT").length).toBeGreaterThan(0);
+    });
 
-
-        // with the queue
+    it("produces no conflicts on queueDriveOperations", async ({ expect }) => {
         const server = new DocumentDriveServer(
             documentModels,
             new MemoryStorage()
@@ -107,7 +98,4 @@ describe("Document Drive Server queuing", () => {
         }))
         expect(driveResults.flat().filter((f: any) => f.status === "CONFLICT").length).toBe(0);
     });
-
-
-}
-);
+});
