@@ -1,4 +1,3 @@
-import { EventEmitter } from "stream";
 import { IJob, IJobQueue, IQueue, IQueueManager, JobId, OperationJob, OperationJobProcessor, QueueEvents } from "./types";
 import { generateUUID } from "../utils";
 import { IOperationResult } from "../server";
@@ -51,15 +50,16 @@ export class MemoryQueue<T, R> implements IQueue<T, R> {
 }
 
 export class MemoryQueueManager implements IQueueManager {
-
     private emitter = createNanoEvents<QueueEvents>();
     private ticker = 0;
     private queues: IJobQueue[] = [];
     private workers = 3;
+    private timeout = 100;
     private processFn: OperationJobProcessor | undefined;
 
-    constructor(workers = 3) {
+    constructor(workers = 3, timeout = 100) {
         this.workers = workers;
+        this.timeout = timeout;
     }
 
     async init(processor: OperationJobProcessor, onError: (err: Error) => void) {
@@ -101,7 +101,7 @@ export class MemoryQueueManager implements IQueueManager {
         }
 
         if (this.queues.length === 0) {
-            setTimeout(() => this.processNextJob.bind(this)(), 1000);
+            setTimeout(() => this.processNextJob(), this.timeout);
             return;
         }
 
@@ -109,19 +109,19 @@ export class MemoryQueueManager implements IQueueManager {
         this.ticker = this.ticker === this.queues.length ? 0 : this.ticker + 1;
         if (!queue) {
             this.ticker = 0;
-            setTimeout(() => this.processNextJob.bind(this)(), 1000);
+            setTimeout(() => this.processNextJob(), this.timeout);
             return;
         }
 
         if (queue.isBlocked() || await queue.amountOfJobs() === 0) {
-            setTimeout(() => this.processNextJob.bind(this)(), 1000);
+            setTimeout(() => this.processNextJob(), this.timeout);
             return;
         }
 
         queue.setBlocked(true);
         const nextJob = await queue.getNextJob();
         if (!nextJob) {
-            setTimeout(() => this.processNextJob.bind(this)(), 1000);
+            setTimeout(() => this.processNextJob(), this.timeout);
             return;
         }
 
@@ -132,7 +132,7 @@ export class MemoryQueueManager implements IQueueManager {
             this.emit("jobFailed", nextJob, e as Error);
         } finally {
             queue.setBlocked(false);
-            void this.processNextJob.bind(this)();
+            void this.processNextJob();
         }
     }
 
