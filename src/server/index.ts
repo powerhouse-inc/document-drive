@@ -643,7 +643,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             if (lastOriginalOperation && firstNewOperation) {
                 if (lastOriginalOperation.index === firstNewOperation.index) {
                     if (lastOriginalOperation.skip >= firstNewOperation.skip) {
-                        console.error(
+                        logger.error(
                             'Unexpected firstNewOperation.skip lower than or equal to lastOriginalOperation.skip.'
                         );
                     }
@@ -849,12 +849,20 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         id: string,
         operations: Operation[],
         forceSync = true) {
-        const job = await this.queueManager.addJob({ driveId: drive, documentId: id, operations, forceSync });
-        return new Promise((resolve) => {
-            this.queueManager.on('jobCompleted', (result) => {
-                console.log("OLAAA");
-                if (result.jobId === job) {
-                    resolve(result.result);
+        const jobId = await this.queueManager.addJob({ driveId: drive, documentId: id, operations, forceSync });
+        return new Promise((resolve, reject) => {
+            const unsubscribe = this.queueManager.on('jobCompleted', (job, result) => {
+                if (job.jobId === jobId) {
+                    unsubscribe();
+                    unsubscribeError();
+                    resolve(result);
+                }
+            });
+            const unsubscribeError = this.queueManager.on('jobFailed', (job, error) => {
+                if (job.jobId === jobId) {
+                    unsubscribe();
+                    unsubscribeError();
+                    reject(error);
                 }
             });
         })
