@@ -1,19 +1,45 @@
 import { Operation } from "document-model/document";
-import { EventEmitter } from "stream";
+import { IOperationResult } from "../server";
+import type { Unsubscribe } from "nanoevents";
 
-export interface IQueueManager extends EventEmitter {
-    addJob(driveId: string, documentId: string, operations: Operation[], forceSync: boolean): Promise<string>;
-    getResults(driveId: string, documentId: string, jobId: string): Promise<any>;
-    init(): Promise<void>;
+export type OperationJob = {
+    driveId: string;
+    documentId?: string
+    operations: Operation[]
+    forceSync?: boolean
 }
 
-export interface IQueue {
-    addJob(data: any): Promise<void>;
-    getNextJob(): Promise<any>;
+export type OperationJobProcessor = (job: OperationJob) => Promise<IOperationResult>;
+
+export type JobId = string;
+
+export interface QueueEvents {
+    jobCompleted: (job: IJob<OperationJob>, result: IOperationResult) => void;
+    jobFailed: (job: IJob<OperationJob>, error: Error) => void;
+}
+
+export interface IQueueManager {
+    addJob(job: OperationJob): Promise<JobId>;
+    getResult(driveId: string, documentId: string, jobId: JobId): Promise<IOperationResult | undefined>;
+    init(processor: OperationJobProcessor, onError: (error: Error) => void): Promise<void>;
+    on<K extends keyof QueueEvents>(
+        this: this,
+        event: K,
+        cb: QueueEvents[K]
+    ): Unsubscribe;
+}
+
+export type IJob<T> = { jobId: JobId } & T;
+
+export interface IQueue<T, R> {
+    addJob(data: IJob<T>): Promise<void>;
+    getNextJob(): Promise<IJob<T> | undefined>;
     amountOfJobs(): Promise<number>;
-    getName(): string;
+    getId(): string;
     setBlocked(blocked: boolean): void;
     isBlocked(): boolean;
-    setResult(jobId: string, result: string): Promise<void>;
-    getResult(jobId: string): Promise<any>;
+    setResult(jobId: JobId, result: R): Promise<void>;
+    getResult(jobId: JobId): Promise<R | undefined>;
 }
+
+export type IJobQueue = IQueue<OperationJob, IOperationResult>;

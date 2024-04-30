@@ -1,47 +1,43 @@
 import { EventEmitter } from "stream";
-import { IQueue, IQueueManager } from "./types";
+import { IJob, IJobQueue, IQueue, IQueueManager, JobId, OperationJob, OperationJobProcessor, QueueEvents } from "./types";
 import { generateUUID } from "../utils";
-import { Operation } from "document-model/document";
+import { IOperationResult } from "../server";
+import { createNanoEvents, Unsubscribe } from 'nanoevents';
 
-export class MemoryQueue implements IQueue {
+export class MemoryQueue<T, R> implements IQueue<T, R> {
+    private id: string;
+    private blocked = false;
+    private items: IJob<T>[] = [];
+    private results = new Map<JobId, R>();
 
-    private name: string;
-    private blocked: boolean = false;
-    private items: any[] = [];
-    private results: any = {};
-
-    constructor(name: string) {
-        this.name = name;
+    constructor(id: string) {
+        this.id = id;
     }
-    async setResult(jobId: string, result: any): Promise<void> {
-        this.results[jobId] = result;
-    }
-    async getResult(jobId: string): Promise<any> {
-        const results = await this.results[jobId];
-        if (!results) {
-            return null;
-        }
-        return results;
+    async setResult(jobId: string, result: R): Promise<void> {
+        this.results.set(jobId, result);
+        return Promise.resolve();
     }
 
-    async addJob(data: any) {
+    async getResult(jobId: string): Promise<R | undefined> {
+        return Promise.resolve(this.results.get(jobId));
+    }
+
+    async addJob(data: IJob<T>) {
         this.items.push(data);
+        return Promise.resolve();
     }
 
     async getNextJob() {
-        const job = await this.items.shift();
-        if (!job) {
-            return null;
-        }
-        return job;
+        const job = this.items.shift();
+        return Promise.resolve(job);
     }
 
     async amountOfJobs() {
-        return this.items.length;
+        return Promise.resolve(this.items.length);
     }
 
-    getName() {
-        return this.name;
+    getId() {
+        return this.id;
     }
 
     setBlocked(blocked: boolean) {
@@ -54,43 +50,42 @@ export class MemoryQueue implements IQueue {
 
 }
 
-export class MemoryQueueManager extends EventEmitter implements IQueueManager {
+export class MemoryQueueManager implements IQueueManager {
 
+    private emitter = createNanoEvents<QueueEvents>();
+    private ticker = 0;
+    private queues: IJobQueue[] = [];
+    private workers = 3;
+    private processFn: OperationJobProcessor | undefined;
 
-    private ticker: number = 0;
-    private queues: IQueue[] = [];
-    private workers: number = 3;
-    private processFn: (driveId: string, documentId: string, operations: Operation[], forceSync: boolean) => Promise<void>;
-
-    constructor(processFn: (driveId: string, documentId: string, operations: Operation[], forceSync: boolean) => Promise<any>, workers: number = 3) {
-        super();
+    constructor(workers = 3) {
         this.workers = workers;
-        this.processFn = processFn;
     }
 
-
-    async getResults(driveId: string, documentId: string, jobId: string): Promise<any> {
-        const queue = await this.getQueue(driveId, documentId);
-        return queue.getResult(jobId);
-    }
-
-    async init() {
+    async init(processor: OperationJobProcessor, onError: (err: Error) => void) {
+        this.processFn = processor;
         // Start workers
         for (let i = 0; i < this.workers; i++) {
-            this.processNextJob();
+            this.processNextJob().catch(onError);
         }
+        return Promise.resolve()
     }
 
-    async addJob(driveId: string, documentId: string, operations: Operation[], forceSync: boolean) {
+    async addJob(job: OperationJob): Promise<JobId> {
         const jobId = generateUUID();
-        const queue = await this.getQueue(driveId, documentId);
-        await queue.addJob({ jobId, operations, forceSync });
+        const queue = this.getQueue(job.driveId, job.documentId);
+        await queue.addJob({ jobId, ...job });
         return jobId;
     }
 
-    async getQueue(driveId: string, documentId: string): Promise<IQueue> {
-        const queueId = `${driveId}:${documentId}`;
-        let queue = this.queues.find((q) => q.getName() === queueId);
+    async getResult(driveId: string, documentId: string, jobId: JobId): Promise<IOperationResult | undefined> {
+        const queue = this.getQueue(driveId, documentId);
+        return queue.getResult(jobId);
+    }
+
+    private getQueue(driveId: string, documentId?: string): IJobQueue {
+        const queueId = `${driveId}${documentId ? `:${documentId}` : ''}`;
+        let queue = this.queues.find((q) => q.getId() === queueId);
 
         if (!queue) {
             queue = new MemoryQueue(queueId);
@@ -101,11 +96,12 @@ export class MemoryQueueManager extends EventEmitter implements IQueueManager {
     }
 
     async processNextJob() {
-        const that = this;
+        if (!this.processFn) {
+            throw new Error("No job processor defined");
+        }
+
         if (this.queues.length === 0) {
-            setTimeout(() => {
-                that.processNextJob()
-            }, 1000);
+            setTimeout(() => this.processNextJob.bind(this)(), 1000);
             return;
         }
 
@@ -113,40 +109,40 @@ export class MemoryQueueManager extends EventEmitter implements IQueueManager {
         this.ticker = this.ticker === this.queues.length ? 0 : this.ticker + 1;
         if (!queue) {
             this.ticker = 0;
-            setTimeout(() => that.processNextJob(), 1000);
+            setTimeout(() => this.processNextJob.bind(this)(), 1000);
             return;
         }
 
-        if (await queue.amountOfJobs() === 0 || await queue.isBlocked()) {
-            setTimeout(() => that.processNextJob(), 1000);
+        if (queue.isBlocked() || await queue.amountOfJobs() === 0) {
+            setTimeout(() => this.processNextJob.bind(this)(), 1000);
             return;
         }
 
         queue.setBlocked(true);
         const nextJob = await queue.getNextJob();
         if (!nextJob) {
-            setTimeout(() => that.processNextJob(), 1000);
+            setTimeout(() => this.processNextJob.bind(this)(), 1000);
             return;
         }
 
-        const [driveId, documentId] = queue.getName().split(":");
-        const { jobId, operations, forceSync } = nextJob;
         try {
-            const result = await this.processFn(driveId!, documentId!, operations, forceSync);
-            this.emit("jobCompleted", { driveId, documentId, jobId, result });
+            const result = await this.processFn(nextJob);
+            this.emit("jobCompleted", nextJob, result);
         } catch (e) {
-            console.error(e);
+            this.emit("jobFailed", nextJob, e as Error);
+        } finally {
+            queue.setBlocked(false);
+            void this.processNextJob.bind(this)();
         }
-
-        queue.setBlocked(false);
-        this.processNextJob();
-
-        return;
-
     }
 
-    async getResult(driveId: string, documentId: string, jobId: string) {
-        const queue = await this.getQueue(driveId, documentId);
-        return queue.getResult(jobId);
+    protected emit<K extends keyof QueueEvents>(
+        event: K,
+        ...args: Parameters<QueueEvents[K]>
+    ) {
+        this.emitter.emit(event, ...args);
+    }
+    on<K extends keyof QueueEvents>(this: this, event: K, cb: QueueEvents[K]): Unsubscribe {
+        return this.emitter.on(event, cb);
     }
 }
