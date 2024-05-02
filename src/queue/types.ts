@@ -41,6 +41,8 @@ export interface IQueue<T, R> {
     setResult(jobId: JobId, result: R): Promise<void>;
     getResult(jobId: JobId): Promise<R | undefined>;
     getJobs(): IJob<T>[];
+    addDependencies(job: IJob<OperationJob>): void;
+    removeDependencies(job: IJob<OperationJob>): void;
 }
 
 export type IJobQueue = IQueue<OperationJob, IOperationResult>;

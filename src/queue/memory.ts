@@ -10,6 +10,7 @@ export class MemoryQueue<T, R> implements IQueue<T, R> {
     private blocked = false;
     private items: IJob<T>[] = [];
     private results = new Map<JobId, R>();
+    private dependencies = new Array<IJob<OperationJob>>();
 
     constructor(id: string) {
         this.id = id;
@@ -53,6 +54,19 @@ export class MemoryQueue<T, R> implements IQueue<T, R> {
         return this.items;
     }
 
+    addDependencies(job: IJob<OperationJob>) {
+        this.dependencies.push(job);
+        if (!this.isBlocked()) {
+            this.setBlocked(true);
+        }
+    }
+
+    removeDependencies(job: IJob<OperationJob>) {
+        this.dependencies = this.dependencies.filter((j) => j.jobId !== job.jobId && j.driveId !== job.driveId);
+        if (this.dependencies.length === 0) {
+            this.setBlocked(false);
+        }
+    }
 }
 
 export class MemoryQueueManager implements IQueueManager {
@@ -87,13 +101,13 @@ export class MemoryQueueManager implements IQueueManager {
         if (firstOp) {
             const driveQueue = await this.getQueue(job.driveId);
             const jobs = driveQueue.getJobs();
-            for (let job of jobs) {
-                const op = job.operations.find((j: Operation) => {
+            for (let driveJob of jobs) {
+                const op = driveJob.operations.find((j: Operation) => {
                     const input = j.input as AddFileInput;
                     return j.type === "ADD_FILE" && input.id === job.documentId
                 })
                 if (op) {
-                    queue.setBlocked(true);
+                    queue.addDependencies(driveJob);
                 }
             }
         }
@@ -103,7 +117,7 @@ export class MemoryQueueManager implements IQueueManager {
         for (const addFileOp of addFileOps) {
             const input = addFileOp.input as AddFileInput;
             const q = this.getQueue(job.driveId, input.id)
-            q.setBlocked(true);
+            q.addDependencies({ jobId, ...job });
         }
 
         return jobId;
@@ -174,7 +188,7 @@ export class MemoryQueueManager implements IQueueManager {
             if (addFileOperations.length > 0) {
                 addFileOperations.map((addFileOp) => {
                     const documentQueue = this.getQueue(nextJob.driveId, (addFileOp.input as AddFileInput).id);
-                    documentQueue.setBlocked(false);
+                    documentQueue.removeDependencies(nextJob);
                 });
             }
 
