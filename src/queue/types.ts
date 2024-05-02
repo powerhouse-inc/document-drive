@@ -40,6 +40,7 @@ export interface IQueue<T, R> {
     isBlocked(): boolean;
     setResult(jobId: JobId, result: R): Promise<void>;
     getResult(jobId: JobId): Promise<R | undefined>;
+    getJobs(): IJob<T>[];
 }
 
 export type IJobQueue = IQueue<OperationJob, IOperationResult>;

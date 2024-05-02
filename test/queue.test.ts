@@ -102,9 +102,9 @@ describe("Document Drive Server queuing", () => {
 
         drive = await server.getDrive(driveId);
         expect(drive.state.global.nodes).toStrictEqual([
-            expect.objectContaining({ id: "folder 2", name: "folder 2" }),
-            expect.objectContaining({ id: "folder 1", name: "folder 1" }),
-            expect.objectContaining({ id: "file 1", name: "file 1", parentFolder: "folder 1", documentType: "powerhouse/budget-statement", synchronizationUnits: [{ syncId: "1", scope: "global", branch: "main" }] })
+            expect.objectContaining({ id: "folder 1", name: "folder 1", kind: "folder", parentFolder: null }),
+            expect.objectContaining({ id: "file 1", name: "file 1", kind: "file", parentFolder: "folder 1", documentType: "powerhouse/budget-statement", synchronizationUnits: [{ syncId: "1", scope: "global", branch: "main" }] }),
+            expect.objectContaining({ id: "folder 2", name: "folder 2", kind: "folder", parentFolder: null }),
         ]);
 
         budget = await server.getDocument(driveId, "file 1") as BudgetStatement.BudgetStatementDocument;
