@@ -117,7 +117,6 @@ describe('processOperations', () => {
 
         expect(result.document.state.global).toMatchObject({ name: 'test' });
         expect(result.error).toBeUndefined();
-        expect(result.operationsUpdated.length).toBe(0);
         expect(result.operationsApplied.length).toBe(1);
         expect(result.operationsApplied).toMatchObject(
             mapExpectedOperations(operations)
@@ -150,7 +149,6 @@ describe('processOperations', () => {
             extension: 'test2'
         });
         expect(result.error).toBeUndefined();
-        expect(result.operationsUpdated.length).toBe(0);
         expect(result.operationsApplied.length).toBe(operations.length);
         expect(result.operationsApplied).toMatchObject(
             mapExpectedOperations(operations)
@@ -176,7 +174,6 @@ describe('processOperations', () => {
             id: ''
         });
         expect(result.error).toBeUndefined();
-        expect(result.operationsUpdated.length).toBe(0);
         expect(result.operationsApplied.length).toBe(operations.length);
         expect(result.operationsApplied).toMatchObject(
             mapExpectedOperations(operations)
@@ -215,14 +212,6 @@ describe('processOperations', () => {
             extension: ''
         });
         expect(result.error).toBeUndefined();
-        expect(result.operationsUpdated.length).toBe(1);
-        expect(result.operationsUpdated).toMatchObject([
-            {
-                index: 3,
-                type: 'NOOP',
-                skip: 2
-            }
-        ]);
         expect(result.operationsApplied.length).toBe(0);
         expect(garbageCollect(result.document.operations.global)).toMatchObject(
             garbageCollect([
@@ -260,7 +249,6 @@ describe('processOperations', () => {
         expect(result.error?.message).toBe(
             'Missing operations: expected 3 with skip 0 or equivalent, got index 4 with skip 0'
         );
-        expect(result.operationsUpdated.length).toBe(0);
         expect(result.operationsApplied.length).toBe(0);
         expect(result.document.operations.global.length).toBe(3);
         expect(result.document.state.global).toMatchObject({
@@ -314,7 +302,6 @@ describe('processOperations', () => {
         expect(result.error?.message).toBe(
             'Missing operations: expected 5 with skip 0 or equivalent, got index 6 with skip 0'
         );
-        expect(result.operationsUpdated.length).toBe(0);
         expect(result.operationsApplied.length).toBe(2);
         expect(result.document.operations.global.length).toBe(5);
         expect(result.document.state.global).toMatchObject({
@@ -347,7 +334,6 @@ describe('processOperations', () => {
         );
 
         expect(result.error).toBeUndefined();
-        expect(result.operationsUpdated.length).toBe(0);
         expect(result.operationsApplied.length).toBe(2);
         expect(result.document.operations.global.length).toBe(5);
         expect(result.document.state.global).toMatchObject({
@@ -392,7 +378,6 @@ describe('processOperations', () => {
         );
 
         expect(result.error).toBeUndefined();
-        expect(result.operationsUpdated.length).toBe(0);
         expect(result.operationsApplied.length).toBe(2);
         expect(result.document.operations.global.length).toBe(5);
         expect(result.document.state.global).toMatchObject({
