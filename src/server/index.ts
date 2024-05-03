@@ -235,12 +235,16 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             });
         }
 
-        await this.queueManager.init(({ driveId, documentId, operations, forceSync }) => documentId ?
-            this.addOperations(driveId, documentId, operations, forceSync)
-            : this.addDriveOperations(driveId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync), error => {
-                logger.error(`Error initializing queue manager`, error);
-                errors.push(error);
-            })
+        await this.queueManager.init({
+            checkDocumentExists: (driveId: string, documentId: string): Promise<boolean> => this.storage.checkDocumentExists(driveId, documentId),
+            processOperationJob: ({ driveId, documentId, operations, forceSync }) => documentId ?
+                this.addOperations(driveId, documentId, operations, forceSync)
+                : this.addDriveOperations(driveId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync)
+
+        }, error => {
+            logger.error(`Error initializing queue manager`, error);
+            errors.push(error);
+        })
 
         // if network connect comes online then
         // triggers the listeners update
@@ -1032,7 +1036,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[],
         forceSync = true
-    ) {
+    ): Promise<IOperationResult> {
         const jobId = await this.queueManager.addJob({ driveId: drive, operations, forceSync });
         return new Promise((resolve, reject) => {
             const unsubscribe = this.queueManager.on('jobCompleted', (job, result) => {

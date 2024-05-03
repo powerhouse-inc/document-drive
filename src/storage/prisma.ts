@@ -273,6 +273,16 @@ export class PrismaStorage implements IDriveStorage {
         return docs.map(doc => doc.id);
     }
 
+    async checkDocumentExists(driveId: string, id: string) {
+        const count = await this.db.document.count({
+            where: {
+                id: id,
+                driveId: driveId
+            },
+        });
+        return count > 0;
+    }
+
     async getDocument(driveId: string, id: string, tx?: Transaction) {
         const result = await (tx ?? this.db).document.findFirst({
             where: {

@@ -17,6 +17,10 @@ export class MemoryStorage implements IDriveStorage {
         this.drives = {};
     }
 
+    checkDocumentExists(drive: string, id: string): Promise<boolean> {
+        return Promise.resolve(this.documents[drive]?.[id] !== undefined)
+    }
+
     async getDocuments(drive: string) {
         return Object.keys(this.documents[drive] ?? {});
     }

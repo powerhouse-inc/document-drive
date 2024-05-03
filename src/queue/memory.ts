@@ -1,4 +1,4 @@
-import { IJob, IJobQueue, IQueue, IQueueManager, JobId, OperationJob, OperationJobProcessor, QueueEvents } from "./types";
+import { IJob, IJobQueue, IQueue, IQueueManager, IServerDelegate, JobId, OperationJob, QueueEvents } from "./types";
 import { generateUUID } from "../utils";
 import { IOperationResult } from "../server";
 import { createNanoEvents, Unsubscribe } from 'nanoevents';
@@ -55,7 +55,9 @@ export class MemoryQueue<T, R> implements IQueue<T, R> {
     }
 
     addDependencies(job: IJob<OperationJob>) {
-        this.dependencies.push(job);
+        if (!this.dependencies.find(j => j.jobId === job.jobId)) {
+            this.dependencies.push(job);
+        }
         if (!this.isBlocked()) {
             this.setBlocked(true);
         }
@@ -75,16 +77,15 @@ export class MemoryQueueManager implements IQueueManager {
     private queues: IJobQueue[] = [];
     private workers: number;
     private timeout: number;
-    private processFn: OperationJobProcessor | undefined;
+    private delegate: IServerDelegate | undefined;
 
     constructor(workers = 3, timeout = 0) {
         this.workers = workers;
         this.timeout = timeout;
     }
 
-    async init(processor: OperationJobProcessor, onError: (err: Error) => void) {
-        this.processFn = processor;
-        // Start workers
+    async init(delegate: IServerDelegate, onError: (error: Error) => void): Promise<void> {
+        this.delegate = delegate;
         for (let i = 0; i < this.workers; i++) {
             this.processNextJob().catch(onError);
         }
@@ -92,16 +93,24 @@ export class MemoryQueueManager implements IQueueManager {
     }
 
     async addJob(job: OperationJob): Promise<JobId> {
+        if (!this.delegate) {
+            throw new Error("No server delegate defined");
+        }
+
         const jobId = generateUUID();
         const queue = this.getQueue(job.driveId, job.documentId);
-        await queue.addJob({ jobId, ...job });
 
-        // block the document queue if this is a document job with op index 0 and a depending job with add file in the drive queue
-        const firstOp = job.documentId && job.operations[0]?.index === 0;
-        if (firstOp) {
-            const driveQueue = await this.getQueue(job.driveId);
+        // checks if the job is for a document that doesn't exist in storage yet
+        const newDocument = job.documentId && !(await this.delegate.checkDocumentExists(job.driveId, job.documentId));
+        // if it is a new document and queue is not yet blocked then 
+        // blocks it so the jobs are not processed until it's ready
+        if (newDocument && !queue.isBlocked()) {
+            queue.setBlocked(true);
+
+            // checks if there any job in the queue adding the file and adds as dependency
+            const driveQueue = this.getQueue(job.driveId);
             const jobs = driveQueue.getJobs();
-            for (let driveJob of jobs) {
+            for (const driveJob of jobs) {
                 const op = driveJob.operations.find((j: Operation) => {
                     const input = j.input as AddFileInput;
                     return j.type === "ADD_FILE" && input.id === job.documentId
@@ -112,13 +121,16 @@ export class MemoryQueueManager implements IQueueManager {
             }
         }
 
-        // block the document queue if the job contains an add file operation for a drive
+        // if it has ADD_FILE operations then adds the job as
+        // a dependency to the corresponding document queues
         const addFileOps = job.operations.filter((j: Operation) => j.type === "ADD_FILE");
         for (const addFileOp of addFileOps) {
             const input = addFileOp.input as AddFileInput;
             const q = this.getQueue(job.driveId, input.id)
             q.addDependencies({ jobId, ...job });
         }
+
+        await queue.addJob({ jobId, ...job });
 
         return jobId;
     }
@@ -146,8 +158,8 @@ export class MemoryQueueManager implements IQueueManager {
     }
 
     private async processNextJob() {
-        if (!this.processFn) {
-            throw new Error("No job processor defined");
+        if (!this.delegate) {
+            throw new Error("No server delegate defined");
         }
 
         if (this.queues.length === 0) {
@@ -181,23 +193,22 @@ export class MemoryQueueManager implements IQueueManager {
         }
 
         try {
-            const result = await this.processFn(nextJob);
+            const result = await this.delegate.processOperationJob(nextJob);
+            await queue.setResult(nextJob.jobId, result);
 
             // unblock the document queues of each add_file operation
             const addFileOperations = nextJob.operations.filter((op) => op.type === "ADD_FILE");
-            if (addFileOperations.length > 0) {
-                addFileOperations.map((addFileOp) => {
-                    const documentQueue = this.getQueue(nextJob.driveId, (addFileOp.input as AddFileInput).id);
-                    documentQueue.removeDependencies(nextJob);
-                });
-            }
+            addFileOperations.forEach((addFileOp) => {
+                const documentQueue = this.getQueue(nextJob.driveId, (addFileOp.input as AddFileInput).id);
+                documentQueue.removeDependencies(nextJob);
+            });
 
             this.emit("jobCompleted", nextJob, result);
         } catch (e) {
             this.emit("jobFailed", nextJob, e as Error);
         } finally {
             queue.setBlocked(false);
-            void this.processNextJob();
+            await this.processNextJob();
         }
     }
 

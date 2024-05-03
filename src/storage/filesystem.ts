@@ -77,6 +77,11 @@ export class FilesystemStorage implements IDriveStorage {
         return documents;
     }
 
+    checkDocumentExists(drive: string, id: string): Promise<boolean> {
+        const documentExists = existsSync(this._buildDocumentPath(drive, id));
+        return Promise.resolve(documentExists);
+    }
+
     async getDocument(drive: string, id: string) {
         try {
             const content = readFileSync(this._buildDocumentPath(drive, id), {

@@ -16,6 +16,7 @@ export type DocumentStorage<D extends Document = Document> = Omit<
 export type DocumentDriveStorage = DocumentStorage<DocumentDriveDocument>;
 
 export interface IStorage {
+    checkDocumentExists(drive: string, id: string): Promise<boolean>;
     getDocuments: (drive: string) => Promise<string[]>;
     getDocument(drive: string, id: string): Promise<DocumentStorage>;
     createDocument(

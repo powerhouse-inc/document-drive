@@ -27,6 +27,13 @@ export class BrowserStorage implements IDriveStorage {
         return args.join(BrowserStorage.SEP);
     }
 
+    async checkDocumentExists(drive: string, id: string): Promise<boolean> {
+        const document = await (
+            await this.db
+        ).getItem<Document>(this.buildKey(drive, id));
+        return document !== undefined;
+    }
+
     async getDocuments(drive: string) {
         const keys = await (await this.db).keys();
         const driveKey = `${drive}${BrowserStorage.SEP}`;

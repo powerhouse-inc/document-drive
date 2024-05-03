@@ -267,6 +267,21 @@ export class SequelizeStorage implements IDriveStorage {
         return ids;
     }
 
+    async checkDocumentExists(driveId: string, id: string): Promise<boolean> {
+        const Document = this.db.models.document;
+        if (!Document) {
+            throw new Error('Document model not found');
+        }
+        const count = await Document.count({
+            where: {
+                id: id,
+                driveId: driveId
+            },
+        })
+
+        return count > 0;
+    }
+
     async getDocument(driveId: string, id: string) {
         const Document = this.db.models.document;
         if (!Document) {
