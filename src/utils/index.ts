@@ -43,10 +43,9 @@ export function mergeOperations<A extends Action = Action>(
 
     return newOperations.sort((a, b) => a.index - b.index
     ).reduce<DocumentOperations<A>>((acc, curr) => {
-        const existingOperations = currentOperations[curr.scope];
-        acc[curr.scope] = [...existingOperations, curr];
-        return acc;
-    }, { global: [], local: [] });
+        const existingOperations = acc[curr.scope] || [];
+        return { ...acc, [curr.scope]: [...existingOperations, curr] };
+    }, currentOperations);
 }
 
 export function generateUUID(): string {
