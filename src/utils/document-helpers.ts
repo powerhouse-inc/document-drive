@@ -458,7 +458,7 @@ export const prepareOperations = (
                 integrityError.operation.index === newOperation.index &&
                 integrityError.operation.skip === newOperation.skip &&
                 integrityError.category ===
-                    IntegrityIssueSubType.DUPLICATED_INDEX
+                IntegrityIssueSubType.DUPLICATED_INDEX
             );
         });
 

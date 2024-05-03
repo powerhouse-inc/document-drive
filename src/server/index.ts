@@ -19,7 +19,7 @@ import {
     DocumentHeader,
     DocumentModel,
     Operation,
-    OperationScope
+    OperationScope,
 } from 'document-model/document';
 import { createNanoEvents, Unsubscribe } from 'nanoevents';
 import { ICache } from '../cache';
@@ -494,7 +494,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             logger.error('Error getting drive from cache', e);
         }
         const driveStorage = await this.storage.getDrive(drive);
-        const document = this._replayDocument(driveStorage, options);
+        const document = this._buildDocument(driveStorage, options);
         if (!isDocumentDrive(document)) {
             throw new Error(
                 `Document with id ${drive} is not a Document Drive`
@@ -518,7 +518,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         }
 
         const driveStorage = await this.storage.getDriveBySlug(slug);
-        const document = this._replayDocument(driveStorage, options);
+        const document = this._buildDocument(driveStorage, options);
         if (!isDocumentDrive(document)) {
             throw new Error(
                 `Document with slug ${slug} is not a Document Drive`
@@ -540,20 +540,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         } catch (e) {
             logger.error('Error getting document from cache', e);
         }
-        const { initialState, operations, ...header } =
+        const documentStorage =
             await this.storage.getDocument(drive, id);
 
-        const documentModel = this._getDocumentModel(header.documentType);
-
-        const document = baseUtils.replayDocument(
-            initialState,
-            filterOperationsByRevision(operations, options?.revisions),
-            documentModel.reducer,
-            undefined,
-            header,
-            undefined,
-            { checkHashes: false }
-        );
+        const document = this._buildDocument(documentStorage, options);
         this.cache.setDocument(drive, id, document).catch(logger.error);
         return document;
     }
@@ -698,14 +688,21 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     }
 
     private _buildDocument<T extends Document>(
-        documentStorage: DocumentStorage<T>
+        documentStorage: DocumentStorage<T>, options?: GetDocumentOptions
     ): T {
         const documentModel = this._getDocumentModel(
             documentStorage.documentType
         );
+
+        const revisionOperations = options?.revisions !== undefined ? filterOperationsByRevision(
+            documentStorage.operations,
+            options.revisions
+        ) : documentStorage.operations;
+        const operations = baseUtils.documentHelpers.grabageCollectDocumentOperations(revisionOperations);
+
         return baseUtils.replayDocument(
             documentStorage.initialState,
-            documentStorage.operations,
+            operations,
             documentModel.reducer,
             undefined,
             documentStorage,
@@ -775,7 +772,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 `Operation with index ${operation.index}:${operation.skip} was not applied.`
             );
         } else if (
-            operation.type !== 'NOOP' &&
             appliedOperation[0]!.hash !== operation.hash &&
             !skipHashValidation
         ) {
@@ -1279,23 +1275,5 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     ): void {
         logger.debug(`Emitting event ${event}`, args);
         return this.emitter.emit(event, ...args);
-    }
-
-    private _replayDocument(documentStorage: DocumentStorage, options?: GetDocumentOptions) {
-        const documentModel = this._getDocumentModel(documentStorage.documentType);
-        const document = baseUtils.replayDocument(
-            documentStorage.initialState,
-            filterOperationsByRevision(
-                documentStorage.operations,
-                options?.revisions
-            ),
-            documentModel.reducer,
-            undefined,
-            documentStorage,
-            undefined,
-            { checkHashes: false }
-        );
-
-        return document;
     }
 }
