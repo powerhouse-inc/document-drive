@@ -36,13 +36,13 @@ export interface IQueue<T, R> {
     getNextJob(): Promise<IJob<T> | undefined>;
     amountOfJobs(): Promise<number>;
     getId(): string;
-    setBlocked(blocked: boolean): void;
-    isBlocked(): boolean;
+    setBlocked(blocked: boolean): Promise<void>;
+    isBlocked(): Promise<boolean>;
     setResult(jobId: JobId, result: R): Promise<void>;
     getResult(jobId: JobId): Promise<R | undefined>;
-    getJobs(): IJob<T>[];
-    addDependencies(job: IJob<OperationJob>): void;
-    removeDependencies(job: IJob<OperationJob>): void;
+    getJobs(): Promise<IJob<T>[]>;
+    addDependencies(job: IJob<OperationJob>): Promise<void>;
+    removeDependencies(job: IJob<OperationJob>): Promise<void>;
 }
 
 export type IJobQueue = IQueue<OperationJob, IOperationResult>;

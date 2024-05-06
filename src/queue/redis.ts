@@ -1,24 +1,37 @@
-import { createClient, RedisClientType } from "redis";
-import { IQueue, IQueueManager } from "./types";
+import { RedisClientType } from "redis";
+import { IJob, IQueue, IQueueManager, JobId, OperationJob, OperationJobProcessor, QueueEvents } from "./types";
 import { generateUUID } from "../utils";
+import { Unsubscribe, createNanoEvents } from "nanoevents";
+import { AddFileInput } from "document-model-libs/document-drive";
+import { IOperationResult } from "../server";
 import { Operation } from "document-model/document";
-import { EventEmitter } from "stream";
 
-export class RedisQueue implements IQueue {
-
+export class RedisQueue<T, R> implements IQueue<T, R> {
+    private id: string;
     private client: RedisClientType;
-    private name: string;
     private blocked = false;
 
-    constructor(name: string, client: RedisClientType) {
+
+    private dependencies = new Array<IJob<OperationJob>>();
+
+    constructor(id: string, client: RedisClientType) {
         this.client = client;
-        this.name = name;
+        this.id = id;
+
     }
+
+    async init() {
+        const queueExists = await this.client.hGet("queues", this.id);
+        if (!queueExists) {
+            await this.client.hSet("queues", this.id, JSON.stringify({ blocked: false, items: [], dependencies: [] }));
+        }
+    }
+
     async setResult(jobId: string, result: any): Promise<void> {
-        await this.client.hSet("results", jobId, JSON.stringify(result));
+        await this.client.hSet(this.id + "-results", jobId, JSON.stringify(result));
     }
     async getResult(jobId: string): Promise<any> {
-        const results = await this.client.hGet("results", jobId);
+        const results = await this.client.hGet(this.id + "-results", jobId);
         if (!results) {
             return null;
         }
@@ -26,11 +39,11 @@ export class RedisQueue implements IQueue {
     }
 
     async addJob(data: any) {
-        await this.client.lPush(this.name, JSON.stringify(data));
+        await this.client.lPush(this.id + "-jobs", JSON.stringify(data));
     }
 
     async getNextJob() {
-        const job = await this.client.rPop(this.name);
+        const job = await this.client.rPop(this.id + "-jobs");
         if (!job) {
             return null;
         }
@@ -38,41 +51,81 @@ export class RedisQueue implements IQueue {
     }
 
     async amountOfJobs() {
-        return this.client.lLen(this.name);
+        return this.client.lLen(this.id + "-jobs");
     }
 
-    getName() {
-        return this.name;
+    async setBlocked(blocked: boolean) {
+        if (blocked) {
+            await this.client.hSet(this.id, "blocked", JSON.stringify(true));
+        } else {
+            await this.client.hDel(this.id, "blocked");
+        }
     }
 
-    setBlocked(blocked: boolean) {
-        this.blocked = blocked;
+    async isBlocked() {
+        const blockedResult = await this.client.hGet(this.id, "blocked");
+        if (blockedResult) {
+            return true;
+        }
+
+        return false;
     }
 
-    isBlocked() {
-        return this.blocked;
+    getId() {
+        return this.id;
     }
 
+    async getJobs() {
+        const entries = await this.client.lRange(this.id + "-jobs", 0, -1)
+        return entries.map(e => JSON.parse(e));
+    }
+
+    async addDependencies(job: IJob<OperationJob>) {
+        const entries = await this.client.lPush(this.id + "-deps", JSON.stringify(job));
+        if (!(await this.isBlocked())) {
+            await this.setBlocked(true);
+        }
+    }
+
+    async removeDependencies(job: IJob<OperationJob>) {
+        const entries = await this.client.lPush(this.id + "-deps", JSON.stringify(job));
+        if (!(await this.isBlocked())) {
+            await this.setBlocked(true);
+        }
+
+        this.dependencies = this.dependencies.filter((j) => j.jobId !== job.jobId && j.driveId !== job.driveId);
+        if (this.dependencies.length === 0) {
+            this.setBlocked(false);
+        }
+    }
 }
 
-export class RedisQueueManager extends EventEmitter implements IQueueManager {
+export class RedisQueueManager implements IQueueManager {
 
-    private client: RedisClientType | null = null;
+    private client: RedisClientType;
+    private emitter = createNanoEvents<QueueEvents>();
     private ticker = 0;
-    private workers = 3;
-    private queues: IQueue[] = [];
-    private processFn: (driveId: string, documentId: string, operations: Operation[], forceSync: boolean) => Promise<void>;
+    private workers: number;
+    private timeout: number;
+    private processFn: OperationJobProcessor | undefined;
 
-    constructor(processFn: (driveId: string, documentId: string, operations: Operation[], forceSync: boolean) => Promise<any>, client: RedisClientType | null = null, workers = 3) {
-        super();
-        this.workers = workers;
-        this.processFn = processFn;
+
+    constructor(workers = 3, timeout = 0, client: RedisClientType) {
         this.client = client;
+        this.workers = workers;
+        this.timeout = timeout;
     }
-    async getResults(driveId: string, documentId: string, jobId: string): Promise<any> {
-        if (!this.client) {
-            await this.init();
+
+    async init(processor: OperationJobProcessor, onError: (err: Error) => void) {
+        this.processFn = processor;
+        // Start workers
+        for (let i = 0; i < this.workers; i++) {
+            this.processNextJob().catch(onError);
         }
+        return Promise.resolve()
+    }
+
+    async getResults(driveId: string, documentId: string, jobId: string): Promise<any> {
         const queue = await this.getQueue(driveId, documentId);
         const results = await queue.getResult(jobId);
         if (!results) {
@@ -81,113 +134,132 @@ export class RedisQueueManager extends EventEmitter implements IQueueManager {
         return results;
     }
 
-    async init() {
-        if (!this.client) {
-            this.client = await createClient({
-                url: process.env.REDIS_TLS_URL, socket: {
-                    tls: true,
-                    rejectUnauthorized: false
-                }
-            });
 
-            await this.client.connect();
-        }
-
-        const queues = await this.client.lRange("queues", 0, -1);
-        this.queues = queues.map((queue) => new RedisQueue(queue, this.client!));
-
-        // Start workers
-        for (let i = 0; i < this.workers; i++) {
-            this.processNextJob();
-        }
-    }
-
-    async addJob(driveId: string, documentId: string, operations: Operation[], forceSync: boolean) {
+    async addJob(job: OperationJob): Promise<JobId> {
         const jobId = generateUUID();
-        const queue = await this.getQueue(driveId, documentId);
-        await queue.addJob({ jobId, operations, forceSync });
+        const queue = await this.getQueue(job.driveId, job.documentId);
+        await queue.addJob({ jobId, ...job });
+
+        // block the document queue if this is a document job with op index 0 and a depending job with add file in the drive queue
+        const firstOp = job.documentId && job.operations[0]?.index === 0;
+        if (firstOp) {
+            const driveQueue = await this.getQueue(job.driveId);
+            const jobs = await driveQueue.getJobs();
+            for (let driveJob of jobs) {
+                const op = driveJob.operations.find((j: Operation) => {
+                    const input = j.input as AddFileInput;
+                    return j.type === "ADD_FILE" && input.id === job.documentId
+                })
+                if (op) {
+                    queue.addDependencies(driveJob);
+                }
+            }
+        }
+
+        // block the document queue if the job contains an add file operation for a drive
+        const addFileOps = job.operations.filter((j: Operation) => j.type === "ADD_FILE");
+        for (const addFileOp of addFileOps) {
+            const input = addFileOp.input as AddFileInput;
+            const q = await this.getQueue(job.driveId, input.id)
+            q.addDependencies({ jobId, ...job });
+        }
+
         return jobId;
     }
 
-    async getQueue(driveId: string, documentId: string): Promise<IQueue> {
-        const queueId = `${status}:${driveId}:${documentId}`;
-        let queue = this.queues.find((q) => q.getName() === queueId);
-        if (!this.client) {
-            await this.init();
-        }
-        if (!queue) {
-            queue = new RedisQueue(queueId, this.client!);
-            this.queues.push(queue);
-            this.client!.rPush("queues", queueId);
-        }
-
+    async getQueue(driveId: string, documentId?: string) {
+        const queueId = documentId ? `${driveId}:${documentId}` : `drives:${driveId}`;
+        const queue = new RedisQueue(queueId, this.client);
+        await queue.init();
         return queue;
     }
 
-    async processNextJob() {
-        const that = this;
-        if (this.queues.length === 0) {
-            setTimeout(() => that.processNextJob(), 1000);
+    private async _getQueues() {
+        return this.client.hKeys("queue");
+    }
+
+
+    private async processNextJob() {
+        if (!this.processFn) {
+            throw new Error("No job processor defined");
+        }
+
+        const queues = await this._getQueues();
+
+        if (queues.length === 0) {
+            this.retryNextJob();
             return;
         }
 
-        const queue = this.queues[this.ticker];
-        this.ticker = this.ticker === this.queues.length ? 0 : this.ticker + 1;
-        if (!queue) {
+        const queueId = queues[this.ticker];
+
+        this.ticker = this.ticker === queues.length ? 0 : this.ticker + 1;
+        if (!queueId) {
             this.ticker = 0;
-            setTimeout(() => that.processNextJob(), 1000);
+            this.retryNextJob();
             return;
         }
 
-        if (await queue.amountOfJobs() === 0 || await queue.isBlocked()) {
-            setTimeout(() => that.processNextJob(), 1000);
+        const [driveId, documentId] = queueId.split(":");
+        const queue = await this.getQueue(driveId!, documentId!);
+        if (await queue.isBlocked()) {
+            this.retryNextJob();
+            return;
+        }
+
+        if (await queue.amountOfJobs() === 0) {
+            this.retryNextJob();
             return;
         }
 
         queue.setBlocked(true);
         const nextJob = await queue.getNextJob();
         if (!nextJob) {
-            setTimeout(() => that.processNextJob(), 1000);
+            this.retryNextJob();
             return;
         }
 
-        const [status, driveId, documentId] = queue.getName().split(":");
-        const { jobId, operations, forceSync } = nextJob;
         try {
-            if (!this.client) {
-                await this.init();
+            const result = await this.processFn(nextJob);
+
+            // unblock the document queues of each add_file operation
+            const addFileOperations = nextJob.operations.filter((op: { type: string; }) => op.type === "ADD_FILE");
+            if (addFileOperations.length > 0) {
+                addFileOperations.map(() => {
+                    queue.removeDependencies(nextJob);
+                });
             }
-            const result = await this.processFn(driveId!, documentId!, operations, forceSync);
-            await this.client!.hSet("results", jobId, JSON.stringify(result));
-            this.emit("jobCompleted", { driveId, documentId, jobId, result });
+
+            this.emit("jobCompleted", nextJob, result);
         } catch (e) {
-            console.error(e);
+            this.emit("jobFailed", nextJob, e as Error);
+        } finally {
+            queue.setBlocked(false);
+            void this.processNextJob();
         }
-
-        queue.setBlocked(false);
-        this.processNextJob();
-
-        return;
-
     }
 
-    getResult(driveId: string, documentId: string, jobId: string) {
-        return new Promise(async (resolve, reject) => {
-            if (!this.client) {
-                await this.init();
-            }
-            const results = await this.client!.HGET("results", jobId);
-            if (!results) {
-                this.on("jobCompleted", (data) => {
-                    if (data.driveId === driveId && data.documentId === documentId && data.jobId === jobId) {
-                        resolve(data.result);
-                    }
-                });
+    async getResult(driveId: string, documentId: string, jobId: JobId): Promise<IOperationResult | undefined> {
+        const queue = await this.getQueue(driveId, documentId);
+        return queue.getResult(jobId);
+    }
 
-                setTimeout(() => {
-                    reject("Job result not found");
-                }, 5000);
-            }
-        });
+
+
+    private retryNextJob() {
+        const retry = this.timeout === 0 && typeof setImmediate !== "undefined" ? setImmediate : (fn: () => void) => setTimeout(fn, this.timeout);
+        return retry(() => this.processNextJob());
+    }
+
+
+
+    protected emit<K extends keyof QueueEvents>(
+        event: K,
+        ...args: Parameters<QueueEvents[K]>
+    ) {
+        this.emitter.emit(event, ...args);
+    }
+    on<K extends keyof QueueEvents>(this: this, event: K, cb: QueueEvents[K]): Unsubscribe {
+        return this.emitter.on(event, cb);
     }
 }

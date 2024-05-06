@@ -42,26 +42,26 @@ export class MemoryQueue<T, R> implements IQueue<T, R> {
         return this.id;
     }
 
-    setBlocked(blocked: boolean) {
+    async setBlocked(blocked: boolean) {
         this.blocked = blocked;
     }
 
-    isBlocked() {
+    async isBlocked() {
         return this.blocked;
     }
 
-    getJobs() {
+    async getJobs() {
         return this.items;
     }
 
-    addDependencies(job: IJob<OperationJob>) {
+    async addDependencies(job: IJob<OperationJob>) {
         this.dependencies.push(job);
         if (!this.isBlocked()) {
             this.setBlocked(true);
         }
     }
 
-    removeDependencies(job: IJob<OperationJob>) {
+    async removeDependencies(job: IJob<OperationJob>) {
         this.dependencies = this.dependencies.filter((j) => j.jobId !== job.jobId && j.driveId !== job.driveId);
         if (this.dependencies.length === 0) {
             this.setBlocked(false);
@@ -100,7 +100,7 @@ export class MemoryQueueManager implements IQueueManager {
         const firstOp = job.documentId && job.operations[0]?.index === 0;
         if (firstOp) {
             const driveQueue = await this.getQueue(job.driveId);
-            const jobs = driveQueue.getJobs();
+            const jobs = await driveQueue.getJobs();
             for (let driveJob of jobs) {
                 const op = driveJob.operations.find((j: Operation) => {
                     const input = j.input as AddFileInput;
@@ -163,7 +163,7 @@ export class MemoryQueueManager implements IQueueManager {
             return;
         }
 
-        if (queue.isBlocked()) {
+        if (await queue.isBlocked()) {
             this.retryNextJob();
             return;
         }
