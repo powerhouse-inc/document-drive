@@ -75,8 +75,8 @@ describe('Drive Operations', () => {
 
         const syncedOperations = client1.getDocument().operations
             .global as Operation<
-                DocumentDrive.DocumentDriveAction | BaseAction
-            >[];
+            DocumentDrive.DocumentDriveAction | BaseAction
+        >[];
         client1.setUnsyncedOperations(syncedOperations);
 
         pushOperationResult = await client1.pushOperationsToServer();
@@ -169,8 +169,8 @@ describe('Drive Operations', () => {
         // Clien1 push already synced operations to server (this should not create new operations in the server document)
         const syncedOperations = client1.getDocument().operations
             .global as Operation<
-                DocumentDrive.DocumentDriveAction | BaseAction
-            >[];
+            DocumentDrive.DocumentDriveAction | BaseAction
+        >[];
 
         client1.setUnsyncedOperations(syncedOperations);
         pushOperationResult = await client1.pushOperationsToServer();
@@ -388,15 +388,9 @@ describe('Drive Operations', () => {
         expect(drive.state.global.nodes).toMatchObject([
             { id: '1', name: 'test1' }
         ]);
-        expect(drive.operations.global.length).toBe(3);
+
+        expect(drive.operations.global.length).toBe(2);
         expect(drive.operations.global).toMatchObject([
-            {
-                type: 'ADD_FOLDER',
-                scope: 'global',
-                index: 0,
-                skip: 0,
-                error: undefined
-            },
             {
                 type: 'ADD_FOLDER',
                 input: { id: '1', name: 'test1' },

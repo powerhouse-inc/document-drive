@@ -335,7 +335,7 @@ describe('processOperations', () => {
 
         expect(result.error).toBeUndefined();
         expect(result.operationsApplied.length).toBe(2);
-        expect(result.document.operations.global.length).toBe(5);
+        expect(result.document.operations.global.length).toBe(4);
         expect(result.document.state.global).toMatchObject({
             name: 'test2',
             id: 'test',
@@ -678,8 +678,8 @@ describe('processOperations', () => {
 
         const updatedClientDocument = await client1.syncDocument();
 
-        expect(finalDocument.operations.global.length).toBe(3);
-        expect(updatedClientDocument.operations.global.length).toBe(3);
+        expect(finalDocument.operations.global.length).toBe(2);
+        expect(updatedClientDocument.operations.global.length).toBe(2);
         expect(updatedClientDocument.operations.global).toMatchObject(
             mapExpectedOperations(finalDocument.operations.global)
         );
