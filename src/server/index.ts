@@ -60,7 +60,8 @@ import {
     InternalTransmitter,
     IReceiver,
     ITransmitter,
-    PullResponderTransmitter
+    PullResponderTransmitter,
+    SubscriptionTransmitter
 } from './listener/transmitter';
 import {
     BaseDocumentDriveServer,
@@ -160,8 +161,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
         if (result.status === 'ERROR') {
             this.updateSyncStatus(strand.driveId, result.status, result.error);
+        } else {
+            this.emit('strandUpdate', strand);
         }
-        this.emit('strandUpdate', strand);
         return result;
     }
 
@@ -253,6 +255,27 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 );
                 driveTriggers.set(trigger.id, cancelPullLoop);
                 this.triggerMap.set(driveId, driveTriggers);
+            } else if (SubscriptionTransmitter.isTrigger(trigger)) {
+                SubscriptionTransmitter.setup(driveId,
+                    trigger,
+                    this.saveStrand.bind(this),
+                    error => {
+                        this.updateSyncStatus(
+                            driveId,
+                            error instanceof OperationError
+                                ? error.status
+                                : 'ERROR',
+                            error
+                        );
+                    },
+                    revisions => {
+                        const errorRevision = revisions.find(
+                            r => r.status !== 'SUCCESS'
+                        );
+                        if (!errorRevision) {
+                            this.updateSyncStatus(driveId, 'SUCCESS');
+                        }
+                    })
             }
         }
     }
@@ -642,10 +665,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             triggers
         } = options;
 
-        const pullTrigger =
-            await PullResponderTransmitter.createPullResponderTrigger(id, url, {
+        const trigger =
+            await SubscriptionTransmitter.createTrigger(id, url, {
                 pullFilter,
-                pullInterval
             });
 
         return await this.addDrive({
@@ -656,7 +678,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 icon: icon ?? null
             },
             local: {
-                triggers: [...triggers, pullTrigger],
+                triggers: [...triggers, trigger],
                 listeners: listeners,
                 availableOffline,
                 sharingType
@@ -1047,7 +1069,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             throw new OperationError(
                 'ERROR',
                 operation,
-                `Operation with index ${operation.index}:${operation.skip} was not applied.`
+                `Operation with index ${operation.index}:${operation.skip || 0} was not applied.`
             );
         } else if (
             appliedOperation[0]!.hash !== operation.hash &&

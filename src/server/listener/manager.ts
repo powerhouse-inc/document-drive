@@ -14,7 +14,7 @@ import {
     StrandUpdate,
     SynchronizationUnit
 } from '../types';
-import { PullResponderTransmitter } from './transmitter';
+import { PullResponderTransmitter, SubscriptionTransmitter } from './transmitter';
 import { InternalTransmitter } from './transmitter/internal';
 import { SwitchboardPushTransmitter } from './transmitter/switchboard-push';
 import { ITransmitter } from './transmitter/types';
@@ -91,6 +91,10 @@ export class ListenerManager extends BaseListenerManager {
                     this.drive,
                     this
                 );
+                break;
+            }
+            case "Subscription": {
+                transmitter = new SubscriptionTransmitter(listener, this);
                 break;
             }
             case 'Internal': {

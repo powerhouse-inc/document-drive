@@ -1,5 +1,5 @@
 import { ListenerFilter, Trigger } from 'document-model-libs/document-drive';
-import { Operation, OperationScope } from 'document-model/document';
+import { OperationScope } from 'document-model/document';
 import { PULL_DRIVE_INTERVAL } from '../..';
 import { generateUUID } from '../../../utils';
 import { gql, requestGraphql } from '../../../utils/graphql';
@@ -16,7 +16,7 @@ import {
     StrandUpdate
 } from '../../types';
 import { ListenerManager } from '../manager';
-import { ITransmitter, PullResponderTrigger } from './types';
+import { ITriggerTransmitter, PullResponderTrigger } from './types';
 
 export type OperationUpdateGraphQL = Omit<OperationUpdate, 'input'> & {
     input: string;
@@ -36,7 +36,7 @@ export type StrandUpdateGraphQL = Omit<StrandUpdate, 'operations'> & {
     operations: OperationUpdateGraphQL[];
 };
 
-export interface IPullResponderTransmitter extends ITransmitter {
+export interface IPullResponderTransmitter extends ITriggerTransmitter {
     getStrands(since?: string): Promise<StrandUpdate[]>;
 }
 
@@ -238,15 +238,10 @@ export class PullResponderTransmitter implements IPullResponderTransmitter {
             const listenerRevisions: ListenerRevisionWithError[] = [];
 
             for (const strand of strands) {
-                const operations: Operation[] = strand.operations.map(op => ({
-                    ...op,
-                    scope: strand.scope,
-                    branch: strand.branch
-                }));
-
+                let result: IOperationResult | undefined = undefined;
                 let error: Error | undefined = undefined;
                 try {
-                    const result = await onStrandUpdate(strand);
+                    result = await onStrandUpdate(strand);
                     if (result.error) {
                         throw result.error;
                     }
@@ -259,7 +254,9 @@ export class PullResponderTransmitter implements IPullResponderTransmitter {
                     branch: strand.branch,
                     documentId: strand.documentId || '',
                     driveId: strand.driveId,
-                    revision: operations.pop()?.index ?? -1,
+                    revision:
+                        result?.document?.operations[strand.scope]?.at(-1)
+                            ?.index ?? -1,
                     scope: strand.scope as OperationScope,
                     status: error
                         ? error instanceof OperationError
