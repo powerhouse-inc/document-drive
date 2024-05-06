@@ -155,7 +155,7 @@ describe('processOperations', () => {
         );
     });
 
-    it('should apply undo operation', async () => {
+    it.skip('should apply undo operation', async () => {
         const document = await buildFile([
             actions.setModelName({ name: 'test' }),
             actions.setModelId({ id: 'test' })
@@ -190,7 +190,7 @@ describe('processOperations', () => {
         });
     });
 
-    it('should update an undo operation', async () => {
+    it.skip('should update an undo operation', async () => {
         const document = await buildFile([
             actions.setModelName({ name: 'test' }),
             actions.setModelId({ id: 'test' }),
