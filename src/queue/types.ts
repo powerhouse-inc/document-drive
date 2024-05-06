@@ -21,6 +21,8 @@ export interface QueueEvents {
 export interface IQueueManager {
     addJob(job: OperationJob): Promise<JobId>;
     getResult(driveId: string, documentId: string, jobId: JobId): Promise<IOperationResult | undefined>;
+    getQueue(driveId: string, document?: string): Promise<IQueue<OperationJob, IOperationResult>>
+    getQueues(): Promise<string[]>
     init(processor: OperationJobProcessor, onError: (error: Error) => void): Promise<void>;
     on<K extends keyof QueueEvents>(
         this: this,
