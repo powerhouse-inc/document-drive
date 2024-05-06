@@ -56,9 +56,7 @@ export class MemoryQueue<T, R> implements IQueue<T, R> {
 
     async addDependencies(job: IJob<OperationJob>) {
         this.dependencies.push(job);
-        if (!this.isBlocked()) {
-            await this.setBlocked(true);
-        }
+        await this.setBlocked(true);
     }
 
     async removeDependencies(job: IJob<OperationJob>) {
@@ -107,7 +105,7 @@ export class MemoryQueueManager implements IQueueManager {
                     return j.type === "ADD_FILE" && input.id === job.documentId
                 })
                 if (op) {
-                    queue.addDependencies(driveJob);
+                    await queue.addDependencies(driveJob);
                 }
             }
         }
@@ -117,7 +115,7 @@ export class MemoryQueueManager implements IQueueManager {
         for (const addFileOp of addFileOps) {
             const input = addFileOp.input as AddFileInput;
             const q = await this.getQueue(job.driveId, input.id)
-            q.addDependencies({ jobId, ...job });
+            await q.addDependencies({ jobId, ...job });
         }
 
         return jobId;
