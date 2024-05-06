@@ -9,10 +9,6 @@ import { Operation } from "document-model/document";
 export class RedisQueue<T, R> implements IQueue<T, R> {
     private id: string;
     private client: RedisClientType;
-    private blocked = false;
-
-
-    private dependencies = new Array<IJob<OperationJob>>();
 
     constructor(id: string, client: RedisClientType) {
         this.client = client;
@@ -81,21 +77,17 @@ export class RedisQueue<T, R> implements IQueue<T, R> {
     }
 
     async addDependencies(job: IJob<OperationJob>) {
-        const entries = await this.client.lPush(this.id + "-deps", JSON.stringify(job));
-        if (!(await this.isBlocked())) {
-            await this.setBlocked(true);
-        }
+        await this.client.lPush(this.id + "-deps", JSON.stringify(job));
+        await this.setBlocked(true);
     }
 
     async removeDependencies(job: IJob<OperationJob>) {
-        const entries = await this.client.lPush(this.id + "-deps", JSON.stringify(job));
-        if (!(await this.isBlocked())) {
+        await this.client.lRem(this.id + "-deps", 1, JSON.stringify(job));
+        const allDeps = await this.client.lLen(this.id + "-deps");
+        if (allDeps > 0) {
             await this.setBlocked(true);
-        }
-
-        this.dependencies = this.dependencies.filter((j) => j.jobId !== job.jobId && j.driveId !== job.driveId);
-        if (this.dependencies.length === 0) {
-            this.setBlocked(false);
+        } else {
+            await this.setBlocked(false);
         }
     }
 }
