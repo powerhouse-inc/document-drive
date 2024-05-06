@@ -50,7 +50,7 @@ export class RedisQueue<T, R> implements IQueue<T, R> {
 
     async setBlocked(blocked: boolean) {
         if (blocked) {
-            await this.client.hSet(this.id, "blocked", JSON.stringify(true));
+            await this.client.hSet(this.id, "blocked", "true");
         } else {
             await this.client.hDel(this.id, "blocked");
         }
