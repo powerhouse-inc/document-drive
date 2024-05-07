@@ -19,7 +19,7 @@ import {
     DocumentHeader,
     DocumentModel,
     Operation,
-    OperationScope
+    OperationScope,
 } from 'document-model/document';
 import { createNanoEvents, Unsubscribe } from 'nanoevents';
 import { ICache } from '../cache';
@@ -29,7 +29,6 @@ import type {
     DocumentDriveStorage,
     DocumentStorage,
     IDriveStorage,
-    StrictDocumentStorage
 } from '../storage/types';
 import { generateUUID, isBefore, isDocumentDrive } from '../utils';
 import {
@@ -613,7 +612,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         operations: Operation<A | BaseAction>[]
     ) {
         const operationsApplied: Operation<A | BaseAction>[] = [];
-        const operationsUpdated: Operation<A | BaseAction>[] = [];
         const signals: SignalResult[] = [];
         let document: T = this._buildDocument(storageDocument);
 
@@ -646,26 +644,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     ? invertedTrunk
                     : merge(trunk, invertedTrunk, reshuffleByTimestamp);
 
-            const lastOriginalOperation = trunk[trunk.length - 1];
-
             const newOperations = newHistory.filter(
                 op => trunk.length < 1 || precedes(trunk[trunk.length - 1]!, op)
             );
 
-            const firstNewOperation = newOperations[0];
-            let updatedOperationIndex = -1;
-
-            if (lastOriginalOperation && firstNewOperation) {
-                if (lastOriginalOperation.index === firstNewOperation.index) {
-                    if (lastOriginalOperation.skip >= firstNewOperation.skip) {
-                        console.error(
-                            'Unexpected firstNewOperation.skip lower than or equal to lastOriginalOperation.skip.'
-                        );
-                    }
-
-                    updatedOperationIndex = firstNewOperation.index;
-                }
-            }
             for (const nextOperation of newOperations) {
                 let skipHashValidation = false;
 
@@ -687,12 +669,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     );
                     document = appliedResult.document;
                     signals.push(...appliedResult.signals);
-
-                    if (nextOperation.index === updatedOperationIndex) {
-                        operationsUpdated.push(...appliedResult.operation);
-                    } else {
-                        operationsApplied.push(...appliedResult.operation);
-                    }
+                    operationsApplied.push(...appliedResult.operation);
                 } catch (e) {
                     error =
                         e instanceof OperationError
@@ -715,26 +692,31 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             operationsApplied,
             signals,
             error,
-            operationsUpdated
         } as const;
     }
 
     private _buildDocument<T extends Document>(
-        documentStorage: DocumentStorage<T>, options?: GetDocumentOptions) {
-        const documentModel = this._getDocumentModel(documentStorage.documentType);
-        const document = baseUtils.replayDocument(
+        documentStorage: DocumentStorage<T>, options?: GetDocumentOptions
+    ): T {
+        const documentModel = this._getDocumentModel(
+            documentStorage.documentType
+        );
+
+        const revisionOperations = options?.revisions !== undefined ? filterOperationsByRevision(
+            documentStorage.operations,
+            options.revisions
+        ) : documentStorage.operations;
+        const operations = baseUtils.documentHelpers.grabageCollectDocumentOperations(revisionOperations);
+
+        return baseUtils.replayDocument(
             documentStorage.initialState,
-            filterOperationsByRevision(
-                documentStorage.operations,
-                options?.revisions
-            ),
+            operations,
             documentModel.reducer,
             undefined,
             documentStorage,
             undefined,
             { checkHashes: options?.checkHashes ?? true }
-        );
-        return document as T;
+        ) as T;
     }
 
     private async _performOperation<T extends Document>(
@@ -798,7 +780,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 `Operation with index ${operation.index}:${operation.skip} was not applied.`
             );
         } else if (
-            operation.type !== 'NOOP' &&
             appliedOperation[0]!.hash !== operation.hash &&
             !skipHashValidation
         ) {
@@ -830,7 +811,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         callback: (document: DocumentStorage) => Promise<{
             operations: Operation[];
             header: DocumentHeader;
-            updatedOperations?: Operation[];
         }>
     ) {
         if (!this.storage.addDocumentOperationsWithTransaction) {
@@ -838,16 +818,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             const result = await callback(documentStorage);
             // saves the applied operations to storage
             if (
-                result.operations.length > 0 ||
-                (result.updatedOperations &&
-                    result.updatedOperations.length > 0)
+                result.operations.length > 0
             ) {
                 await this.storage.addDocumentOperations(
                     drive,
                     id,
                     result.operations,
                     result.header,
-                    result.updatedOperations
                 );
             }
         } else {
@@ -867,7 +844,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     ) {
         let document: Document | undefined;
         const operationsApplied: Operation[] = [];
-        const updatedOperations: Operation[] = [];
         const signals: SignalResult[] = [];
         let error: Error | undefined;
 
@@ -888,12 +864,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 error = result.error;
                 signals.push(...result.signals);
                 operationsApplied.push(...result.operationsApplied);
-                updatedOperations.push(...result.operationsUpdated);
 
                 return {
                     operations: result.operationsApplied,
-                    header: result.document,
-                    updatedOperations: result.operationsUpdated
+                    header: result.document
                 };
             });
 
@@ -902,10 +876,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             }
 
             // gets all the different scopes and branches combinations from the operations
-            const { scopes, branches } = [
-                ...operationsApplied,
-                ...updatedOperations
-            ].reduce(
+            const { scopes, branches } = operationsApplied.reduce(
                 (acc, operation) => {
                     if (!acc.scopes.includes(operation.scope)) {
                         acc.scopes.push(operation.scope);
@@ -996,7 +967,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         callback: (document: DocumentDriveStorage) => Promise<{
             operations: Operation<DocumentDriveAction | BaseAction>[];
             header: DocumentHeader;
-            updatedOperations?: Operation[];
         }>
     ) {
         if (!this.storage.addDriveOperationsWithTransaction) {
@@ -1045,7 +1015,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 return {
                     operations: result.operationsApplied,
                     header: result.document,
-                    updatedOperations: result.operationsUpdated
                 };
             });
 

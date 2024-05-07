@@ -106,7 +106,6 @@ export class PrismaStorage implements IDriveStorage {
         callback: (document: DocumentDriveStorage) => Promise<{
             operations: Operation<DocumentDriveAction | BaseAction>[];
             header: DocumentHeader;
-            updatedOperations?: Operation[] | undefined;
         }>
     ) {
         return this.addDocumentOperationsWithTransaction(
@@ -147,7 +146,6 @@ export class PrismaStorage implements IDriveStorage {
         id: string,
         operations: Operation[],
         header: DocumentHeader,
-        updatedOperations: Operation[] = []
     ): Promise<void> {
         const document = await this.getDocument(drive, id, tx);
         if (!document) {
@@ -170,35 +168,6 @@ export class PrismaStorage implements IDriveStorage {
                     context: op.context
                 }))
             });
-
-            await Promise.all(
-                updatedOperations.map(op =>
-                    tx.operation.updateMany({
-                        where: {
-                            AND: {
-                                driveId: drive,
-                                documentId: id,
-                                scope: op.scope,
-                                branch: 'main',
-                                index: op.index
-                            }
-                        },
-                        data: {
-                            driveId: drive,
-                            documentId: id,
-                            hash: op.hash,
-                            index: op.index,
-                            input: JSON.stringify(op.input),
-                            timestamp: op.timestamp,
-                            type: op.type,
-                            scope: op.scope,
-                            branch: 'main',
-                            skip: op.skip,
-                            context: op.context
-                        }
-                    })
-                )
-            );
 
             await tx.document.updateMany({
                 where: {
@@ -255,13 +224,11 @@ export class PrismaStorage implements IDriveStorage {
         callback: (document: DocumentStorage) => Promise<{
             operations: Operation[];
             header: DocumentHeader;
-            updatedOperations?: Operation[] | undefined;
         }>
     ) {
         let result: {
             operations: Operation[];
             header: DocumentHeader;
-            updatedOperations?: Operation[] | undefined;
         } | null = null;
 
         await this.db.$transaction(async tx => {
@@ -271,14 +238,13 @@ export class PrismaStorage implements IDriveStorage {
             }
             result = await callback(document);
 
-            const { operations, header, updatedOperations } = result;
+            const { operations, header } = result;
             return this._addDocumentOperations(
                 tx,
                 drive,
                 id,
                 operations,
                 header,
-                updatedOperations
             );
         }, { isolationLevel: "Serializable" });
 
@@ -296,7 +262,6 @@ export class PrismaStorage implements IDriveStorage {
         id: string,
         operations: Operation[],
         header: DocumentHeader,
-        updatedOperations: Operation[] = []
     ): Promise<void> {
         return this._addDocumentOperations(
             this.db,
@@ -304,7 +269,6 @@ export class PrismaStorage implements IDriveStorage {
             id,
             operations,
             header,
-            updatedOperations
         );
     }
 
