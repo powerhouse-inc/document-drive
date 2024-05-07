@@ -5,7 +5,7 @@ import {
     DocumentHeader,
     Operation
 } from 'document-model/document';
-import { applyUpdatedOperations, mergeOperations } from '..';
+import { mergeOperations } from '..';
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 
 export class BrowserStorage implements IDriveStorage {
@@ -62,7 +62,6 @@ export class BrowserStorage implements IDriveStorage {
         id: string,
         operations: Operation[],
         header: DocumentHeader,
-        updatedOperations: Operation[] = []
     ): Promise<void> {
         const document = await this.getDocument(drive, id);
         if (!document) {
@@ -74,16 +73,11 @@ export class BrowserStorage implements IDriveStorage {
             operations
         );
 
-        const mergedUpdatedOperations = applyUpdatedOperations(
-            mergedOperations,
-            updatedOperations
-        );
-
         const db = await this.db;
         await db.setItem(this.buildKey(drive, id), {
             ...document,
             ...header,
-            operations: mergedUpdatedOperations
+            operations: mergedOperations
         });
     }
 

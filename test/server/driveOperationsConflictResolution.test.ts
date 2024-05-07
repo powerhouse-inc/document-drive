@@ -88,15 +88,8 @@ describe('Drive Operations', () => {
             { id: '1', name: 'test1' },
             { id: '2', name: 'test2' }
         ]);
-        expect(drive.operations.global.length).toBe(3);
+        expect(drive.operations.global.length).toBe(2);
         expect(drive.operations.global).toMatchObject([
-            {
-                type: 'NOOP',
-                input: {},
-                scope: 'global',
-                index: 0,
-                skip: 0
-            },
             {
                 type: 'ADD_FOLDER',
                 input: { id: '1', name: 'test1' },
@@ -395,15 +388,9 @@ describe('Drive Operations', () => {
         expect(drive.state.global.nodes).toMatchObject([
             { id: '1', name: 'test1' }
         ]);
-        expect(drive.operations.global.length).toBe(3);
+
+        expect(drive.operations.global.length).toBe(2);
         expect(drive.operations.global).toMatchObject([
-            {
-                type: 'NOOP',
-                scope: 'global',
-                index: 0,
-                skip: 0,
-                error: undefined
-            },
             {
                 type: 'ADD_FOLDER',
                 input: { id: '1', name: 'test1' },

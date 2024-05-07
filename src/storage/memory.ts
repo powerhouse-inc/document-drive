@@ -5,7 +5,7 @@ import {
     DocumentHeader,
     Operation
 } from 'document-model/document';
-import { applyUpdatedOperations, mergeOperations } from '..';
+import { mergeOperations } from '..';
 import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 
 export class MemoryStorage implements IDriveStorage {
@@ -73,8 +73,7 @@ export class MemoryStorage implements IDriveStorage {
         drive: string,
         id: string,
         operations: Operation[],
-        header: DocumentHeader,
-        updatedOperations: Operation[] = []
+        header: DocumentHeader
     ): Promise<void> {
         const document = await this.getDocument(drive, id);
         if (!document) {
@@ -86,15 +85,10 @@ export class MemoryStorage implements IDriveStorage {
             operations
         );
 
-        const mergedUpdatedOperations = applyUpdatedOperations(
-            mergedOperations,
-            updatedOperations
-        );
-
         this.documents[drive]![id] = {
             ...document,
             ...header,
-            operations: mergedUpdatedOperations
+            operations: mergedOperations
         };
     }
 
