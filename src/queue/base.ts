@@ -3,7 +3,7 @@ import { generateUUID } from "../utils";
 import { IOperationResult } from "../server";
 import { createNanoEvents, Unsubscribe } from 'nanoevents';
 import { Operation } from "document-model/document";
-import { AddFileInput } from "document-model-libs/document-drive";
+import { AddFileInput, DeleteNodeInput } from "document-model-libs/document-drive";
 
 export class MemoryQueue<T, R> implements IQueue<T, R> {
     private id: string;
@@ -67,13 +67,13 @@ export class MemoryQueue<T, R> implements IQueue<T, R> {
     }
 }
 
-export class MemoryQueueManager implements IQueueManager {
-    private emitter = createNanoEvents<QueueEvents>();
-    private ticker = 0;
-    private queues: IJobQueue[] = [];
-    private workers: number;
-    private timeout: number;
-    private processFn: OperationJobProcessor | undefined;
+export class BaseQueueManager implements IQueueManager {
+    protected emitter = createNanoEvents<QueueEvents>();
+    protected ticker = 0;
+    protected queues: IJobQueue[] = [];
+    protected workers: number;
+    protected timeout: number;
+    protected processFn: OperationJobProcessor | undefined;
 
     constructor(workers = 3, timeout = 0) {
         this.workers = workers;
@@ -84,20 +84,20 @@ export class MemoryQueueManager implements IQueueManager {
         this.processFn = processor;
         // Start workers
         for (let i = 0; i < this.workers; i++) {
-            this.processNextJob().catch(onError);
+            setTimeout(() => this.processNextJob.bind(this)().catch(onError), 100 * i);
         }
         return Promise.resolve()
     }
 
     async addJob(job: OperationJob): Promise<JobId> {
         const jobId = generateUUID();
-        const queue = await this.getQueue(job.driveId, job.documentId);
+        const queue = this.getQueue(job.driveId, job.documentId);
         await queue.addJob({ jobId, ...job });
 
         // block the document queue if this is a document job with op index 0 and a depending job with add file in the drive queue
         const firstOp = job.documentId && job.operations[0]?.index === 0;
         if (firstOp) {
-            const driveQueue = await this.getQueue(job.driveId);
+            const driveQueue = this.getQueue(job.driveId);
             const jobs = await driveQueue.getJobs();
             for (let driveJob of jobs) {
                 const op = driveJob.operations.find((j: Operation) => {
@@ -114,19 +114,27 @@ export class MemoryQueueManager implements IQueueManager {
         const addFileOps = job.operations.filter((j: Operation) => j.type === "ADD_FILE");
         for (const addFileOp of addFileOps) {
             const input = addFileOp.input as AddFileInput;
-            const q = await this.getQueue(job.driveId, input.id)
+            const q = this.getQueue(job.driveId, input.id)
             await q.addDependencies({ jobId, ...job });
+        }
+
+        // block the document queue if the job contains a remove file operation
+        const removeFileOps = job.operations.filter((j: Operation) => j.type === "DELETE_NODE");
+        for (const removeFileOp of removeFileOps) {
+            const input = removeFileOp.input as DeleteNodeInput;
+            const q = this.getQueue(job.driveId, input.id)
+            await q.setBlocked(true);
         }
 
         return jobId;
     }
 
     async getResult(driveId: string, documentId: string, jobId: JobId): Promise<IOperationResult | undefined> {
-        const queue = await this.getQueue(driveId, documentId);
+        const queue = this.getQueue(driveId, documentId);
         return queue.getResult(jobId);
     }
 
-    async getQueue(driveId: string, documentId?: string): Promise<IJobQueue> {
+    getQueue(driveId: string, documentId?: string) {
         const queueId = `${driveId}${documentId ? `:${documentId}` : ''}`;
         let queue = this.queues.find((q) => q.getId() === queueId);
 
@@ -138,7 +146,16 @@ export class MemoryQueueManager implements IQueueManager {
         return queue;
     }
 
-    async getQueues() {
+    getQueueByIndex(index: number) {
+        const queue = this.queues[index];
+        if (queue) {
+            return queue;
+        }
+
+        return null;
+    }
+
+    getQueues() {
         return Object.keys(new Array(this.queues));
     }
 
@@ -152,26 +169,27 @@ export class MemoryQueueManager implements IQueueManager {
             throw new Error("No job processor defined");
         }
 
-        const queues = await this.getQueues();
-        if (queues.length === 0) {
+        if (this.queues.length === 0) {
             this.retryNextJob();
             return;
         }
 
         const queue = this.queues[this.ticker];
-        this.ticker = this.ticker === this.queues.length ? 0 : this.ticker + 1;
+        this.ticker = this.ticker === this.queues.length - 1 ? 0 : this.ticker + 1;
         if (!queue) {
             this.ticker = 0;
             this.retryNextJob();
             return;
         }
 
-        if (await queue.isBlocked()) {
+        const amountOfJobs = await queue.amountOfJobs();
+        if (amountOfJobs === 0) {
             this.retryNextJob();
             return;
         }
 
-        if (await queue.amountOfJobs() === 0) {
+        const isBlocked = await queue.isBlocked();
+        if (isBlocked) {
             this.retryNextJob();
             return;
         }
@@ -190,8 +208,8 @@ export class MemoryQueueManager implements IQueueManager {
             const addFileOperations = nextJob.operations.filter((op) => op.type === "ADD_FILE");
             if (addFileOperations.length > 0) {
                 addFileOperations.map(async (addFileOp) => {
-                    const documentQueue = await this.getQueue(nextJob.driveId, (addFileOp.input as AddFileInput).id);
-                    documentQueue.removeDependencies(nextJob);
+                    const documentQueue = this.getQueue(nextJob.driveId, (addFileOp.input as AddFileInput).id);
+                    await documentQueue.removeDependencies(nextJob);
                 });
             }
 
