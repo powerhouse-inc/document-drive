@@ -131,7 +131,7 @@ describe.each(queueLayers)(
             ]);
         });
 
-        it.only("it blocks a document queue when the drive queue processes a delete node operation", async ({ expect }) => {
+        it("it blocks a document queue when the drive queue processes a delete node operation", async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
                 new MemoryStorage(),
