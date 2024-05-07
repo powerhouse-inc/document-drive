@@ -1,14 +1,12 @@
 import {
     actions,
-    DocumentDriveAction,
     DocumentDriveDocument,
-    DocumentDriveState,
     utils as DocumentDriveUtils,
     reducer
 } from 'document-model-libs/document-drive';
 import * as BudgetStatement from 'document-model-libs/budget-statement';
 import * as DocumentModelsLibs from 'document-model-libs/document-models';
-import { Document, DocumentModel } from 'document-model/document';
+import { DocumentModel } from 'document-model/document';
 import {
     module as DocumentModelLib,
 } from 'document-model/document-model';
