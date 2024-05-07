@@ -11,6 +11,7 @@ import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 export class MemoryStorage implements IDriveStorage {
     private documents: Record<string, Record<string, DocumentStorage>>;
     private drives: Record<string, DocumentDriveStorage>;
+    private slugToDriveId: Record<string, string> = {};
 
     constructor() {
         this.documents = {};
@@ -120,9 +121,20 @@ export class MemoryStorage implements IDriveStorage {
         return drive;
     }
 
+    async getDriveBySlug(slug: string) {
+        const driveId = this.slugToDriveId[slug];
+        if (!driveId) {
+            throw new Error(`Drive with slug ${slug} not found`);
+        }
+        return this.getDrive(driveId);
+    }
+
     async createDrive(id: string, drive: DocumentDriveStorage) {
         this.drives[id] = drive;
-        this.documents[id] = {};
+        const { slug } = drive.initialState.state.global;
+        if (slug) {
+            this.slugToDriveId[slug] = id;
+        }
     }
 
     async addDriveOperations(

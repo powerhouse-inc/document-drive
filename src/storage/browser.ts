@@ -118,6 +118,19 @@ export class BrowserStorage implements IDriveStorage {
         return drive;
     }
 
+    async getDriveBySlug(slug: string) {
+        // get oldes drives first
+        const drives = (await this.getDrives()).reverse();
+        for (const drive of drives) {
+            const driveData = await this.getDrive(drive);
+            if (driveData.initialState.state.global.slug === slug) {
+                return this.getDrive(drive);
+            }
+        }
+
+        throw new Error(`Drive with slug ${slug} not found`);
+    }
+
     async createDrive(id: string, drive: DocumentDriveStorage) {
         const db = await this.db;
         await db.setItem(this.buildKey(BrowserStorage.DRIVES_KEY, id), drive);

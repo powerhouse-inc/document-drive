@@ -43,7 +43,7 @@ import {
 } from '../utils/document-helpers';
 import { requestPublicDrive } from '../utils/graphql';
 import { logger } from '../utils/logger';
-import { OperationError } from './error';
+import { ConflictOperationError, OperationError } from './error';
 import { ListenerManager } from './listener/manager';
 import {
     CancelPullLoop,
@@ -120,13 +120,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
     private async saveStrand(strand: StrandUpdate) {
         const operations: Operation[] = strand.operations.map(
-            ({ index, type, hash, input, skip, timestamp }) => ({
-                index,
-                type,
-                hash,
-                input,
-                skip,
-                timestamp,
+            (op) => ({
+                ...op,
                 scope: strand.scope,
                 branch: strand.branch
             })
@@ -429,7 +424,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             timestamp: operation.timestamp,
             type: operation.type,
             input: operation.input as object,
-            skip: operation.skip
+            skip: operation.skip,
+            context: operation.context
         }));
     }
 
@@ -517,19 +513,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             logger.error('Error getting drive from cache', e);
         }
         const driveStorage = await this.storage.getDrive(drive);
-        const documentModel = this._getDocumentModel(driveStorage.documentType);
-        const document = baseUtils.replayDocument(
-            driveStorage.initialState,
-            filterOperationsByRevision(
-                driveStorage.operations,
-                options?.revisions
-            ),
-            documentModel.reducer,
-            undefined,
-            driveStorage,
-            undefined,
-            { checkHashes: false }
-        );
+        const document = this._replayDocument(driveStorage, options);
         if (!isDocumentDrive(document)) {
             throw new Error(
                 `Document with id ${drive} is not a Document Drive`
@@ -537,6 +521,30 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         } else {
             this.cache
                 .setDocument('drives', drive, document)
+                .catch(logger.error);
+            return document;
+        }
+    }
+
+    async getDriveBySlug(slug: string, options?: GetDocumentOptions) {
+        try {
+            const document = await this.cache.getDocument('drives', slug);
+            if (document && isDocumentDrive(document)) {
+                return document;
+            }
+        } catch (e) {
+            logger.error('Error getting drive from cache', e);
+        }
+
+        const driveStorage = await this.storage.getDriveBySlug(slug);
+        const document = this._replayDocument(driveStorage, options);
+        if (!isDocumentDrive(document)) {
+            throw new Error(
+                `Document with slug ${slug} is not a Document Drive`
+            );
+        } else {
+            this.cache
+                .setDocument('drives', slug, document)
                 .catch(logger.error);
             return document;
         }
@@ -790,10 +798,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             appliedOperation[0]!.hash !== operation.hash &&
             !skipHashValidation
         ) {
-            throw new OperationError(
-                'CONFLICT',
+            throw new ConflictOperationError(
                 operation,
-                `Operation with index ${operation.index}:${operation.skip} has unexpected result hash`
+                appliedOperation[0]!
             );
         }
 
@@ -1339,5 +1346,23 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     ): void {
         logger.debug(`Emitting event ${event}`, args);
         return this.emitter.emit(event, ...args);
+    }
+
+    private _replayDocument(documentStorage: DocumentStorage, options?: GetDocumentOptions) {
+        const documentModel = this._getDocumentModel(documentStorage.documentType);
+        const document = baseUtils.replayDocument(
+            documentStorage.initialState,
+            filterOperationsByRevision(
+                documentStorage.operations,
+                options?.revisions
+            ),
+            documentModel.reducer,
+            undefined,
+            documentStorage,
+            undefined,
+            { checkHashes: false }
+        );
+
+        return document;
     }
 }

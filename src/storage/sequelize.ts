@@ -20,6 +20,13 @@ export class SequelizeStorage implements IDriveStorage {
     }
 
     public syncModels() {
+        const Drive = this.db.define('drive', {
+            slug: {
+                type: DataTypes.STRING,
+                primaryKey: true
+            },
+            id: DataTypes.STRING,
+        })
         const Document = this.db.define('document', {
             id: {
                 type: DataTypes.STRING,
@@ -113,6 +120,8 @@ export class SequelizeStorage implements IDriveStorage {
 
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
         await this.createDocument('drives', id, drive as DocumentStorage);
+        const Drive = this.db.models.drive;
+        await Drive?.upsert({ id, slug: drive.initialState.state.global.slug });
     }
     async addDriveOperations(
         id: string,
@@ -394,6 +403,25 @@ export class SequelizeStorage implements IDriveStorage {
         return doc as DocumentDriveStorage;
     }
 
+    async getDriveBySlug(slug: string) {
+        const Drive = this.db.models.drive;
+        if (!Drive) {
+            throw new Error('Drive model not found');
+        }
+
+        const driveEntity = await Drive.findOne({
+            where: {
+                slug
+            }
+        });
+
+        if (!driveEntity) {
+            throw new Error(`Drive with slug ${slug} not found`);
+        }
+
+        return this.getDrive(driveEntity.dataValues.id);
+    }
+
     async deleteDrive(id: string) {
         await this.deleteDocument('drives', id);
 
@@ -407,5 +435,14 @@ export class SequelizeStorage implements IDriveStorage {
                 driveId: id
             }
         });
+
+        const Drive = this.db.models.drive;
+        if (Drive) {
+            await Drive.destroy({
+                where: {
+                    id: id
+                }
+            });
+        }
     }
 }
