@@ -68,8 +68,7 @@ import {
     type SynchronizationUnit
 } from './types';
 import { filterOperationsByRevision } from './utils';
-import { RedisQueueManager } from '../queue/redis';
-import { MemoryQueueManager } from '../queue/memory';
+import { BaseQueueManager } from '../queue/base';
 import { IQueueManager } from '../queue/types';
 
 export * from './listener';
@@ -95,7 +94,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         documentModels: DocumentModel[],
         storage: IDriveStorage = new MemoryStorage(),
         cache: ICache = new InMemoryCache(),
-        queueManager: IQueueManager = new MemoryQueueManager(),
+        queueManager: IQueueManager = new BaseQueueManager(),
     ) {
         super();
         this.listenerStateManager = new ListenerManager(this);
@@ -860,6 +859,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         id: string,
         operations: Operation[],
         forceSync = true) {
+        // try {
+        //     await this.getDocument(drive, id);
+        // } catch (error) {
+        //     logger.error('Error getting document', error);
+        //     throw error;
+        // }
+
         const jobId = await this.queueManager.addJob({ driveId: drive, documentId: id, operations, forceSync });
         return new Promise((resolve, reject) => {
             const unsubscribe = this.queueManager.on('jobCompleted', (job, result) => {
@@ -876,6 +882,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     reject(error);
                 }
             });
+
+            setTimeout(() => {
+                unsubscribe();
+                unsubscribeError();
+                reject(new Error('Operation queue timeout'));
+            }, 5000);
         })
     }
 
@@ -1060,6 +1072,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     reject(error);
                 }
             });
+
+            setTimeout(() => {
+                unsubscribe();
+                unsubscribeError();
+                reject(new Error('Operation queue timeout'));
+            }, 5000);
         })
     }
 

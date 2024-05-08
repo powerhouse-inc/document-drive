@@ -3,7 +3,7 @@ import { generateUUID } from "../utils";
 import { IOperationResult } from "../server";
 import { createNanoEvents, Unsubscribe } from 'nanoevents';
 import { Operation } from "document-model/document";
-import { AddFileInput } from "document-model-libs/document-drive";
+import { AddFileInput, DeleteNodeInput } from "document-model-libs/document-drive";
 
 export class MemoryQueue<T, R> implements IQueue<T, R> {
     private id: string;
@@ -42,19 +42,19 @@ export class MemoryQueue<T, R> implements IQueue<T, R> {
         return this.id;
     }
 
-    setBlocked(blocked: boolean) {
+    async setBlocked(blocked: boolean) {
         this.blocked = blocked;
     }
 
-    isBlocked() {
+    async isBlocked() {
         return this.blocked;
     }
 
-    getJobs() {
+    async getJobs() {
         return this.items;
     }
 
-    addDependencies(job: IJob<OperationJob>) {
+    async addDependencies(job: IJob<OperationJob>) {
         if (!this.dependencies.find(j => j.jobId === job.jobId)) {
             this.dependencies.push(job);
         }
@@ -63,20 +63,20 @@ export class MemoryQueue<T, R> implements IQueue<T, R> {
         }
     }
 
-    removeDependencies(job: IJob<OperationJob>) {
+    async removeDependencies(job: IJob<OperationJob>) {
         this.dependencies = this.dependencies.filter((j) => j.jobId !== job.jobId && j.driveId !== job.driveId);
         if (this.dependencies.length === 0) {
-            this.setBlocked(false);
+            await this.setBlocked(false);
         }
     }
 }
 
-export class MemoryQueueManager implements IQueueManager {
-    private emitter = createNanoEvents<QueueEvents>();
-    private ticker = 0;
-    private queues: IJobQueue[] = [];
-    private workers: number;
-    private timeout: number;
+export class BaseQueueManager implements IQueueManager {
+    protected emitter = createNanoEvents<QueueEvents>();
+    protected ticker = 0;
+    protected queues: IJobQueue[] = [];
+    protected workers: number;
+    protected timeout: number;
     private delegate: IServerDelegate | undefined;
 
     constructor(workers = 3, timeout = 0) {
@@ -87,7 +87,7 @@ export class MemoryQueueManager implements IQueueManager {
     async init(delegate: IServerDelegate, onError: (error: Error) => void): Promise<void> {
         this.delegate = delegate;
         for (let i = 0; i < this.workers; i++) {
-            this.processNextJob().catch(onError);
+            setTimeout(() => this.processNextJob.bind(this)().catch(onError), 100 * i);
         }
         return Promise.resolve()
     }
@@ -104,19 +104,19 @@ export class MemoryQueueManager implements IQueueManager {
         const newDocument = job.documentId && !(await this.delegate.checkDocumentExists(job.driveId, job.documentId));
         // if it is a new document and queue is not yet blocked then 
         // blocks it so the jobs are not processed until it's ready
-        if (newDocument && !queue.isBlocked()) {
+        if (newDocument && !(await queue.isBlocked())) {
             queue.setBlocked(true);
 
             // checks if there any job in the queue adding the file and adds as dependency
             const driveQueue = this.getQueue(job.driveId);
-            const jobs = driveQueue.getJobs();
+            const jobs = await driveQueue.getJobs();
             for (const driveJob of jobs) {
                 const op = driveJob.operations.find((j: Operation) => {
                     const input = j.input as AddFileInput;
                     return j.type === "ADD_FILE" && input.id === job.documentId
                 })
                 if (op) {
-                    queue.addDependencies(driveJob);
+                    await queue.addDependencies(driveJob);
                 }
             }
         }
@@ -127,7 +127,15 @@ export class MemoryQueueManager implements IQueueManager {
         for (const addFileOp of addFileOps) {
             const input = addFileOp.input as AddFileInput;
             const q = this.getQueue(job.driveId, input.id)
-            q.addDependencies({ jobId, ...job });
+            await q.addDependencies({ jobId, ...job });
+        }
+
+        // block the document queue if the job contains a remove file operation
+        const removeFileOps = job.operations.filter((j: Operation) => j.type === "DELETE_NODE");
+        for (const removeFileOp of removeFileOps) {
+            const input = removeFileOp.input as DeleteNodeInput;
+            const q = this.getQueue(job.driveId, input.id)
+            await q.setBlocked(true);
         }
 
         await queue.addJob({ jobId, ...job });
@@ -140,7 +148,7 @@ export class MemoryQueueManager implements IQueueManager {
         return queue.getResult(jobId);
     }
 
-    private getQueue(driveId: string, documentId?: string): IJobQueue {
+    getQueue(driveId: string, documentId?: string) {
         const queueId = `${driveId}${documentId ? `:${documentId}` : ''}`;
         let queue = this.queues.find((q) => q.getId() === queueId);
 
@@ -150,6 +158,19 @@ export class MemoryQueueManager implements IQueueManager {
         }
 
         return queue;
+    }
+
+    getQueueByIndex(index: number) {
+        const queue = this.queues[index];
+        if (queue) {
+            return queue;
+        }
+
+        return null;
+    }
+
+    getQueues() {
+        return Object.keys(new Array(this.queues));
     }
 
     private retryNextJob() {
@@ -168,24 +189,26 @@ export class MemoryQueueManager implements IQueueManager {
         }
 
         const queue = this.queues[this.ticker];
-        this.ticker = this.ticker === this.queues.length ? 0 : this.ticker + 1;
+        this.ticker = this.ticker === this.queues.length - 1 ? 0 : this.ticker + 1;
         if (!queue) {
             this.ticker = 0;
             this.retryNextJob();
             return;
         }
 
-        if (queue.isBlocked()) {
+        const amountOfJobs = await queue.amountOfJobs();
+        if (amountOfJobs === 0) {
             this.retryNextJob();
             return;
         }
 
-        if (await queue.amountOfJobs() === 0) {
+        const isBlocked = await queue.isBlocked();
+        if (isBlocked) {
             this.retryNextJob();
             return;
         }
 
-        queue.setBlocked(true);
+        await queue.setBlocked(true);
         const nextJob = await queue.getNextJob();
         if (!nextJob) {
             this.retryNextJob();
@@ -198,10 +221,12 @@ export class MemoryQueueManager implements IQueueManager {
 
             // unblock the document queues of each add_file operation
             const addFileOperations = nextJob.operations.filter((op) => op.type === "ADD_FILE");
-            addFileOperations.forEach((addFileOp) => {
-                const documentQueue = this.getQueue(nextJob.driveId, (addFileOp.input as AddFileInput).id);
-                documentQueue.removeDependencies(nextJob);
-            });
+            if (addFileOperations.length > 0) {
+                addFileOperations.map(async (addFileOp) => {
+                    const documentQueue = this.getQueue(nextJob.driveId, (addFileOp.input as AddFileInput).id);
+                    await documentQueue.removeDependencies(nextJob);
+                });
+            }
 
             this.emit("jobCompleted", nextJob, result);
         } catch (e) {
