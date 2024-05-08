@@ -181,23 +181,29 @@ describe.each(queueLayers)(
             let drive = await createDrive(server);
             const driveId = drive.state.global.id;
 
+            // add file op
             const driveOperations = buildOperations(reducer, drive, [
                 actions.addFile({ id: "file 1", name: "file 1", parentFolder: "folder 1", documentType: "powerhouse/budget-statement", synchronizationUnits: [{ syncId: "1", scope: "global", branch: "main" }] })]
             );
 
+            // delete node op
             const deleteNode = buildOperations(reducer, drive, [
                 actions.deleteNode({ id: "file 1" })
             ]);
 
             let budget = BudgetStatement.utils.createDocument();
+
+            // first doc op
             const budgetOperation = buildOperation(BudgetStatement.reducer, budget, BudgetStatement.actions.addAccount({
                 address: '0x123'
             }));
+
+            // second doc op
             const budgetOperation2 = buildOperation(BudgetStatement.reducer, budget, BudgetStatement.actions.addAccount({
                 address: '0x123456'
             }));
 
-
+            // queue addFile and first doc op
             const results1 = await Promise.all([
                 server.queueDriveOperations(driveId, driveOperations),
                 server.queueOperations(driveId, "file 1", [budgetOperation]),
@@ -208,7 +214,9 @@ describe.each(queueLayers)(
                 errors.forEach(error => console.error(error));
             }
 
-            await server.queueDriveOperations(driveId, deleteNode);
+            // queue delete node op
+            const result = await server.queueDriveOperations(driveId, deleteNode);
+            // ==> receives deleteNode and addFile operation?
 
             try {
                 await server.queueOperations(driveId, "file 1", [budgetOperation2]);
