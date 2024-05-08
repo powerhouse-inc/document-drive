@@ -16,7 +16,7 @@
         "./cache/redis": "./src/cache/redis.ts",
         "./cache/memory": "./src/cache/memory.ts",
         "./queue/redis": "./src/queue/redis.ts",
-        "./queue/memory": "./src/queue/memory.ts",
+        "./queue/base": "./src/queue/base.ts",
         "./utils": "./src/utils/index.ts",
         "./utils/graphql": "./src/utils/graphql.ts",
         "./logger": "./src/utils/logger.ts"
