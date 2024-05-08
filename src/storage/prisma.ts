@@ -1,11 +1,13 @@
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { backOff, IBackOffOptions } from "exponential-backoff";
 import {
     DocumentDriveAction,
     DocumentDriveLocalState,
     DocumentDriveState
 } from 'document-model-libs/document-drive';
 import type {
+    ActionContext,
     BaseAction,
     DocumentHeader,
     ExtendedState,
@@ -19,7 +21,7 @@ import { DocumentDriveStorage, DocumentStorage, IDriveStorage } from './types';
 type Transaction = Omit<
     PrismaClient<Prisma.PrismaClientOptions, never>,
     '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
->;
+> | ExtendedPrismaClient;
 
 function storageToOperation(
     op: Prisma.$OperationPayload['scalars']
@@ -31,21 +33,63 @@ function storageToOperation(
         timestamp: new Date(op.timestamp).toISOString(),
         input: op.input,
         type: op.type,
-        scope: op.scope as OperationScope
+        scope: op.scope as OperationScope,
+        context: op.context ? op.context as ActionContext : undefined,
         // attachments: fileRegistry
     };
 }
 
-export class PrismaStorage implements IDriveStorage {
-    private db: PrismaClient;
+export type PrismaStorageOptions = {
+    transactionRetryBackoff?: IBackOffOptions;
+}
 
-    constructor(db: PrismaClient) {
-        this.db = db;
+function getRetryTransactionsClient<T extends PrismaClient>(prisma: T, backOffOptions?: Partial<IBackOffOptions>) {
+    return prisma.$extends({
+        client: {
+            $transaction: (...args: Parameters<T["$transaction"]>) => {
+                // eslint-disable-next-line prefer-spread
+                return backOff(() => prisma.$transaction.apply(prisma, args), {
+                    retry: (e) => {
+                        // Retry the transaction only if the error was due to a write conflict or deadlock
+                        // See: https://www.prisma.io/docs/reference/api-reference/error-reference#p2034
+                        return (e as { code: string }).code === "P2034";
+                    },
+                    ...backOffOptions,
+                });
+            }
+        }
+    });
+}
+
+type ExtendedPrismaClient = ReturnType<typeof getRetryTransactionsClient<PrismaClient>>;
+
+export class PrismaStorage implements IDriveStorage {
+    private db: ExtendedPrismaClient;
+
+    constructor(db: PrismaClient, options?: PrismaStorageOptions) {
+        const backOffOptions = options?.transactionRetryBackoff;
+        this.db = getRetryTransactionsClient(db, {
+            ...backOffOptions,
+            jitter: backOffOptions?.jitter ?? "full"
+        });
+
     }
 
     async createDrive(id: string, drive: DocumentDriveStorage): Promise<void> {
         // drive for all drive documents
         await this.createDocument('drives', id, drive as DocumentStorage);
+        const count = await this.db.drive.upsert({
+            where: {
+                slug: drive.initialState.state.global.slug ?? id
+            },
+            create: {
+                id: id,
+                slug: drive.initialState.state.global.slug ?? id
+            },
+            update: {
+                id
+            }
+        });
     }
     async addDriveOperations(
         id: string,
@@ -120,7 +164,8 @@ export class PrismaStorage implements IDriveStorage {
                     type: op.type,
                     scope: op.scope,
                     branch: 'main',
-                    skip: op.skip
+                    skip: op.skip,
+                    context: op.context
                 }))
             });
 
@@ -146,7 +191,8 @@ export class PrismaStorage implements IDriveStorage {
                             type: op.type,
                             scope: op.scope,
                             branch: 'main',
-                            skip: op.skip
+                            skip: op.skip,
+                            context: op.context
                         }
                     })
                 )
@@ -215,6 +261,7 @@ export class PrismaStorage implements IDriveStorage {
             header: DocumentHeader;
             updatedOperations?: Operation[] | undefined;
         } | null = null;
+
         await this.db.$transaction(async tx => {
             const document = await this.getDocument(drive, id, tx);
             if (!document) {
@@ -231,7 +278,8 @@ export class PrismaStorage implements IDriveStorage {
                 header,
                 updatedOperations
             );
-        });
+        }, { isolationLevel: "Serializable" });
+
 
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (!result) {
@@ -271,6 +319,16 @@ export class PrismaStorage implements IDriveStorage {
         });
 
         return docs.map(doc => doc.id);
+    }
+
+    async checkDocumentExists(driveId: string, id: string) {
+        const count = await this.db.document.count({
+            where: {
+                id: id,
+                driveId: driveId
+            },
+        });
+        return count > 0;
     }
 
     async getDocument(driveId: string, id: string, tx?: Transaction) {
@@ -352,6 +410,20 @@ export class PrismaStorage implements IDriveStorage {
             logger.error(e);
             throw new Error(`Drive with id ${id} not found`);
         }
+    }
+
+    async getDriveBySlug(slug: string) {
+        const driveEntity = await this.db.drive.findFirst({
+            where: {
+                slug
+            }
+        });
+
+        if (!driveEntity) {
+            throw new Error(`Drive with slug ${slug} not found`);
+        }
+
+        return this.getDrive(driveEntity.id);
     }
 
     async deleteDrive(id: string) {

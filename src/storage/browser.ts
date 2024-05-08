@@ -27,6 +27,13 @@ export class BrowserStorage implements IDriveStorage {
         return args.join(BrowserStorage.SEP);
     }
 
+    async checkDocumentExists(drive: string, id: string): Promise<boolean> {
+        const document = await (
+            await this.db
+        ).getItem<Document>(this.buildKey(drive, id));
+        return document !== undefined;
+    }
+
     async getDocuments(drive: string) {
         const keys = await (await this.db).keys();
         const driveKey = `${drive}${BrowserStorage.SEP}`;
@@ -109,6 +116,19 @@ export class BrowserStorage implements IDriveStorage {
             throw new Error(`Drive with id ${id} not found`);
         }
         return drive;
+    }
+
+    async getDriveBySlug(slug: string) {
+        // get oldes drives first
+        const drives = (await this.getDrives()).reverse();
+        for (const drive of drives) {
+            const driveData = await this.getDrive(drive);
+            if (driveData.initialState.state.global.slug === slug) {
+                return this.getDrive(drive);
+            }
+        }
+
+        throw new Error(`Drive with slug ${slug} not found`);
     }
 
     async createDrive(id: string, drive: DocumentDriveStorage) {

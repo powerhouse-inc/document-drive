@@ -9,13 +9,16 @@ export type OperationJob = {
     forceSync?: boolean
 }
 
-export type OperationJobProcessor = (job: OperationJob) => Promise<IOperationResult>;
-
 export type JobId = string;
 
 export interface QueueEvents {
     jobCompleted: (job: IJob<OperationJob>, result: IOperationResult) => void;
     jobFailed: (job: IJob<OperationJob>, error: Error) => void;
+}
+
+export interface IServerDelegate {
+    checkDocumentExists: (driveId: string, documentId: string) => Promise<boolean>;
+    processOperationJob: (job: OperationJob) => Promise<IOperationResult>;
 }
 
 export interface IQueueManager {
@@ -24,7 +27,7 @@ export interface IQueueManager {
     getQueue(driveId: string, document?: string): IQueue<OperationJob, IOperationResult>;
     getQueueByIndex(index: number): IQueue<OperationJob, IOperationResult> | null;
     getQueues(): string[];
-    init(processor: OperationJobProcessor, onError: (error: Error) => void): Promise<void>;
+    init(delegate: IServerDelegate, onError: (error: Error) => void): Promise<void>;
     on<K extends keyof QueueEvents>(
         this: this,
         event: K,

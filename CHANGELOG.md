@@ -1,3 +1,54 @@
+# [1.0.0-alpha.53](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.52...v1.0.0-alpha.53) (2024-04-30)
+
+
+### Features
+
+* added getDrive by slug to memory adapter ([5515c34](https://github.com/powerhouse-inc/document-drive/commit/5515c34ecc18a6f14931a1a66cee454f14dbe03f))
+* added getDriveBySlug ([680cf71](https://github.com/powerhouse-inc/document-drive/commit/680cf71209853689e1414f90f58f079460be94d5))
+* get drive by id or slug ([95c171e](https://github.com/powerhouse-inc/document-drive/commit/95c171e97eb7e27a65129d7fc400fae862d62fdc))
+
+# [1.0.0-alpha.52](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.51...v1.0.0-alpha.52) (2024-04-24)
+
+
+### Features
+
+* store and sync operation context ([b2e5d5e](https://github.com/powerhouse-inc/document-drive/commit/b2e5d5efe59ed382fe6f984c193959218cbac4e0))
+
+# [1.0.0-alpha.51](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.50...v1.0.0-alpha.51) (2024-04-24)
+
+
+### Features
+
+* added exponential retry backoff to prisma transactions ([b38e72f](https://github.com/powerhouse-inc/document-drive/commit/b38e72fdfd29f4c39e15f606fccc942ec966fffe))
+
+# [1.0.0-alpha.50](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.49...v1.0.0-alpha.50) (2024-04-23)
+
+
+### Features
+
+* update document-model and document-model-libs ([#145](https://github.com/powerhouse-inc/document-drive/issues/145)) ([87dff17](https://github.com/powerhouse-inc/document-drive/commit/87dff17b5c8a76010e09dff2d8e6dba55fb262a5))
+
+# [1.0.0-alpha.49](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.48...v1.0.0-alpha.49) (2024-04-23)
+
+
+### Features
+
+* added duplicate folders id tests ([#143](https://github.com/powerhouse-inc/document-drive/issues/143)) ([abd3688](https://github.com/powerhouse-inc/document-drive/commit/abd3688bb284257a8f088e905e1f7cf6de1f8f5d))
+
+# [1.0.0-alpha.48](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.47...v1.0.0-alpha.48) (2024-04-23)
+
+
+### Features
+
+* added retry mechanism to transaction ([e01a2cb](https://github.com/powerhouse-inc/document-drive/commit/e01a2cb6e1c64d37655255191fc4af13254201fe))
+
+# [1.0.0-alpha.47](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.46...v1.0.0-alpha.47) (2024-04-23)
+
+
+### Features
+
+* use serializable transactions ([267cae4](https://github.com/powerhouse-inc/document-drive/commit/267cae47ba3fec4a4863169350cbf961172caebf))
+
 # [1.0.0-alpha.46](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.45...v1.0.0-alpha.46) (2024-04-23)
 
 

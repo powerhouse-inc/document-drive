@@ -43,7 +43,7 @@ import {
 } from '../utils/document-helpers';
 import { requestPublicDrive } from '../utils/graphql';
 import { logger } from '../utils/logger';
-import { OperationError } from './error';
+import { ConflictOperationError, OperationError } from './error';
 import { ListenerManager } from './listener/manager';
 import {
     CancelPullLoop,
@@ -68,8 +68,7 @@ import {
     type SynchronizationUnit
 } from './types';
 import { filterOperationsByRevision } from './utils';
-import { RedisQueueManager } from '../queue/redis';
-import { MemoryQueueManager } from '../queue/base';
+import { BaseQueueManager } from '../queue/base';
 import { IQueueManager } from '../queue/types';
 
 export * from './listener';
@@ -95,7 +94,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         documentModels: DocumentModel[],
         storage: IDriveStorage = new MemoryStorage(),
         cache: ICache = new InMemoryCache(),
-        queueManager: IQueueManager = new MemoryQueueManager(),
+        queueManager: IQueueManager = new BaseQueueManager(),
     ) {
         super();
         this.listenerStateManager = new ListenerManager(this);
@@ -120,13 +119,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
     private async saveStrand(strand: StrandUpdate) {
         const operations: Operation[] = strand.operations.map(
-            ({ index, type, hash, input, skip, timestamp }) => ({
-                index,
-                type,
-                hash,
-                input,
-                skip,
-                timestamp,
+            (op) => ({
+                ...op,
                 scope: strand.scope,
                 branch: strand.branch
             })
@@ -235,12 +229,16 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             });
         }
 
-        await this.queueManager.init(({ driveId, documentId, operations, forceSync }) => documentId ?
-            this.addOperations(driveId, documentId, operations, forceSync)
-            : this.addDriveOperations(driveId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync), error => {
-                logger.error(`Error initializing queue manager`, error);
-                errors.push(error);
-            })
+        await this.queueManager.init({
+            checkDocumentExists: (driveId: string, documentId: string): Promise<boolean> => this.storage.checkDocumentExists(driveId, documentId),
+            processOperationJob: ({ driveId, documentId, operations, forceSync }) => documentId ?
+                this.addOperations(driveId, documentId, operations, forceSync)
+                : this.addDriveOperations(driveId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync)
+
+        }, error => {
+            logger.error(`Error initializing queue manager`, error);
+            errors.push(error);
+        })
 
         // if network connect comes online then
         // triggers the listeners update
@@ -425,7 +423,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             timestamp: operation.timestamp,
             type: operation.type,
             input: operation.input as object,
-            skip: operation.skip
+            skip: operation.skip,
+            context: operation.context
         }));
     }
 
@@ -513,19 +512,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             logger.error('Error getting drive from cache', e);
         }
         const driveStorage = await this.storage.getDrive(drive);
-        const documentModel = this._getDocumentModel(driveStorage.documentType);
-        const document = baseUtils.replayDocument(
-            driveStorage.initialState,
-            filterOperationsByRevision(
-                driveStorage.operations,
-                options?.revisions
-            ),
-            documentModel.reducer,
-            undefined,
-            driveStorage,
-            undefined,
-            { checkHashes: false }
-        );
+        const document = this._replayDocument(driveStorage, options);
         if (!isDocumentDrive(document)) {
             throw new Error(
                 `Document with id ${drive} is not a Document Drive`
@@ -533,6 +520,30 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         } else {
             this.cache
                 .setDocument('drives', drive, document)
+                .catch(logger.error);
+            return document;
+        }
+    }
+
+    async getDriveBySlug(slug: string, options?: GetDocumentOptions) {
+        try {
+            const document = await this.cache.getDocument('drives', slug);
+            if (document && isDocumentDrive(document)) {
+                return document;
+            }
+        } catch (e) {
+            logger.error('Error getting drive from cache', e);
+        }
+
+        const driveStorage = await this.storage.getDriveBySlug(slug);
+        const document = this._replayDocument(driveStorage, options);
+        if (!isDocumentDrive(document)) {
+            throw new Error(
+                `Document with slug ${slug} is not a Document Drive`
+            );
+        } else {
+            this.cache
+                .setDocument('drives', slug, document)
                 .catch(logger.error);
             return document;
         }
@@ -786,10 +797,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             appliedOperation[0]!.hash !== operation.hash &&
             !skipHashValidation
         ) {
-            throw new OperationError(
-                'CONFLICT',
+            throw new ConflictOperationError(
                 operation,
-                `Operation with index ${operation.index}:${operation.skip} has unexpected result hash`
+                appliedOperation[0]!
             );
         }
 
@@ -1045,7 +1055,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[],
         forceSync = true
-    ) {
+    ): Promise<IOperationResult> {
         const jobId = await this.queueManager.addJob({ driveId: drive, operations, forceSync });
         return new Promise((resolve, reject) => {
             const unsubscribe = this.queueManager.on('jobCompleted', (job, result) => {
@@ -1348,5 +1358,23 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     ): void {
         logger.debug(`Emitting event ${event}`, args);
         return this.emitter.emit(event, ...args);
+    }
+
+    private _replayDocument(documentStorage: DocumentStorage, options?: GetDocumentOptions) {
+        const documentModel = this._getDocumentModel(documentStorage.documentType);
+        const document = baseUtils.replayDocument(
+            documentStorage.initialState,
+            filterOperationsByRevision(
+                documentStorage.operations,
+                options?.revisions
+            ),
+            documentModel.reducer,
+            undefined,
+            documentStorage,
+            undefined,
+            { checkHashes: false }
+        );
+
+        return document;
     }
 }

@@ -77,6 +77,11 @@ export class FilesystemStorage implements IDriveStorage {
         return documents;
     }
 
+    checkDocumentExists(drive: string, id: string): Promise<boolean> {
+        const documentExists = existsSync(this._buildDocumentPath(drive, id));
+        return Promise.resolve(documentExists);
+    }
+
     async getDocument(drive: string, id: string) {
         try {
             const content = readFileSync(this._buildDocumentPath(drive, id), {
@@ -195,6 +200,18 @@ export class FilesystemStorage implements IDriveStorage {
         } catch {
             throw new Error(`Drive with id ${id} not found`);
         }
+    }
+
+    async getDriveBySlug(slug: string) {
+        // get oldes drives first
+        const drives = (await this.getDrives()).reverse();
+        for (const drive of drives) {
+            const { initialState: { state: { global: { slug: driveSlug } } } } = await this.getDrive(drive);
+            if (driveSlug === slug) {
+                return this.getDrive(drive);
+            }
+        }
+        throw new Error(`Drive with slug ${slug} not found`);
     }
 
     createDrive(id: string, drive: DocumentDriveStorage) {

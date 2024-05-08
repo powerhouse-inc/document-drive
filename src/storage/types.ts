@@ -8,6 +8,7 @@ import type {
     DocumentHeader,
     Operation
 } from 'document-model/document';
+import { GetDocumentOptions } from '../server';
 
 export type DocumentStorage<D extends Document = Document> = Omit<
     D,
@@ -16,6 +17,7 @@ export type DocumentStorage<D extends Document = Document> = Omit<
 export type DocumentDriveStorage = DocumentStorage<DocumentDriveDocument>;
 
 export interface IStorage {
+    checkDocumentExists(drive: string, id: string): Promise<boolean>;
     getDocuments: (drive: string) => Promise<string[]>;
     getDocument(drive: string, id: string): Promise<DocumentStorage>;
     createDocument(
@@ -45,6 +47,7 @@ export interface IStorage {
 export interface IDriveStorage extends IStorage {
     getDrives(): Promise<string[]>;
     getDrive(id: string): Promise<DocumentDriveStorage>;
+    getDriveBySlug(slug: string): Promise<DocumentDriveStorage>;
     createDrive(id: string, drive: DocumentDriveStorage): Promise<void>;
     deleteDrive(id: string): Promise<void>;
     clearStorage?(): Promise<void>;
