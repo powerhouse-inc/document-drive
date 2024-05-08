@@ -28,14 +28,14 @@ const documentModels = [
 
 const queueLayers = [
     ['Memory Queue', async () => new BaseQueueManager()],
-    // [
-    //     'Redis Queue',
-    //     async () => {
-    //         const client = await createClient().connect();
-    //         await client.flushAll();
-    //         return new RedisQueueManager(3, 0, client as RedisClientType);
-    //     }
-    // ]
+    [
+        'Redis Queue',
+        async () => {
+            const client = await createClient().connect();
+            await client.flushAll();
+            return new RedisQueueManager(3, 0, client as RedisClientType);
+        }
+    ]
 ] as unknown as [string, () => Promise<IQueueManager>][];
 
 describe.each(queueLayers)(
@@ -170,7 +170,7 @@ describe.each(queueLayers)(
             ]);
         });
 
-        it.only("it blocks a document queue when the drive queue processes a delete node operation", async ({ expect }) => {
+        it("it blocks a document queue when the drive queue processes a delete node operation", async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
                 new MemoryStorage(),
@@ -180,16 +180,6 @@ describe.each(queueLayers)(
             await server.initialize();
             let drive = await createDrive(server);
             const driveId = drive.state.global.id;
-
-            // add file op
-            const driveOperations = buildOperations(reducer, drive, [
-                actions.addFile({ id: "file 1", name: "file 1", parentFolder: "folder 1", documentType: "powerhouse/budget-statement", synchronizationUnits: [{ syncId: "1", scope: "global", branch: "main" }] })]
-            );
-
-            // delete node op
-            const deleteNode = buildOperations(reducer, drive, [
-                actions.deleteNode({ id: "file 1" })
-            ]);
 
             let budget = BudgetStatement.utils.createDocument();
 
@@ -203,6 +193,13 @@ describe.each(queueLayers)(
                 address: '0x123456'
             }));
 
+            // add file op
+            const driveOperations = buildOperations(reducer, drive, [
+                actions.addFile({ id: "file 1", name: "file 1", parentFolder: "folder 1", documentType: "powerhouse/budget-statement", synchronizationUnits: [{ syncId: "1", scope: "global", branch: "main" }] })]
+            );
+
+
+
             // queue addFile and first doc op
             const results1 = await Promise.all([
                 server.queueDriveOperations(driveId, driveOperations),
@@ -214,27 +211,21 @@ describe.each(queueLayers)(
                 errors.forEach(error => console.error(error));
             }
 
+            // delete node op
+            drive = await server.getDrive(driveId);
+            const deleteNode = buildOperations(reducer, drive, [
+                actions.deleteNode({ id: "file 1" })
+            ]);
+
             // queue delete node op
-            const result = await server.queueDriveOperations(driveId, deleteNode);
+            await server.queueDriveOperations(driveId, deleteNode)
             // ==> receives deleteNode and addFile operation?
 
-            try {
-                await server.queueOperations(driveId, "file 1", [budgetOperation2]);
-            } catch (e: any) {
-                expect(e.message).toContain("Operation queue timeout");
-            }
 
-            expect(errors.length).toBe(0);
+            await expect(server.queueOperations(driveId, "file 1", [budgetOperation2])).rejects.toThrowError("Queue is deleted");
 
             drive = await server.getDrive(driveId);
-            expect(drive.state.global.nodes).toStrictEqual([
-                expect.objectContaining({ id: "file 1", name: "file 1", kind: "file", parentFolder: "folder 1", documentType: "powerhouse/budget-statement", synchronizationUnits: [{ syncId: "1", scope: "global", branch: "main" }] }),
-            ]);
-
-            budget = await server.getDocument(driveId, "file 1") as BudgetStatement.BudgetStatementDocument;
-            expect(budget.state.global.accounts).toStrictEqual([
-                expect.objectContaining({ address: "0x123" }),
-            ]);
+            expect(drive.state.global.nodes).toStrictEqual([]);
         });
 
         it("produces conflicts on addDriveOperations", async ({ expect }) => {

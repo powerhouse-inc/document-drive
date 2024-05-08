@@ -8,6 +8,7 @@ import { AddFileInput, DeleteNodeInput } from "document-model-libs/document-driv
 export class MemoryQueue<T, R> implements IQueue<T, R> {
     private id: string;
     private blocked = false;
+    private deleted = false;
     private items: IJob<T>[] = [];
     private results = new Map<JobId, R>();
     private dependencies = new Array<IJob<OperationJob>>();
@@ -15,6 +16,15 @@ export class MemoryQueue<T, R> implements IQueue<T, R> {
     constructor(id: string) {
         this.id = id;
     }
+
+    async setDeleted(deleted: boolean) {
+        this.deleted = deleted;
+    }
+
+    async isDeleted() {
+        return this.deleted;
+    }
+
     async setResult(jobId: string, result: R): Promise<void> {
         this.results.set(jobId, result);
         return Promise.resolve();
@@ -100,6 +110,10 @@ export class BaseQueueManager implements IQueueManager {
         const jobId = generateUUID();
         const queue = this.getQueue(job.driveId, job.documentId);
 
+        if (await queue.isDeleted()) {
+            throw new Error("Queue is deleted")
+        }
+
         // checks if the job is for a document that doesn't exist in storage yet
         const newDocument = job.documentId && !(await this.delegate.checkDocumentExists(job.driveId, job.documentId));
         // if it is a new document and queue is not yet blocked then 
@@ -134,7 +148,8 @@ export class BaseQueueManager implements IQueueManager {
         const removeFileOps = job.operations.filter((j: Operation) => j.type === "DELETE_NODE");
         for (const removeFileOp of removeFileOps) {
             const input = removeFileOp.input as DeleteNodeInput;
-            await this.removeQueue(job.driveId, input.id);
+            const queue = this.getQueue(job.driveId, input.id);
+            await queue.setDeleted(true);
         }
 
         await queue.addJob({ jobId, ...job });

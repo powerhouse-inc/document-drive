@@ -866,23 +866,30 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         //     throw error;
         // }
 
-        const jobId = await this.queueManager.addJob({ driveId: drive, documentId: id, operations, forceSync });
-        return new Promise((resolve, reject) => {
-            const unsubscribe = this.queueManager.on('jobCompleted', (job, result) => {
-                if (job.jobId === jobId) {
-                    unsubscribe();
-                    unsubscribeError();
-                    resolve(result);
-                }
-            });
-            const unsubscribeError = this.queueManager.on('jobFailed', (job, error) => {
-                if (job.jobId === jobId) {
-                    unsubscribe();
-                    unsubscribeError();
-                    reject(error);
-                }
-            });
-        })
+        try {
+            const jobId = await this.queueManager.addJob({ driveId: drive, documentId: id, operations, forceSync });
+
+            return new Promise((resolve, reject) => {
+                const unsubscribe = this.queueManager.on('jobCompleted', (job, result) => {
+                    if (job.jobId === jobId) {
+                        unsubscribe();
+                        unsubscribeError();
+                        resolve(result);
+                    }
+                });
+                const unsubscribeError = this.queueManager.on('jobFailed', (job, error) => {
+                    console.log("test")
+                    if (job.jobId === jobId) {
+                        unsubscribe();
+                        unsubscribeError();
+                        reject(error);
+                    }
+                });
+            })
+        } catch (error) {
+            logger.error('Error adding job', error);
+            throw error;
+        }
     }
 
     async addOperations(

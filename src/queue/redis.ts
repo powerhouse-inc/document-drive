@@ -89,6 +89,19 @@ export class RedisQueue<T, R> implements IQueue<T, R> {
             await this.setBlocked(false);
         }
     }
+
+    async isDeleted() {
+        const deleted = await this.client.hGet(this.id, "deleted");
+        return deleted === "true";
+    }
+
+    async setDeleted(deleted: boolean) {
+        if (deleted) {
+            await this.client.hSet(this.id, "deleted", "true");
+        } else {
+            await this.client.hDel(this.id, "deleted");
+        }
+    }
 }
 
 export class RedisQueueManager extends BaseQueueManager implements IQueueManager {
