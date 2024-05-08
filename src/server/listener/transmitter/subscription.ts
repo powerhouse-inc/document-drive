@@ -1,4 +1,4 @@
-import { Client, createClient, type SubscribePayload } from 'graphql-ws';
+import { Client, createClient } from 'graphql-ws';
 import WebSocket from 'isomorphic-ws';
 import { logger } from '../../../utils/logger';
 import {
@@ -23,7 +23,7 @@ export class SubscriptionTransmitter implements ITriggerTransmitter {
     private _strands: StrandUpdate[] = [];
     private listener: Listener;
     private manager: ListenerManager;
-    private _init: Promise<StrandUpdate[]>;
+    private _init: Promise<StrandUpdate[]> | null = null;
     private handler: ((strands: StrandUpdate[]) => void) | null = null;
 
     constructor(
@@ -32,8 +32,14 @@ export class SubscriptionTransmitter implements ITriggerTransmitter {
     ) {
         this.listener = listener;
         this.manager = manager;
-        console.log("CONSTRUCTOR", listener.listenerId);
+    }
+
+    async init() {
+        if (this._init) {
+            return this._init;
+        }
         this._init = this.#refreshStrands();
+        return this._init;
     }
 
     #updateStrands(strands: StrandUpdate[]): void {
@@ -46,16 +52,12 @@ export class SubscriptionTransmitter implements ITriggerTransmitter {
             this.listener.driveId,
             this.listener.listenerId
         );
-        console.log("REFRESH", strands.map(s => s.operations.length));
         this.#updateStrands(strands);
         return Promise.resolve(strands);
     }
 
-    async init() {
-        return this._init;
-    }
-
     async * strandsGenerator(since?: number): AsyncGenerator<StrandUpdate[]> {
+        await this.init();
         let waitHandler = null;
         let firstTime = true;
         // eslint-disable-next-line
@@ -77,7 +79,12 @@ export class SubscriptionTransmitter implements ITriggerTransmitter {
     }
 
     async transmit(strands: StrandUpdate[]): Promise<ListenerRevision[]> {
-        console.log("transmit", strands.map(s => s.operations.length));
+        // if subscription has not been initiated by
+        // the client then ignores new strands
+        if (!this._init) {
+            return [];
+        }
+        console.log("TRANSMIT", this.listener.listenerId, strands.map(s => s.operations.length))
         this.#updateStrands([...this._strands, ...strands]);
         return Promise.resolve([]);
     }
@@ -119,7 +126,6 @@ export class SubscriptionTransmitter implements ITriggerTransmitter {
             acknowledged = true;
         }
         if (acknowledged) {
-            console.log("processAcknowledge");
             await this.#refreshStrands();
         }
 
@@ -190,14 +196,14 @@ export class SubscriptionTransmitter implements ITriggerTransmitter {
         );
     }
 
-    static async setup(driveId: string,
+    static setup(driveId: string,
         trigger: SubscriptionTrigger,
         onStrandUpdate: (strand: StrandUpdate) => Promise<IOperationResult>,
         onError: (error: Error) => void,
         onRevisions?: (revisions: ListenerRevisionWithError[]) => void,
         onAcknowledge?: (success: boolean) => void) {
 
-        const { url, listenerId } = trigger.data;
+        const { url } = trigger.data;
         let subscriptionUrl = url.replace("http", "ws")
         subscriptionUrl += subscriptionUrl.endsWith("/") ? "ws" : "/ws";
 
@@ -206,56 +212,64 @@ export class SubscriptionTransmitter implements ITriggerTransmitter {
             webSocketImpl: WebSocket,
         });
         try {
-            const subscription = client.iterate<{ subscribeStrands: StrandUpdateGraphQL[] }>({
-                query: `
-                subscription($listenerId: ID) {
-                    subscribeStrands(listenerId: $listenerId) {
-                    branch
-                    documentId
-                    driveId
-                    operations {
-                        timestamp
-                        skip
-                        type
-                        input
-                        hash
-                        index
-                        context {
-                            signer {
-                                user {
-                                    address
-                                    networkId
-                                    chainId
-                                }
-                                app {
-                                    name
-                                    key
-                                }
-                                signature
-                            }
-                        }
-                    }
-                    scope
-                    }
-                }`,
-                variables: {
-                    listenerId,
-                }
-            });
-            for await (const { errors, data } of subscription) {
-                const error = errors?.at(0);
-                if (error) {
-                    onError(error);
-                } else {
-                    const strands = data?.subscribeStrands ?? [];
-                    console.log("NEW STRANDS", strands.map(s => s.operations.length));
-                    SubscriptionTransmitter.saveStrands(trigger, client, strands, onStrandUpdate, onError, onRevisions, onAcknowledge).catch(onError);
-                }
-                return;
-            }
-            return () => subscription.return?.();
+            SubscriptionTransmitter.subscribeStrands(client, trigger, onStrandUpdate, onError, onRevisions, onAcknowledge).catch(onError);
         } catch (error) {
             onError(error as Error);
+        }
+        return () => { return client.dispose(); };
+    }
+
+    private static async subscribeStrands(client: Client, trigger: SubscriptionTrigger,
+        onStrandUpdate: (strand: StrandUpdate) => Promise<IOperationResult>,
+        onError: (error: Error) => void,
+        onRevisions?: (revisions: ListenerRevisionWithError[]) => void,
+        onAcknowledge?: (success: boolean) => void) {
+        const { listenerId } = trigger.data;
+        const subscription = client.iterate<{ subscribeStrands: StrandUpdateGraphQL[] }>({
+            query: `
+            subscription($listenerId: ID) {
+                subscribeStrands(listenerId: $listenerId) {
+                branch
+                documentId
+                driveId
+                operations {
+                    timestamp
+                    skip
+                    type
+                    input
+                    hash
+                    index
+                    context {
+                        signer {
+                            user {
+                                address
+                                networkId
+                                chainId
+                            }
+                            app {
+                                name
+                                key
+                            }
+                            signature
+                        }
+                    }
+                }
+                scope
+                }
+            }`,
+            variables: {
+                listenerId,
+            }
+        });
+        for await (const { errors, data } of subscription) {
+            const error = errors?.at(0);
+            if (error) {
+                onError(error);
+            } else {
+                const strands = data?.subscribeStrands ?? [];
+                console.log(listenerId, "Save strands", strands);
+                SubscriptionTransmitter.saveStrands(trigger, client, strands, onStrandUpdate, onError, onRevisions, onAcknowledge).catch(onError);
+            }
         }
     }
 
@@ -345,6 +359,6 @@ export class SubscriptionTransmitter implements ITriggerTransmitter {
         });
         const result = await subscription.next();
 
-        return result.value.acknowledge as boolean;
+        return (result.value as { acknowledge: boolean }).acknowledge as boolean;
     }
 }

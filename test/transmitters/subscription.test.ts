@@ -285,7 +285,9 @@ describe('Subscrition Transmitter', () => {
 
         const transmitter = new SubscriptionTransmitter(listener, manager);
         const generator = transmitter.strandsGenerator();
+
         expect((await generator.next()).value).toStrictEqual([]);
+        expect(manager.getStrands).toBeCalledTimes(1);
 
         await transmitter.transmit([{
             driveId: "1",
@@ -326,8 +328,11 @@ describe('Subscrition Transmitter', () => {
         const listener = {} as any as Listener;
 
         const transmitter = new SubscriptionTransmitter(listener, manager);
+        expect(manager.getStrands).toBeCalledTimes(0);
         const generator = transmitter.strandsGenerator();
+
         expect((await generator.next()).value).toStrictEqual([]);
+        expect(manager.getStrands).toBeCalledTimes(1);
 
         await transmitter.transmit([{
             driveId: "1",

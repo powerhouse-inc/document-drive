@@ -211,8 +211,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 this.updateSyncStatus(syncUnit.syncId, 'SYNCING');
             }
 
+            let cancelTrigger: (() => void) | undefined = undefined;
             if (PullResponderTransmitter.isPullResponderTrigger(trigger)) {
-                const cancelPullLoop = PullResponderTransmitter.setupPull(
+                cancelTrigger = PullResponderTransmitter.setupPull(
                     driveId,
                     trigger,
                     this.saveStrand.bind(this),
@@ -253,10 +254,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                         }
                     }
                 );
-                driveTriggers.set(trigger.id, cancelPullLoop);
-                this.triggerMap.set(driveId, driveTriggers);
             } else if (SubscriptionTransmitter.isTrigger(trigger)) {
-                SubscriptionTransmitter.setup(driveId,
+                cancelTrigger = SubscriptionTransmitter.setup(
+                    driveId,
                     trigger,
                     this.saveStrand.bind(this),
                     error => {
@@ -275,7 +275,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                         if (!errorRevision) {
                             this.updateSyncStatus(driveId, 'SUCCESS');
                         }
-                    })
+                    }
+                );
+            }
+
+            if (cancelTrigger) {
+                driveTriggers.set(trigger.id, cancelTrigger);
+                this.triggerMap.set(driveId, driveTriggers);
             }
         }
     }
@@ -665,10 +671,9 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             triggers
         } = options;
 
-        const trigger =
-            await SubscriptionTransmitter.createTrigger(id, url, {
-                pullFilter,
-            });
+        const trigger = await SubscriptionTransmitter.createTrigger(id, url, {
+            pullFilter
+        });
 
         return await this.addDrive({
             global: {
