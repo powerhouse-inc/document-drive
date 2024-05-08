@@ -130,12 +130,11 @@ export class BaseQueueManager implements IQueueManager {
             await q.addDependencies({ jobId, ...job });
         }
 
-        // block the document queue if the job contains a remove file operation
+        // remove document if operations contains delete_node
         const removeFileOps = job.operations.filter((j: Operation) => j.type === "DELETE_NODE");
         for (const removeFileOp of removeFileOps) {
             const input = removeFileOp.input as DeleteNodeInput;
-            const q = this.getQueue(job.driveId, input.id)
-            await q.setBlocked(true);
+            await this.removeQueue(job.driveId, input.id);
         }
 
         await queue.addJob({ jobId, ...job });
@@ -149,7 +148,7 @@ export class BaseQueueManager implements IQueueManager {
     }
 
     getQueue(driveId: string, documentId?: string) {
-        const queueId = `${driveId}${documentId ? `:${documentId}` : ''}`;
+        const queueId = this.getQueueId(driveId, documentId);
         let queue = this.queues.find((q) => q.getId() === queueId);
 
         if (!queue) {
@@ -158,6 +157,12 @@ export class BaseQueueManager implements IQueueManager {
         }
 
         return queue;
+    }
+
+    removeQueue(driveId: string, documentId?: string) {
+        const queueId = this.getQueueId(driveId, documentId);
+        this.queues = this.queues.filter((q) => q.getId() !== queueId);
+        this.emit("queueRemoved", queueId)
     }
 
     getQueueByIndex(index: number) {
@@ -245,5 +250,9 @@ export class BaseQueueManager implements IQueueManager {
     }
     on<K extends keyof QueueEvents>(this: this, event: K, cb: QueueEvents[K]): Unsubscribe {
         return this.emitter.on(event, cb);
+    }
+
+    protected getQueueId(driveId: string, documentId?: string) {
+        return `${driveId}${documentId ? `:${documentId}` : ''}`;
     }
 }

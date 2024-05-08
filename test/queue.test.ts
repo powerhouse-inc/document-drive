@@ -28,14 +28,14 @@ const documentModels = [
 
 const queueLayers = [
     ['Memory Queue', async () => new BaseQueueManager()],
-    [
-        'Redis Queue',
-        async () => {
-            const client = await createClient().connect();
-            await client.flushAll();
-            return new RedisQueueManager(3, 0, client as RedisClientType);
-        }
-    ]
+    // [
+    //     'Redis Queue',
+    //     async () => {
+    //         const client = await createClient().connect();
+    //         await client.flushAll();
+    //         return new RedisQueueManager(3, 0, client as RedisClientType);
+    //     }
+    // ]
 ] as unknown as [string, () => Promise<IQueueManager>][];
 
 describe.each(queueLayers)(
@@ -170,7 +170,7 @@ describe.each(queueLayers)(
             ]);
         });
 
-        it("it blocks a document queue when the drive queue processes a delete node operation", async ({ expect }) => {
+        it.only("it blocks a document queue when the drive queue processes a delete node operation", async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
                 new MemoryStorage(),

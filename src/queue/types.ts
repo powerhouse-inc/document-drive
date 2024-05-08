@@ -14,6 +14,7 @@ export type JobId = string;
 export interface QueueEvents {
     jobCompleted: (job: IJob<OperationJob>, result: IOperationResult) => void;
     jobFailed: (job: IJob<OperationJob>, error: Error) => void;
+    queueRemoved: (queueId: string) => void;
 }
 
 export interface IServerDelegate {
@@ -25,6 +26,7 @@ export interface IQueueManager {
     addJob(job: OperationJob): Promise<JobId>;
     getResult(driveId: string, documentId: string, jobId: JobId): Promise<IOperationResult | undefined>;
     getQueue(driveId: string, document?: string): IQueue<OperationJob, IOperationResult>;
+    removeQueue(driveId: string, documentId?: string): void;
     getQueueByIndex(index: number): IQueue<OperationJob, IOperationResult> | null;
     getQueues(): string[];
     init(delegate: IServerDelegate, onError: (error: Error) => void): Promise<void>;

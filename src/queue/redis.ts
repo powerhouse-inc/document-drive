@@ -100,9 +100,8 @@ export class RedisQueueManager extends BaseQueueManager implements IQueueManager
         this.client = client;
     }
 
-    async init(processor: OperationJobProcessor, onError: (err: Error) => void) {
-        super.init(processor, onError);
-
+    async init(delegate: IServerDelegate, onError: (error: Error) => void): Promise<void> {
+        await super.init(delegate, onError);
         // load all queues
         const queues = await this.client.hGetAll("queues");
         for (const queueId in queues) {
@@ -111,7 +110,7 @@ export class RedisQueueManager extends BaseQueueManager implements IQueueManager
     }
 
     getQueue(driveId: string, documentId?: string) {
-        const queueId = `${driveId}${documentId ? `:${documentId}` : ''}`;
+        const queueId = this.getQueueId(driveId, documentId);
         let queue = this.queues.find((q) => q.getId() === queueId);
 
         if (!queue) {
@@ -120,5 +119,12 @@ export class RedisQueueManager extends BaseQueueManager implements IQueueManager
         }
 
         return queue;
+    }
+
+    removeQueue(driveId: string, documentId?: string | undefined): void {
+        super.removeQueue(driveId, documentId);
+
+        const queueId = this.getQueueId(driveId, documentId);
+        this.client.hDel("queues", queueId);
     }
 }

@@ -882,12 +882,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     reject(error);
                 }
             });
-
-            setTimeout(() => {
-                unsubscribe();
-                unsubscribeError();
-                reject(new Error('Operation queue timeout'));
-            }, 5000);
         })
     }
 
@@ -1073,11 +1067,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 }
             });
 
-            setTimeout(() => {
-                unsubscribe();
-                unsubscribeError();
-                reject(new Error('Operation queue timeout'));
-            }, 5000);
         })
     }
 
