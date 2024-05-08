@@ -1,3 +1,10 @@
+# [1.0.0-experimental.2](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-experimental.1...v1.0.0-experimental.2) (2024-05-08)
+
+
+### Features
+
+* added operation queues with memory and redis adapters ([#139](https://github.com/powerhouse-inc/document-drive/issues/139)) ([7839cea](https://github.com/powerhouse-inc/document-drive/commit/7839ceadb666d2358a7e06167862c7f179b7ad5a)), closes [#154](https://github.com/powerhouse-inc/document-drive/issues/154)
+
 # 1.0.0-experimental.1 (2024-05-07)
 
 
