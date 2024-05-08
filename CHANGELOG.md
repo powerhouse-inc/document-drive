@@ -1,3 +1,10 @@
+# [1.0.0-experimental.4](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-experimental.3...v1.0.0-experimental.4) (2024-05-08)
+
+
+### Bug Fixes
+
+* add exports ([#157](https://github.com/powerhouse-inc/document-drive/issues/157)) ([59b5753](https://github.com/powerhouse-inc/document-drive/commit/59b57539216aea41f633c7a3f88cf93974c5f0e5))
+
 # [1.0.0-experimental.3](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-experimental.2...v1.0.0-experimental.3) (2024-05-08)
 
 
