@@ -104,7 +104,7 @@ export class BaseQueueManager implements IQueueManager {
         const newDocument = job.documentId && !(await this.delegate.checkDocumentExists(job.driveId, job.documentId));
         // if it is a new document and queue is not yet blocked then 
         // blocks it so the jobs are not processed until it's ready
-        if (newDocument && !queue.isBlocked()) {
+        if (newDocument && !(await queue.isBlocked())) {
             queue.setBlocked(true);
 
             // checks if there any job in the queue adding the file and adds as dependency

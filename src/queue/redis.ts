@@ -1,9 +1,6 @@
 import { RedisClientType } from "redis";
-import { IJob, IJobQueue, IQueue, IQueueManager, JobId, OperationJob, OperationJobProcessor, QueueEvents } from "./types";
-import { Unsubscribe, createNanoEvents } from "nanoevents";
+import { IJob, IQueue, IQueueManager, OperationJob } from "./types";
 import { BaseQueueManager } from "./base";
-import { IOperationResult } from "../server";
-import { generateUUID } from "../utils";
 
 export class RedisQueue<T, R> implements IQueue<T, R> {
     private id: string;
