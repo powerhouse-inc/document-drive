@@ -156,7 +156,6 @@ export class SequelizeStorage implements IDriveStorage {
         id: string,
         operations: Operation[],
         header: DocumentHeader,
-        updatedOperations: Operation[] = []
     ): Promise<void> {
         const document = await this.getDocument(drive, id);
         if (!document) {
