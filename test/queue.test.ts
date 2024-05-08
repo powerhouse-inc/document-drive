@@ -86,44 +86,44 @@ describe.each(queueLayers)(
             return Promise.all(promisses);
         }
 
-        // it("block document queue until ADD_FILE is processed", async ({ expect }) => {
-        //     const server = new DocumentDriveServer(
-        //         documentModels,
-        //         new MemoryStorage()
-        //     );
-        //     await server.initialize();
-        //     let drive = await createDrive(server);
-        //     const driveId = drive.state.global.id;
-        //     const driveOperations = buildOperations(reducer, drive, [
-        //         actions.addFolder({ id: "folder 1", name: "folder 1" }),
-        //         actions.addFile({ id: "file 1", name: "file 1", parentFolder: "folder 1", documentType: "powerhouse/budget-statement", synchronizationUnits: [{ syncId: "1", scope: "global", branch: "main" }] })]
-        //     );
-        //     let budget = BudgetStatement.utils.createDocument();
-        //     const budgetOperation = buildOperation(BudgetStatement.reducer, budget, BudgetStatement.actions.addAccount({
-        //         address: '0x123'
-        //     }));
+        it("block document queue until ADD_FILE is processed", async ({ expect }) => {
+            const server = new DocumentDriveServer(
+                documentModels,
+                new MemoryStorage()
+            );
+            await server.initialize();
+            let drive = await createDrive(server);
+            const driveId = drive.state.global.id;
+            const driveOperations = buildOperations(reducer, drive, [
+                actions.addFolder({ id: "folder 1", name: "folder 1" }),
+                actions.addFile({ id: "file 1", name: "file 1", parentFolder: "folder 1", documentType: "powerhouse/budget-statement", synchronizationUnits: [{ syncId: "1", scope: "global", branch: "main" }] })]
+            );
+            let budget = BudgetStatement.utils.createDocument();
+            const budgetOperation = buildOperation(BudgetStatement.reducer, budget, BudgetStatement.actions.addAccount({
+                address: '0x123'
+            }));
 
-        //     const documentResult = server.queueOperations(driveId, "file 1", [budgetOperation]);
-        //     await expect(server.getDocument(driveId, "file 1")).rejects.toThrowError("Document with id file 1 not found");
-        //     const results = await server.queueDriveOperations(driveId, driveOperations);
+            const documentResult = server.queueOperations(driveId, "file 1", [budgetOperation]);
+            await expect(server.getDocument(driveId, "file 1")).rejects.toThrowError("Document with id file 1 not found");
+            const results = await server.queueDriveOperations(driveId, driveOperations);
 
-        //     const errors = [results, await documentResult].filter(r => !!(r as IOperationResult).error);
-        //     if (errors.length) {
-        //         errors.forEach(error => console.error(error));
-        //     }
-        //     expect(errors.length).toBe(0);
+            const errors = [results, await documentResult].filter(r => !!(r as IOperationResult).error);
+            if (errors.length) {
+                errors.forEach(error => console.error(error));
+            }
+            expect(errors.length).toBe(0);
 
-        //     drive = await server.getDrive(driveId);
-        //     expect(drive.state.global.nodes).toStrictEqual([
-        //         expect.objectContaining({ id: "folder 1", name: "folder 1", kind: "folder", parentFolder: null }),
-        //         expect.objectContaining({ id: "file 1", name: "file 1", kind: "file", parentFolder: "folder 1", documentType: "powerhouse/budget-statement", synchronizationUnits: [{ syncId: "1", scope: "global", branch: "main" }] }),
-        //     ]);
+            drive = await server.getDrive(driveId);
+            expect(drive.state.global.nodes).toStrictEqual([
+                expect.objectContaining({ id: "folder 1", name: "folder 1", kind: "folder", parentFolder: null }),
+                expect.objectContaining({ id: "file 1", name: "file 1", kind: "file", parentFolder: "folder 1", documentType: "powerhouse/budget-statement", synchronizationUnits: [{ syncId: "1", scope: "global", branch: "main" }] }),
+            ]);
 
-        //     budget = await server.getDocument(driveId, "file 1") as BudgetStatement.BudgetStatementDocument;
-        //     expect(budget.state.global.accounts).toStrictEqual([
-        //         expect.objectContaining({ address: "0x123" }),
-        //     ]);
-        // });
+            budget = await server.getDocument(driveId, "file 1") as BudgetStatement.BudgetStatementDocument;
+            expect(budget.state.global.accounts).toStrictEqual([
+                expect.objectContaining({ address: "0x123" }),
+            ]);
+        });
 
         it("orders strands correctly", async ({ expect }) => {
 
