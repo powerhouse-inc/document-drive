@@ -18,6 +18,10 @@ export class MemoryStorage implements IDriveStorage {
         this.drives = {};
     }
 
+    checkDocumentExists(drive: string, id: string): Promise<boolean> {
+        return Promise.resolve(this.documents[drive]?.[id] !== undefined)
+    }
+
     async getDocuments(drive: string) {
         return Object.keys(this.documents[drive] ?? {});
     }
@@ -121,6 +125,7 @@ export class MemoryStorage implements IDriveStorage {
 
     async createDrive(id: string, drive: DocumentDriveStorage) {
         this.drives[id] = drive;
+        this.documents[id] = {};
         const { slug } = drive.initialState.state.global;
         if (slug) {
             this.slugToDriveId[slug] = id;

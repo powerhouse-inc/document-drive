@@ -68,6 +68,8 @@ import {
     type SynchronizationUnit
 } from './types';
 import { filterOperationsByRevision } from './utils';
+import { BaseQueueManager } from '../queue/base';
+import { IQueueManager } from '../queue/types';
 
 export * from './listener';
 export type * from './types';
@@ -86,16 +88,20 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     >();
     private syncStatus = new Map<DocumentDriveState['id'], SyncStatus>();
 
+    private queueManager: IQueueManager;
+
     constructor(
         documentModels: DocumentModel[],
         storage: IDriveStorage = new MemoryStorage(),
-        cache: ICache = new InMemoryCache()
+        cache: ICache = new InMemoryCache(),
+        queueManager: IQueueManager = new BaseQueueManager(),
     ) {
         super();
         this.listenerStateManager = new ListenerManager(this);
         this.documentModels = documentModels;
         this.storage = storage;
         this.cache = cache;
+        this.queueManager = queueManager;
     }
 
     private updateSyncStatus(
@@ -222,6 +228,17 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 errors.push(error as Error);
             });
         }
+
+        await this.queueManager.init({
+            checkDocumentExists: (driveId: string, documentId: string): Promise<boolean> => this.storage.checkDocumentExists(driveId, documentId),
+            processOperationJob: ({ driveId, documentId, operations, forceSync }) => documentId ?
+                this.addOperations(driveId, documentId, operations, forceSync)
+                : this.addDriveOperations(driveId, operations as Operation<DocumentDriveAction | BaseAction>[], forceSync)
+
+        }, error => {
+            logger.error(`Error initializing queue manager`, error);
+            errors.push(error);
+        })
 
         // if network connect comes online then
         // triggers the listeners update
@@ -438,6 +455,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
         await this.storage.createDrive(id, document);
         await this._initializeDrive(id);
+
         return document;
     }
 
@@ -805,6 +823,44 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         }
     }
 
+
+    async queueOperations(drive: string,
+        id: string,
+        operations: Operation[],
+        forceSync = true) {
+        // try {
+        //     await this.getDocument(drive, id);
+        // } catch (error) {
+        //     logger.error('Error getting document', error);
+        //     throw error;
+        // }
+
+        try {
+            const jobId = await this.queueManager.addJob({ driveId: drive, documentId: id, operations, forceSync });
+
+            return new Promise((resolve, reject) => {
+                const unsubscribe = this.queueManager.on('jobCompleted', (job, result) => {
+                    if (job.jobId === jobId) {
+                        unsubscribe();
+                        unsubscribeError();
+                        resolve(result);
+                    }
+                });
+                const unsubscribeError = this.queueManager.on('jobFailed', (job, error) => {
+                    console.log("test")
+                    if (job.jobId === jobId) {
+                        unsubscribe();
+                        unsubscribeError();
+                        reject(error);
+                    }
+                });
+            })
+        } catch (error) {
+            logger.error('Error adding job', error);
+            throw error;
+        }
+    }
+
     async addOperations(
         drive: string,
         id: string,
@@ -956,6 +1012,31 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 callback
             );
         }
+    }
+
+    async queueDriveOperations(
+        drive: string,
+        operations: Operation<DocumentDriveAction | BaseAction>[],
+        forceSync = true
+    ): Promise<IOperationResult> {
+        const jobId = await this.queueManager.addJob({ driveId: drive, operations, forceSync });
+        return new Promise((resolve, reject) => {
+            const unsubscribe = this.queueManager.on('jobCompleted', (job, result) => {
+                if (job.jobId === jobId) {
+                    unsubscribe();
+                    unsubscribeError();
+                    resolve(result);
+                }
+            });
+            const unsubscribeError = this.queueManager.on('jobFailed', (job, error) => {
+                if (job.jobId === jobId) {
+                    unsubscribe();
+                    unsubscribeError();
+                    reject(error);
+                }
+            });
+
+        })
     }
 
     async addDriveOperations(
