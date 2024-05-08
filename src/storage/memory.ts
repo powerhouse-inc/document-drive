@@ -131,6 +131,7 @@ export class MemoryStorage implements IDriveStorage {
 
     async createDrive(id: string, drive: DocumentDriveStorage) {
         this.drives[id] = drive;
+        this.documents[id] = {};
         const { slug } = drive.initialState.state.global;
         if (slug) {
             this.slugToDriveId[slug] = id;
