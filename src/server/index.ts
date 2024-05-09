@@ -438,7 +438,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         return documentModel;
     }
 
-    async addDrive(drive: DriveInput) {
+    async addDrive(drive: DriveInput): Promise<DocumentDriveDocument> {
         const id = drive.global.id || generateUUID();
         if (!id) {
             throw new Error('Invalid Drive Id');
@@ -459,7 +459,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         return document;
     }
 
-    async addRemoteDrive(url: string, options: RemoteDriveOptions) {
+    async addRemoteDrive(url: string, options: RemoteDriveOptions): Promise<DocumentDriveDocument> {
         const { id, name, slug, icon } = await requestPublicDrive(url);
         const {
             pullFilter,
@@ -854,22 +854,19 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         }
     }
 
+    queueOperation(drive: string, id: string, operation: Operation, forceSync = true): Promise<IOperationResult> {
+        return this.queueOperations(drive, id, [operation], forceSync);
+    }
 
     async queueOperations(drive: string,
         id: string,
         operations: Operation[],
         forceSync = true) {
-        // try {
-        //     await this.getDocument(drive, id);
-        // } catch (error) {
-        //     logger.error('Error getting document', error);
-        //     throw error;
-        // }
 
         try {
             const jobId = await this.queueManager.addJob({ driveId: drive, documentId: id, operations, forceSync });
 
-            return new Promise((resolve, reject) => {
+            return new Promise<IOperationResult>((resolve, reject) => {
                 const unsubscribe = this.queueManager.on('jobCompleted', (job, result) => {
                     if (job.jobId === jobId) {
                         unsubscribe();
@@ -1045,18 +1042,22 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         }
     }
 
+    queueDriveOperation(drive: string, operation: Operation<DocumentDriveAction | BaseAction>, forceSync = true): Promise<IOperationResult<DocumentDriveDocument>> {
+        return this.queueDriveOperations(drive, [operation], forceSync);
+    }
+
     async queueDriveOperations(
         drive: string,
         operations: Operation<DocumentDriveAction | BaseAction>[],
         forceSync = true
-    ): Promise<IOperationResult> {
+    ): Promise<IOperationResult<DocumentDriveDocument>> {
         const jobId = await this.queueManager.addJob({ driveId: drive, operations, forceSync });
-        return new Promise((resolve, reject) => {
+        return new Promise<IOperationResult<DocumentDriveDocument>>((resolve, reject) => {
             const unsubscribe = this.queueManager.on('jobCompleted', (job, result) => {
                 if (job.jobId === jobId) {
                     unsubscribe();
                     unsubscribeError();
-                    resolve(result);
+                    resolve(result as IOperationResult<DocumentDriveDocument>);
                 }
             });
             const unsubscribeError = this.queueManager.on('jobFailed', (job, error) => {
