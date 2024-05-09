@@ -1,3 +1,10 @@
+# [1.0.0-experimental.5](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-experimental.4...v1.0.0-experimental.5) (2024-05-09)
+
+
+### Features
+
+* updated IDocumentDriveServer type ([09dfbd4](https://github.com/powerhouse-inc/document-drive/commit/09dfbd41da5a805c842a69bedf168d5cff0976f0))
+
 # [1.0.0-experimental.4](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-experimental.3...v1.0.0-experimental.4) (2024-05-08)
 
 
