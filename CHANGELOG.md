@@ -54,9 +54,6 @@
 
 ### Features
 
-<<<<<<< HEAD
-* fix adding files with documents ([b033ff9](https://github.com/powerhouse-inc/document-drive/commit/b033ff99be62a7024448c51186b26aaa6d49215c))
-=======
 * add ts-reset lib ([760c3fb](https://github.com/powerhouse-inc/document-drive/commit/760c3fbe685775be506835a1975541539c8fb862))
 * add unique constraint on operation index ([b058834](https://github.com/powerhouse-inc/document-drive/commit/b058834a8b48c2f6db971427e9633a91141c1079))
 * added .env.example ([c781094](https://github.com/powerhouse-inc/document-drive/commit/c781094ad7f7312efeee3e94695e809c5d4c6722))
@@ -152,7 +149,6 @@
 * use prisma transaction ([4a02fb8](https://github.com/powerhouse-inc/document-drive/commit/4a02fb8c7d2b93253c4cd7104318772e3b199b61))
 * use reshuffleByTimestamp + added BasciClient + tests ([#129](https://github.com/powerhouse-inc/document-drive/issues/129)) ([8e0cfae](https://github.com/powerhouse-inc/document-drive/commit/8e0cfae5e0d2de52064689f023e4a80c170d8c84))
 * use serializable transactions ([267cae4](https://github.com/powerhouse-inc/document-drive/commit/267cae47ba3fec4a4863169350cbf961172caebf))
->>>>>>> d9e9789 (chore(release): set `package.json` to 1.0.0-experimental.1 [skip ci])
 
 # [1.0.0-alpha.54](https://github.com/powerhouse-inc/document-drive/compare/v1.0.0-alpha.53...v1.0.0-alpha.54) (2024-05-07)
 
