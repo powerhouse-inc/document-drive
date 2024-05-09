@@ -8,7 +8,6 @@ import type {
     DocumentHeader,
     Operation
 } from 'document-model/document';
-import { GetDocumentOptions } from '../server';
 
 export type DocumentStorage<D extends Document = Document> = Omit<
     D,
