@@ -819,8 +819,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         };
     }
 
-    addOperation(drive: string, id: string, operation: Operation) {
-        return this.addOperations(drive, id, [operation]);
+    addOperation(drive: string, id: string, operation: Operation, forceSync = true): Promise<IOperationResult> {
+        return this.addOperations(drive, id, [operation], forceSync);
     }
 
     private async _addOperations(
@@ -1002,9 +1002,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
 
     addDriveOperation(
         drive: string,
-        operation: Operation<DocumentDriveAction | BaseAction>
+        operation: Operation<DocumentDriveAction | BaseAction>,
+        forceSync = true
     ) {
-        return this.addDriveOperations(drive, [operation]);
+        return this.addDriveOperations(drive, [operation], forceSync);
     }
 
     async clearStorage() {
