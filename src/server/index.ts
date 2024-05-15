@@ -127,12 +127,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         );
 
         const result = await (!strand.documentId
-            ? this.addDriveOperations(
+            ? this.queueDriveOperations(
                 strand.driveId,
                 operations as Operation<DocumentDriveAction | BaseAction>[],
                 false
             )
-            : this.addOperations(
+            : this.queueOperations(
                 strand.driveId,
                 strand.documentId,
                 operations,
@@ -1232,7 +1232,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     ): Promise<IOperationResult> {
         const document = await this.getDocument(drive, id);
         const operations = this._buildOperations(document, actions);
-        return this.addOperations(drive, id, operations);
+        return this.queueOperations(drive, id, operations);
     }
 
     async addDriveAction(
@@ -1248,7 +1248,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     ): Promise<IOperationResult<DocumentDriveDocument>> {
         const document = await this.getDrive(drive);
         const operations = this._buildOperations(document, actions);
-        return this.addDriveOperations(drive, operations);
+        const result = await this.queueDriveOperations(drive, operations);
+        return result as IOperationResult<DocumentDriveDocument>;
     }
 
     async addInternalListener(
