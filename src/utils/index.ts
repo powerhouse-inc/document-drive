@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import {
     DocumentDriveDocument,
     documentModel as DocumentDriveModel,
@@ -58,11 +59,7 @@ export function mergeOperations<A extends Action = Action>(
 }
 
 export function generateUUID(): string {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const crypto =
-        typeof window !== 'undefined' ? window.crypto : require('crypto');
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    return crypto.randomUUID() as string;
+    return uuidv4();
 }
 
 export function isNoopUpdate(
