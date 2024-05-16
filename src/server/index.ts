@@ -672,10 +672,14 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 // when dealing with a merge (tail.length > 0) we have to skip hash validation
                 // for the operations that were re-indexed (previous hash becomes invalid due the new position in the history)
                 if (tail.length > 0) {
-                    skipHashValidation = [...invertedTrunk, ...tail].some(
-                        invertedTrunkOp =>
-                            invertedTrunkOp.hash === nextOperation.hash
+                    const sourceOperation = operations.find(
+                        op => op.hash === nextOperation.hash
                     );
+
+                    skipHashValidation =
+                        !sourceOperation ||
+                        sourceOperation.index !== nextOperation.index ||
+                        sourceOperation.skip !== nextOperation.skip;
                 }
 
                 try {
