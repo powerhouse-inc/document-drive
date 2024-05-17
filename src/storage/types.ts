@@ -6,12 +6,14 @@ import type {
     BaseAction,
     Document,
     DocumentHeader,
-    Operation
+    ExtendedState,
+    Operation,
+    State
 } from 'document-model/document';
 
 export type DocumentStorage<D extends Document = Document> = Omit<
     D,
-    'state' | 'attachments'
+    'attachments'
 >;
 
 export type DocumentDriveStorage = DocumentStorage<DocumentDriveDocument>;
@@ -38,6 +40,7 @@ export interface IStorage {
             operations: Operation[];
             header: DocumentHeader;
             updatedOperations?: Operation[];
+            newState: State<any, any> | undefined
         }>
     ): Promise<void>;
     deleteDocument(drive: string, id: string): Promise<void>;

@@ -19,7 +19,8 @@ import {
     DocumentHeader,
     DocumentModel,
     Operation,
-    OperationScope
+    OperationScope,
+    State
 } from 'document-model/document';
 import { createNanoEvents, Unsubscribe } from 'nanoevents';
 import { ICache } from '../cache';
@@ -558,11 +559,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         input: CreateDocumentInput
     ) {
         // if a document was provided then checks if it's valid
+        let state = undefined;
         if (input.document) {
             if (input.documentType !== input.document.documentType) {
                 throw new Error(`Provided document is not ${input.documentType}`);
             }
-            this._buildDocument(input.document);
+            const doc = this._buildDocument(input.document);
+            state = doc.state;
         }
 
         // if no document was provided then create a new one
@@ -579,6 +582,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             operations: { global: [], local: [] },
             initialState: document.initialState,
             clipboard: [],
+            state: state ?? document.state
         };
         await this.storage.createDocument(driveId, input.id, documentStorage);
 
@@ -615,7 +619,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const operationsApplied: Operation<A | BaseAction>[] = [];
         const operationsUpdated: Operation<A | BaseAction>[] = [];
         const signals: SignalResult[] = [];
-        let document: T = this._buildDocument(storageDocument);
+        let document: T = storageDocument as T;
 
         let error: OperationError | undefined; // TODO: replace with an array of errors/consistency issues
         const operationsByScope = groupOperationsByScope(operations);
@@ -831,6 +835,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             operations: Operation[];
             header: DocumentHeader;
             updatedOperations?: Operation[];
+            newState: State<any, any> | undefined;
         }>
     ) {
         if (!this.storage.addDocumentOperationsWithTransaction) {
@@ -893,7 +898,8 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                 return {
                     operations: result.operationsApplied,
                     header: result.document,
-                    updatedOperations: result.operationsUpdated
+                    updatedOperations: result.operationsUpdated,
+                    newState: document.state
                 };
             });
 

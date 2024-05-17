@@ -55,7 +55,8 @@ export class MemoryStorage implements IDriveStorage {
             documentType,
             created,
             lastModified,
-            clipboard
+            clipboard,
+            state
         } = document;
         this.documents[drive]![id] = {
             operations,
@@ -65,7 +66,8 @@ export class MemoryStorage implements IDriveStorage {
             documentType,
             created,
             lastModified,
-            clipboard
+            clipboard,
+            state
         };
     }
 
