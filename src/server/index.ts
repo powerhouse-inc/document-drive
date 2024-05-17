@@ -635,7 +635,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     ) {
         const operationsApplied: Operation<A | BaseAction>[] = [];
         const signals: SignalResult[] = [];
-        let document: T = storageDocument as T;
+        let document: T = this._buildDocument(storageDocument);
 
         let error: OperationError | undefined; // TODO: replace with an array of errors/consistency issues
         const operationsByScope = groupOperationsByScope(operations);
@@ -729,6 +729,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             options.revisions
         ) : documentStorage.operations;
         const operations = baseUtils.documentHelpers.grabageCollectDocumentOperations(revisionOperations);
+
+        if (documentStorage.state && (!options || options.checkHashes === false)) {
+            return documentStorage as T;
+        }
 
         return baseUtils.replayDocument(
             documentStorage.initialState,
