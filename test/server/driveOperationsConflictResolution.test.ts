@@ -409,8 +409,7 @@ describe('Drive Operations', () => {
         ]);
     });
 
-    // TODO: this test requires a fix from document-model-libs to work
-    it.skip('should resolve conflicts without duplicate ids when copy folders', async () => {
+    it('should resolve conflicts without duplicate ids when copy folders', async () => {
         let idCounter = 0;
         const generateId = () => {
             idCounter++;
@@ -492,7 +491,7 @@ describe('Drive Operations', () => {
         expect(drive.state.global.nodes).toMatchObject([
             { id: '1', name: '1', parentFolder: null },
             { id: '2', name: '2', parentFolder: '1' },
-            { id: '3', name: '1', parentFolder: null },
+            { id: '3', name: '1 (copy) 1', parentFolder: null },
             { id: '4', name: '2', parentFolder: '3' }
         ]);
 
@@ -544,9 +543,9 @@ describe('Drive Operations', () => {
         expect(drive.state.global.nodes).toMatchObject([
             { id: '1', name: '1', parentFolder: null },
             { id: '2', name: '2', parentFolder: '1' },
-            { id: '3', name: '1', parentFolder: null },
+            { id: '3', name: '1 (copy) 1', parentFolder: null },
             { id: '4', name: '2', parentFolder: '3' },
-            { id: '5', name: '1', parentFolder: null },
+            { id: '5', name: '1 (copy) 2', parentFolder: null },
             { id: '6', name: '2', parentFolder: '5' }
         ]);
 
@@ -562,15 +561,16 @@ describe('Drive Operations', () => {
             client2.getDocument() as DocumentDrive.DocumentDriveDocument
         ).state.global.nodes;
 
+        // TODO: validate that there are not duplicated operations after operation id implementation
         expect(client2Nodes).toHaveLength(8);
-        expect(drive.state.global.nodes).toMatchObject([
+        expect(client2Nodes).toMatchObject([
             { id: '1', name: '1', parentFolder: null },
             { id: '2', name: '2', parentFolder: '1' },
-            { id: '3', name: '1', parentFolder: null },
-            { id: '4', name: '2', parentFolder: '3' },
-            { id: '5', name: '1', parentFolder: null },
+            { id: '5', name: '1 (copy) 1', parentFolder: null },
             { id: '6', name: '2', parentFolder: '5' },
-            { id: '7', name: '1', parentFolder: null },
+            { id: '3', name: '1 (copy) 2', parentFolder: null },
+            { id: '4', name: '2', parentFolder: '3' },
+            { id: '7', name: '1 (copy) 3', parentFolder: null },
             { id: '8', name: '2', parentFolder: '7' }
         ]);
     });
