@@ -351,7 +351,7 @@ export class PrismaStorage implements IDriveStorage {
             clipboard: dbDoc.operations
                 .filter(op => op.clipboard)
                 .map(storageToOperation),
-            revision: JSON.parse(dbDoc.revision),
+            revision: JSON.parse(dbDoc.revision) as Record<OperationScope, number>,
             attachments: {}
         };
 
