@@ -133,11 +133,11 @@ export class PrismaStorage implements IDriveStorage {
                 name: document.name,
                 documentType: document.documentType,
                 driveId: drive,
-                initialState: document.initialState as Prisma.InputJsonObject,
+                initialState: JSON.stringify(document.initialState),
                 lastModified: document.lastModified,
-                revision: document.revision,
+                revision: JSON.stringify(document.revision),
                 id,
-                state: document.initialState
+                state: JSON.stringify(document.initialState)
             }
         });
     }
@@ -179,8 +179,8 @@ export class PrismaStorage implements IDriveStorage {
                 },
                 data: {
                     lastModified: header.lastModified,
-                    revision: header.revision,
-                    state: newState
+                    revision: JSON.stringify(header.revision),
+                    state: JSON.stringify(newState)
                 }
             });
         } catch (e) {
@@ -331,11 +331,11 @@ export class PrismaStorage implements IDriveStorage {
             created: dbDoc.created.toISOString(),
             name: dbDoc.name ? dbDoc.name : '',
             documentType: dbDoc.documentType,
-            initialState: dbDoc.initialState as ExtendedState<
+            initialState: JSON.parse(dbDoc.initialState) as ExtendedState<
                 DocumentDriveState,
                 DocumentDriveLocalState
             >,
-            state: dbDoc.state as State<unknown, unknown>,
+            state: JSON.parse(dbDoc.state) as State<unknown, unknown>,
             lastModified: new Date(dbDoc.lastModified).toISOString(),
             operations: {
                 global: dbDoc.operations
@@ -348,7 +348,7 @@ export class PrismaStorage implements IDriveStorage {
             clipboard: dbDoc.operations
                 .filter(op => op.clipboard)
                 .map(storageToOperation),
-            revision: dbDoc.revision as Record<OperationScope, number>
+            revision: JSON.parse(dbDoc.revision) as Record<OperationScope, number>
         };
 
         return doc;
