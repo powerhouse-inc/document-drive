@@ -27,8 +27,7 @@ export function isDocumentDrive(
     document: Document
 ): document is DocumentDriveDocument {
     return (
-        document.documentType === DocumentDriveModel.id &&
-        z.DocumentDriveStateSchema().safeParse(document.state.global).success
+        document.documentType === DocumentDriveModel.id
     );
 }
 
