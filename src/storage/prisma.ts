@@ -137,7 +137,6 @@ export class PrismaStorage implements IDriveStorage {
                 lastModified: document.lastModified,
                 revision: JSON.stringify(document.revision),
                 id,
-                state: JSON.stringify(document.state)
             }
         });
     }
