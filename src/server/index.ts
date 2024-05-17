@@ -635,7 +635,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     ) {
         const operationsApplied: Operation<A | BaseAction>[] = [];
         const signals: SignalResult[] = [];
-        let document: T = this._buildDocument(storageDocument);
+        let document: T = storageDocument as T;
 
         let error: OperationError | undefined; // TODO: replace with an array of errors/consistency issues
         const operationsByScope = groupOperationsByScope(operations);
@@ -724,6 +724,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
     private _buildDocument<T extends Document>(
         documentStorage: DocumentStorage<T>, options?: GetDocumentOptions
     ): T {
+        if (documentStorage.state && (!options || options.checkHashes === false)) {
+            return documentStorage as T;
+        }
+
         const documentModel = this._getDocumentModel(
             documentStorage.documentType
         );
@@ -733,10 +737,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             options.revisions
         ) : documentStorage.operations;
         const operations = baseUtils.documentHelpers.garbageCollectDocumentOperations(revisionOperations);
-
-        if (documentStorage.state && (!options || options.checkHashes === false)) {
-            return documentStorage as T;
-        }
 
         return baseUtils.replayDocument(
             documentStorage.initialState,

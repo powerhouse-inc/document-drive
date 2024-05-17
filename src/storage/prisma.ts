@@ -8,6 +8,7 @@ import {
 } from 'document-model-libs/document-drive';
 import type {
     BaseAction,
+    Document,
     DocumentHeader,
     ExtendedState,
     Operation,
@@ -138,6 +139,7 @@ export class PrismaStorage implements IDriveStorage {
                 lastModified: document.lastModified,
                 revision: JSON.stringify(document.revision),
                 id,
+                state: JSON.stringify(document.initialState)
             }
         });
     }
@@ -328,7 +330,7 @@ export class PrismaStorage implements IDriveStorage {
         }
 
         const dbDoc = result;
-        const doc = {
+        const doc: Document = {
             created: dbDoc.created.toISOString(),
             name: dbDoc.name ? dbDoc.name : '',
             documentType: dbDoc.documentType,
@@ -349,7 +351,8 @@ export class PrismaStorage implements IDriveStorage {
             clipboard: dbDoc.operations
                 .filter(op => op.clipboard)
                 .map(storageToOperation),
-            revision: JSON.parse(dbDoc.revision) as Record<OperationScope, number>
+            revision: JSON.parse(dbDoc.revision),
+            attachments: {}
         };
 
         return doc;
