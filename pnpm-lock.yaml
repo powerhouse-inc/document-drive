@@ -76,8 +76,8 @@ devDependencies:
     specifier: ^1.4.0
     version: 1.4.0(vitest@1.5.0)
   document-model:
-    specifier: 1.1.0-experimental.3
-    version: 1.1.0-experimental.3
+    specifier: 1.1.0-experimental.4
+    version: 1.1.0-experimental.4
   document-model-libs:
     specifier: 1.52.0
     version: 1.52.0(graphql@16.8.1)(react-dom@18.2.0)(react@18.2.0)(vitest@1.5.0)
@@ -4932,8 +4932,8 @@ packages:
       - vitest
     dev: true
 
-  /document-model@1.1.0-experimental.3:
-    resolution: {integrity: sha512-RSv0vBPenPwzXatFokOtv+vlWw5E1EYxgzxg9owqGQyFbmyA5PPR+oqdIFNVkitTlHrpiB97DqKSxS19P768vg==}
+  /document-model@1.1.0-experimental.4:
+    resolution: {integrity: sha512-UdhEv2klnKmnBo4gHtDZC0cjDdc3iMIvwmAQ+BL6NgPOpPG7ADqls51TEpfy6dxLlCu5rLE3RPA2F0Rnw/h1lw==}
     dependencies:
       change-case: 5.4.4
       immer: 10.0.4
