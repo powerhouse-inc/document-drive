@@ -667,7 +667,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     : merge(trunk, invertedTrunk, reshuffleByTimestamp);
 
             const newOperations = newHistory.filter(
-                (op: any) => trunk.length < 1 || precedes(trunk[trunk.length - 1]!, op)
+                (op) => trunk.length < 1 || precedes(trunk[trunk.length - 1]!, op)
             );
 
             for (const nextOperation of newOperations) {
@@ -728,7 +728,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             documentStorage.operations,
             options.revisions
         ) : documentStorage.operations;
-        const operations = baseUtils.documentHelpers.grabageCollectDocumentOperations(revisionOperations);
+        const operations = baseUtils.documentHelpers.garbageCollectDocumentOperations(revisionOperations);
 
         if (documentStorage.state && (!options || options.checkHashes === false)) {
             return documentStorage as T;
@@ -741,7 +741,11 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             undefined,
             documentStorage,
             undefined,
-            { checkHashes: options?.checkHashes ?? true }
+            {
+                ...options,
+                checkHashes: options?.checkHashes ?? true,
+                reuseOperationResultingState: options?.checkHashes ?? true
+            }
         ) as T;
     }
 
@@ -792,7 +796,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     );
                 }
             },
-            { skip: operation.skip }
+            { skip: operation.skip, reuseOperationResultingState: true }
         ) as T;
 
         const appliedOperation = newDocument.operations[operation.scope].filter(
@@ -884,7 +888,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                     }
                 });
                 const unsubscribeError = this.queueManager.on('jobFailed', (job, error) => {
-                    console.log("test")
                     if (job.jobId === jobId) {
                         unsubscribe();
                         unsubscribeError();
