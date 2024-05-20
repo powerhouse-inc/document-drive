@@ -1262,7 +1262,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         const document = await this.getDrive(drive);
         const operations = this._buildOperations(document, actions);
         const result = await this.queueDriveOperations(drive, operations);
-        return result as IOperationResult<DocumentDriveDocument>;
+        return result;
     }
 
     async addInternalListener(
