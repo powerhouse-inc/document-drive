@@ -48,6 +48,7 @@ model Operation {
   syncId      String?
   clipboard   Boolean?     @default(false)
   context     Json?
+  resultingState String?
 
   SyncronizationUnit SyncronizationUnit? @relation(fields: [syncId, driveId], references: [id, driveId], onDelete: Cascade)
 

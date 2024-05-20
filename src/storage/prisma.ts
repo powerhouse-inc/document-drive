@@ -34,6 +34,7 @@ function storageToOperation(
         input: JSON.parse(op.input),
         type: op.type,
         scope: op.scope as OperationScope,
+        resultingState: op.resultingState ? JSON.parse(op.resultingState) : undefined
         // attachments: fileRegistry
     };
     if (op.context) {
@@ -167,7 +168,8 @@ export class PrismaStorage implements IDriveStorage {
                     scope: op.scope,
                     branch: 'main',
                     skip: op.skip,
-                    context: op.context
+                    context: op.context,
+                    resultingState: op.resultingState ? JSON.stringify(op.resultingState) : undefined
                 }))
             });
 
@@ -334,7 +336,7 @@ export class PrismaStorage implements IDriveStorage {
                 DocumentDriveState,
                 DocumentDriveLocalState
             >,
-            state: JSON.parse(dbDoc.state) as State<unknown, unknown>,
+            state: JSON.parse(dbDoc.state!) as State<unknown, unknown>,
             lastModified: new Date(dbDoc.lastModified).toISOString(),
             operations: {
                 global: dbDoc.operations
