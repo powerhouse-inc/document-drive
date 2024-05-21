@@ -14,6 +14,7 @@ import type {
     Document,
     Operation,
     OperationScope,
+    ReducerOptions,
     Signal,
     State
 } from 'document-model/document';
@@ -140,7 +141,7 @@ export type PartialRecord<K extends keyof any, T> = {
 
 export type RevisionsFilter = PartialRecord<OperationScope, number>;
 
-export type GetDocumentOptions = {
+export type GetDocumentOptions = ReducerOptions & {
     revisions?: RevisionsFilter;
     checkHashes?: boolean;
 };

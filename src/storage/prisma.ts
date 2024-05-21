@@ -11,7 +11,8 @@ import type {
     DocumentHeader,
     ExtendedState,
     Operation,
-    OperationScope
+    OperationScope,
+    State
 } from 'document-model/document';
 import { ConflictOperationError } from '../server/error';
 import { logger } from '../utils/logger';
@@ -33,6 +34,7 @@ function storageToOperation(
         input: JSON.parse(op.input),
         type: op.type,
         scope: op.scope as OperationScope,
+        resultingState: op.resultingState ? JSON.parse(op.resultingState) : undefined
         // attachments: fileRegistry
     };
     if (op.context) {
@@ -132,10 +134,10 @@ export class PrismaStorage implements IDriveStorage {
                 name: document.name,
                 documentType: document.documentType,
                 driveId: drive,
-                initialState: document.initialState as Prisma.InputJsonObject,
+                initialState: JSON.stringify(document.initialState),
                 lastModified: document.lastModified,
-                revision: document.revision,
-                id
+                revision: JSON.stringify(document.revision),
+                id,
             }
         });
     }
@@ -146,6 +148,7 @@ export class PrismaStorage implements IDriveStorage {
         id: string,
         operations: Operation[],
         header: DocumentHeader,
+        newState: State<any, any> | undefined = undefined
     ): Promise<void> {
         const document = await this.getDocument(drive, id, tx);
         if (!document) {
@@ -165,7 +168,8 @@ export class PrismaStorage implements IDriveStorage {
                     scope: op.scope,
                     branch: 'main',
                     skip: op.skip,
-                    context: op.context
+                    context: op.context,
+                    resultingState: op.resultingState ? JSON.stringify(op.resultingState) : undefined
                 }))
             });
 
@@ -176,7 +180,8 @@ export class PrismaStorage implements IDriveStorage {
                 },
                 data: {
                     lastModified: header.lastModified,
-                    revision: header.revision
+                    revision: JSON.stringify(header.revision),
+                    state: JSON.stringify(newState)
                 }
             });
         } catch (e) {
@@ -224,11 +229,13 @@ export class PrismaStorage implements IDriveStorage {
         callback: (document: DocumentStorage) => Promise<{
             operations: Operation[];
             header: DocumentHeader;
+            newState?: State<any, any> | undefined
         }>
     ) {
         let result: {
             operations: Operation[];
             header: DocumentHeader;
+            newState?: State<any, any> | undefined;
         } | null = null;
 
         await this.db.$transaction(async tx => {
@@ -238,13 +245,14 @@ export class PrismaStorage implements IDriveStorage {
             }
             result = await callback(document);
 
-            const { operations, header } = result;
+            const { operations, header, newState } = result;
             return this._addDocumentOperations(
                 tx,
                 drive,
                 id,
                 operations,
                 header,
+                newState
             );
         }, { isolationLevel: "Serializable" });
 
@@ -324,10 +332,11 @@ export class PrismaStorage implements IDriveStorage {
             created: dbDoc.created.toISOString(),
             name: dbDoc.name ? dbDoc.name : '',
             documentType: dbDoc.documentType,
-            initialState: dbDoc.initialState as ExtendedState<
+            initialState: JSON.parse(dbDoc.initialState) as ExtendedState<
                 DocumentDriveState,
                 DocumentDriveLocalState
             >,
+            state: JSON.parse(dbDoc.state!) as State<unknown, unknown>,
             lastModified: new Date(dbDoc.lastModified).toISOString(),
             operations: {
                 global: dbDoc.operations
@@ -340,7 +349,7 @@ export class PrismaStorage implements IDriveStorage {
             clipboard: dbDoc.operations
                 .filter(op => op.clipboard)
                 .map(storageToOperation),
-            revision: dbDoc.revision as Record<OperationScope, number>
+            revision: JSON.parse(dbDoc.revision) as Record<OperationScope, number>
         };
 
         return doc;
