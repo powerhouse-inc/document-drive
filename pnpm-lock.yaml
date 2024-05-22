@@ -76,11 +76,11 @@ devDependencies:
     specifier: ^1.4.0
     version: 1.4.0(vitest@1.5.0)
   document-model:
-    specifier: 1.1.0-experimental.4
-    version: 1.1.0-experimental.4
+    specifier: ^1.2.0
+    version: 1.2.0
   document-model-libs:
-    specifier: 1.52.0
-    version: 1.52.0(graphql@16.8.1)(react-dom@18.2.0)(react@18.2.0)(vitest@1.5.0)
+    specifier: ^1.53.1
+    version: 1.53.1(graphql@16.8.1)(react-dom@18.2.0)(react@18.2.0)(vitest@1.5.0)
   eslint:
     specifier: ^8.57.0
     version: 8.57.0
@@ -1421,12 +1421,6 @@ packages:
   /@inquirer/type@1.2.1:
     resolution: {integrity: sha512-xwMfkPAxeo8Ji/IxfUSqzRi0/+F2GIqJmpc5/thelgMGsjNZcjDDRBO9TLXT1s/hdx/mK5QbVIvgoLIFgXhTMQ==}
     engines: {node: '>=18'}
-    dev: true
-
-  /@internationalized/date@3.5.2:
-    resolution: {integrity: sha512-vo1yOMUt2hzp63IutEaTUxROdvQg1qlMRsbCvbay2AK2Gai7wIgCyK5weEX3nHkiLgo4qCXHijFNC/ILhlRpOQ==}
-    dependencies:
-      '@swc/helpers': 0.5.10
     dev: true
 
   /@internationalized/date@3.5.3:
@@ -4901,8 +4895,8 @@ packages:
       esutils: 2.0.3
     dev: true
 
-  /document-model-libs@1.52.0(graphql@16.8.1)(react-dom@18.2.0)(react@18.2.0)(vitest@1.5.0):
-    resolution: {integrity: sha512-4CS7U6ReUFvS86Vmnj7rYNP6uq7WnoA+AtjX2i5uwQ4Bzcih1SwwLE+2LDQ28KsnjMtpN/zmnoQ7mAAe+U7KvQ==}
+  /document-model-libs@1.53.1(graphql@16.8.1)(react-dom@18.2.0)(react@18.2.0)(vitest@1.5.0):
+    resolution: {integrity: sha512-56/labJOC7bIQfesLwR8iUlGA1WazgQgpmCMymQUlsWgLU20XgfMFedZg6xGiA4yQi10uzHhMhPZZ5AP4/5nMQ==}
     peerDependencies:
       react: ^18.2.0
       react-dom: ^18.2.0
@@ -4910,7 +4904,7 @@ packages:
       '@acaldas/graphql-codegen-typescript-validation-schema': 0.12.3(graphql@16.8.1)
       '@graphql-codegen/core': 4.0.2(graphql@16.8.1)
       '@graphql-codegen/typescript': 4.0.6(graphql@16.8.1)
-      '@internationalized/date': 3.5.2
+      '@internationalized/date': 3.5.3
       '@storybook/test': 8.0.8(vitest@1.5.0)
       copy-anything: 3.0.5
       date-fns: 3.6.0
@@ -4932,14 +4926,15 @@ packages:
       - vitest
     dev: true
 
-  /document-model@1.1.0-experimental.4:
-    resolution: {integrity: sha512-UdhEv2klnKmnBo4gHtDZC0cjDdc3iMIvwmAQ+BL6NgPOpPG7ADqls51TEpfy6dxLlCu5rLE3RPA2F0Rnw/h1lw==}
+  /document-model@1.2.0:
+    resolution: {integrity: sha512-9nG80lQQghlvWndruBZuU8mNSsfwG7SRHczLAPEyy1iatct4mfdxkIck7b5vFAlAz43glqKy7QwAjxXX0oQ/7g==}
     dependencies:
       change-case: 5.4.4
       immer: 10.0.4
       jszip: 3.10.1
       mime: 4.0.1
       safe-stable-stringify: 2.4.3
+      uuid: 9.0.1
       zod: 3.23.0
     dev: true
 
@@ -9276,7 +9271,6 @@ packages:
   /uuid@9.0.1:
     resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
     hasBin: true
-    dev: false
 
   /v8-to-istanbul@9.2.0:
     resolution: {integrity: sha512-/EH/sDgxU2eGxajKdwLCDmQ4FWq+kpi3uCmBGpw1xJtnAxEjlD8j8PEiGWpCIMIs3ciNAgH0d3TTJiUkYzyZjA==}
