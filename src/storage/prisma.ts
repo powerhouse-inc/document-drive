@@ -35,7 +35,7 @@ function storageToOperation(
         input: JSON.parse(op.input),
         type: op.type,
         scope: op.scope as OperationScope,
-        resultingState: op.resultingState ? JSON.parse(op.resultingState) : undefined
+        resultingState: op.resultingState ? op.resultingState : undefined
         // attachments: fileRegistry
     };
     if (op.context) {
@@ -139,7 +139,6 @@ export class PrismaStorage implements IDriveStorage {
                 lastModified: document.lastModified,
                 revision: JSON.stringify(document.revision),
                 id,
-                state: JSON.stringify(document.initialState)
             }
         });
     }
@@ -149,8 +148,7 @@ export class PrismaStorage implements IDriveStorage {
         drive: string,
         id: string,
         operations: Operation[],
-        header: DocumentHeader,
-        newState: State<any, any> | undefined = undefined
+        header: DocumentHeader
     ): Promise<void> {
         const document = await this.getDocument(drive, id, tx);
         if (!document) {
@@ -183,7 +181,6 @@ export class PrismaStorage implements IDriveStorage {
                 data: {
                     lastModified: header.lastModified,
                     revision: JSON.stringify(header.revision),
-                    state: JSON.stringify(newState)
                 }
             });
         } catch (e) {
@@ -254,7 +251,6 @@ export class PrismaStorage implements IDriveStorage {
                 id,
                 operations,
                 header,
-                newState
             );
         }, { isolationLevel: "Serializable" });
 
@@ -338,7 +334,7 @@ export class PrismaStorage implements IDriveStorage {
                 DocumentDriveState,
                 DocumentDriveLocalState
             >,
-            state: JSON.parse(dbDoc.state!) as State<unknown, unknown>,
+            state: undefined,
             lastModified: new Date(dbDoc.lastModified).toISOString(),
             operations: {
                 global: dbDoc.operations

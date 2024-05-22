@@ -849,7 +849,6 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         callback: (document: DocumentStorage) => Promise<{
             operations: Operation[];
             header: DocumentHeader;
-            newState: State<any, any> | undefined;
         }>
     ) {
         if (!this.storage.addDocumentOperationsWithTransaction) {

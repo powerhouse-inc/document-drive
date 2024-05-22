@@ -39,7 +39,6 @@ export interface IStorage {
         callback: (document: DocumentStorage) => Promise<{
             operations: Operation[];
             header: DocumentHeader;
-            newState: State<any, any> | undefined
         }>
     ): Promise<void>;
     deleteDocument(drive: string, id: string): Promise<void>;
