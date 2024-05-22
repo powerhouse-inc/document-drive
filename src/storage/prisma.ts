@@ -35,11 +35,7 @@ function storageToOperation(
         input: JSON.parse(op.input),
         type: op.type,
         scope: op.scope as OperationScope,
-<<<<<<< HEAD
-        resultingState: op.resultingState ?? undefined
-=======
         resultingState: op.resultingState ? JSON.parse(op.resultingState) : undefined
->>>>>>> 7055428 (feat: added resulting state for operations)
         // attachments: fileRegistry
     };
     if (op.context) {
