@@ -69,4 +69,6 @@ export interface IDriveStorage extends IStorage {
         }>
     ): Promise<void>;
     getDriveOperationResultingState?(drive: string, index: number, scope: string, branch: string): Promise<unknown>;
+
+    getSyncronizationUnitsRevision(units: { driveId: string, documentId?: string, scope: string, branch: string }[]): Promise<{ driveId: string, documentId?: string, scope: string, branch: string, timestamp: Date, index: number }[]>
 }

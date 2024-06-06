@@ -100,6 +100,7 @@ export class PrismaStorage implements IDriveStorage {
         });
     }
 
+
     setStorageDelegate(delegate: IStorageDelegate): void {
         this.delegate = delegate;
     }
@@ -409,7 +410,7 @@ export class PrismaStorage implements IDriveStorage {
                 ELSE NULL
             END AS "resultingState"
             FROM ranked_operations
-            WHERE "driveId" = $1 AND "documentId" = $2
+            WHERE "driveId" = $1 AND "documentId" = $2 "scope" = $3 and "branch" = $4
             AND (${conditions.join(' OR ')})
             ORDER BY scope, index;
         `, driveId, id);
@@ -549,4 +550,43 @@ export class PrismaStorage implements IDriveStorage {
     getDriveOperationResultingState(drive: string, index: number, scope: string, branch: string): Promise<unknown> {
         return this.getOperationResultingState("drives", drive, index, scope, branch);
     }
+
+    async getSyncronizationUnitsRevision(units: { driveId: string; documentId?: string | undefined; scope: string; branch: string; }[]): Promise<{ driveId: string; documentId?: string | undefined; scope: string; branch: string; timestamp: Date; index: number; }[]> {
+
+        const results = await Promise.all(units.map(async (u) => {
+            const result = await this.db.operation.findFirst({
+                select: {
+                    driveId: true,
+                    documentId: true,
+                    scope: true,
+                    branch: true,
+                    timestamp: true,
+                    index: true
+                },
+                where: {
+                    AND: {
+                        scope: u.scope,
+                        branch: u.branch,
+                        driveId: u.driveId,
+                        documentId: u.documentId
+                    }
+                },
+                orderBy: {
+                    index: "desc"
+                }
+
+
+            })
+
+            if (!result) {
+                throw new Error("Synchronization unit not found");
+            }
+
+            return result;
+        }))
+
+        return results;
+
+    }
+
 }
