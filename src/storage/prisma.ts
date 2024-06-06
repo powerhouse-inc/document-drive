@@ -100,7 +100,6 @@ export class PrismaStorage implements IDriveStorage {
         });
     }
 
-
     setStorageDelegate(delegate: IStorageDelegate): void {
         this.delegate = delegate;
     }
@@ -410,7 +409,7 @@ export class PrismaStorage implements IDriveStorage {
                 ELSE NULL
             END AS "resultingState"
             FROM ranked_operations
-            WHERE "driveId" = $1 AND "documentId" = $2 "scope" = $3 and "branch" = $4
+            WHERE "driveId" = $1 AND "documentId" = $2
             AND (${conditions.join(' OR ')})
             ORDER BY scope, index;
         `, driveId, id);
