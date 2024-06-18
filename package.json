@@ -35,7 +35,7 @@
     },
     "peerDependencies": {
         "document-model": "^1.4.0",
-        "document-model-libs": "^1.57.0"
+        "document-model-libs": "^1.60.1"
     },
     "optionalDependencies": {
         "@prisma/client": "5.14.0",
@@ -64,13 +64,13 @@
         "@semantic-release/git": "^10.0.1",
         "@total-typescript/ts-reset": "^0.5.1",
         "@types/node": "^20.12.7",
-        "@types/ws": "^8.5.10",
         "@types/uuid": "^9.0.8",
+        "@types/ws": "^8.5.10",
         "@typescript-eslint/eslint-plugin": "^6.21.0",
         "@typescript-eslint/parser": "^6.21.0",
         "@vitest/coverage-v8": "^1.4.0",
         "document-model": "^1.4.0",
-        "document-model-libs": "^1.57.0",
+        "document-model-libs": "^1.60.1",
         "eslint": "^8.57.0",
         "eslint-config-prettier": "^9.1.0",
         "fake-indexeddb": "^5.0.2",
