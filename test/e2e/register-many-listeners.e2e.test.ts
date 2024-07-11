@@ -49,7 +49,7 @@ describe("register many listeners with prisma and redis", () => {
                     block: false,
                     callInfo: {
                         data: null,
-                        name: "test",
+                        name: "test-" + i,
                         transmitterType: "PullResponder",
                     },
                     filter: {
@@ -58,8 +58,8 @@ describe("register many listeners with prisma and redis", () => {
                         documentType: ["*"],
                         scope: ["*"],
                     },
-                    label: "test",
-                    listenerId: "test",
+                    label: "test-" + i,
+                    listenerId: "test-" + i,
                     system: false,
                 }
             })))
