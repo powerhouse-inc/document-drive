@@ -172,10 +172,7 @@ export class BaseQueueManager implements IQueueManager {
             const queue = this.getQueue(job.driveId, input.id);
             await queue.setDeleted(true);
         }
-        console.time('adding job to redis');
         await queue.addJob({ jobId, ...job });
-        console.timeEnd('adding job to redis');
-        console.time(`job picked up: ${jobId}`);
 
         return jobId;
     }
@@ -211,12 +208,28 @@ export class BaseQueueManager implements IQueueManager {
         return Object.keys(new Array(this.queues));
     }
 
-    private retryNextJob() {
+    private retryNextJob(timeout?: number) {
+        const _timeout = timeout !== undefined ? timeout : this.timeout;
         const retry =
-            this.timeout === 0 && typeof setImmediate !== 'undefined'
+            _timeout === 0 && typeof setImmediate !== 'undefined'
                 ? setImmediate
-                : (fn: () => void) => setTimeout(fn, this.timeout);
+                : (fn: () => void) => setTimeout(fn, _timeout);
         return retry(() => this.processNextJob());
+    }
+
+    private async findFirstNonEmptyQueue(
+        ticker: number
+    ): Promise<number | null> {
+        const numQueues = this.queues.length;
+
+        for (let i = 0; i < numQueues; i++) {
+            const index = (ticker + i) % numQueues;
+            const queue = this.queues[index];
+            if (queue && (await queue.amountOfJobs()) > 0) {
+                return index;
+            }
+        }
+        return null;
     }
 
     private async processNextJob() {
@@ -230,17 +243,26 @@ export class BaseQueueManager implements IQueueManager {
         }
 
         const queue = this.queues[this.ticker];
-        this.ticker =
-            this.ticker === this.queues.length - 1 ? 0 : this.ticker + 1;
+
         if (!queue) {
             this.ticker = 0;
             this.retryNextJob();
             return;
         }
 
+        // if no jobs in the current queue then looks for the
+        // next queue with jobs. If no jobs in any queue then
+        // retries after a timeout
         const amountOfJobs = await queue.amountOfJobs();
         if (amountOfJobs === 0) {
-            return this.processNextJob();
+            const nextTicker = await this.findFirstNonEmptyQueue(this.ticker);
+            if (nextTicker !== null) {
+                this.ticker = nextTicker;
+                this.retryNextJob(0);
+            } else {
+                this.retryNextJob();
+            }
+            return;
         }
 
         const isBlocked = await queue.isBlocked();
@@ -257,9 +279,6 @@ export class BaseQueueManager implements IQueueManager {
         }
 
         try {
-            console.timeEnd(`job picked up: ${nextJob.jobId}`);
-            console.time(`job ${nextJob.jobId}`);
-
             const result = await this.delegate.processJob(nextJob);
 
             // unblock the document queues of each add_file operation
@@ -277,11 +296,8 @@ export class BaseQueueManager implements IQueueManager {
                 }
             }
             this.emit('jobCompleted', nextJob, result);
-
-            console.timeEnd(`job ${nextJob.jobId}`);
         } catch (e) {
             console.error(`job failed`, e);
-            console.timeEnd(`job ${nextJob.jobId}`);
             this.emit('jobFailed', nextJob, e as Error);
         } finally {
             await queue.setBlocked(false);

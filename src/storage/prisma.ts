@@ -82,6 +82,9 @@ function getRetryTransactionsClient<T extends PrismaClient>(
                     retry: e => {
                         // Retry the transaction only if the error was due to a write conflict or deadlock
                         // See: https://www.prisma.io/docs/reference/api-reference/error-reference#p2034
+                        if ((e as { code: string }).code !== 'P2034') {
+                            console.error('TRANSACTION ERROR', e);
+                        }
                         return (e as { code: string }).code === 'P2034';
                     },
                     ...backOffOptions
