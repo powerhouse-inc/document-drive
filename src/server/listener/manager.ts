@@ -160,6 +160,15 @@ export class ListenerManager extends BaseListenerManager {
             ) {
                 continue;
             }
+
+            const transmitter = await this.getTransmitter(
+                driveId,
+                listener.listener.listenerId
+            );
+            if (!transmitter?.transmit) {
+                continue;
+            }
+
             for (const syncUnit of syncUnits) {
                 if (!this._checkFilter(listener.listener.filter, syncUnit)) {
                     continue;
@@ -229,7 +238,7 @@ export class ListenerManager extends BaseListenerManager {
         for (const [driveId, drive] of this.listenerState) {
             for (const [id, listener] of drive) {
                 const transmitter = await this.getTransmitter(driveId, id);
-                if (!transmitter) {
+                if (!transmitter?.transmit) {
                     continue;
                 }
 
@@ -239,6 +248,8 @@ export class ListenerManager extends BaseListenerManager {
                 );
 
                 const strandUpdates: StrandUpdate[] = [];
+
+                // TODO change to push one after the other, reusing operation data
                 await Promise.all(
                     syncUnits.map(async syncUnit => {
                         const unitState = listener.syncUnits.get(
@@ -292,7 +303,7 @@ export class ListenerManager extends BaseListenerManager {
 
                 // TODO update listeners in parallel, blocking for listeners with block=true
                 try {
-                    const listenerRevisions = await transmitter?.transmit(
+                    const listenerRevisions = await transmitter.transmit(
                         strandUpdates,
                         source
                     );
