@@ -9,24 +9,29 @@ export class RedisQueue<T, R> implements IQueue<T, R> {
     constructor(id: string, client: RedisClientType) {
         this.client = client;
         this.id = id;
-        this.client.hSet("queues", id, "true");
-        this.client.hSet(this.id, "blocked", "false");
     }
 
-    async addJob(data: any) {
-        await this.client.lPush(this.id + "-jobs", JSON.stringify(data));
+    async addJob(job: IJob<T>) {
+        this.client.zAdd(this.id + "-jobs", {
+            score: job.score,
+            value: JSON.stringify(job)
+        });
     }
 
     async getNextJob() {
-        const job = await this.client.rPop(this.id + "-jobs");
-        if (!job) {
-            return undefined;
+        let entry: null | any = null;
+        while (!entry) {
+            entry = await this.client.zPopMin(this.id + "-jobs");
+            if (!entry) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
         }
-        return JSON.parse(job) as IJob<T>;
+
+        return { ...JSON.parse(entry.value), score: entry.score } as IJob<T>;
     }
 
     async amountOfJobs() {
-        return this.client.lLen(this.id + "-jobs");
+        return this.client.zCount(this.id + "-jobs", 0, -1);
     }
 
     getId() {
@@ -34,20 +39,21 @@ export class RedisQueue<T, R> implements IQueue<T, R> {
     }
 
     async getJobs() {
-        const entries = await this.client.lRange(this.id + "-jobs", 0, -1)
-        return entries.map(e => JSON.parse(e) as IJob<T>);
+        const entries = await this.client.zRangeWithScores(this.id + "-jobs", 0, -1)
+        return entries.map(e => ({ ...JSON.parse(e.value), score: e.score }) as IJob<T>);
     }
 
     async createOrUpdateJobs(jobs: IJob<T>[]) {
-        await this.client.del(this.id + "-jobs");
         for (const job of jobs) {
-            await this.client.lPush(this.id + "-jobs", JSON.stringify(job));
-        }
+            await this.addJob(job);
+        };
     }
 
     async removeJobs(jobIds: string[]) {
-        for (const jobId of jobIds) {
-            await this.client.lRem(this.id + "-jobs", 1, JSON.stringify(jobId));
+        const entries = await this.getJobs();
+        const entriesToDelete = entries.filter(e => jobIds.includes(e.jobId))
+        for (const entry of entriesToDelete) {
+            await this.client.zRem(this.id + "-jobs", JSON.stringify(entry));
         }
     }
 }
