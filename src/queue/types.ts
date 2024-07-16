@@ -6,7 +6,7 @@ export interface BaseJob {
     driveId: string;
     documentId?: string
     actions?: Action[]
-    options?: AddOperationOptions;    
+    options?: AddOperationOptions;
 }
 
 export interface OperationJob extends BaseJob {
@@ -46,7 +46,7 @@ export interface IQueueManager {
     ): Unsubscribe;
 }
 
-export type IJob<T> = { jobId: JobId } & T;
+export type IJob<T> = { jobId: JobId, score: number } & T;
 
 export interface IQueue<T, R> {
     addJob(data: IJob<T>): Promise<void>;
