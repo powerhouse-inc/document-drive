@@ -265,6 +265,9 @@ export class BaseQueueManager implements IQueueManager {
             return;
         }
 
+        this.ticker =
+            this.ticker === this.queues.length - 1 ? 0 : this.ticker + 1;
+
         const isBlocked = await queue.isBlocked();
         if (isBlocked) {
             this.retryNextJob();
