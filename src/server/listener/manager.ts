@@ -321,22 +321,31 @@ export class ListenerManager extends BaseListenerManager {
                             );
                         }
                     }
-                    const revisionError = listenerRevisions.find(
-                        l => l.status !== 'SUCCESS'
-                    );
-                    if (revisionError) {
-                        throw new OperationError(
-                            revisionError.status as ErrorStatus,
-                            undefined,
-                            revisionError.error,
-                            revisionError.error
-                        );
+
+                    for (const revision of listenerRevisions) {
+                        const error = revision.status === 'ERROR';
+                        if (revision.error?.includes('Missing operations')) {
+                            const updates = await this._triggerUpdate(
+                                source,
+                                onError
+                            );
+                            listenerUpdates.push(...updates);
+                        } else {
+                            listenerUpdates.push({
+                                listenerId: listener.listener.listenerId,
+                                listenerRevisions
+                            });
+                            if (error) {
+                                throw new OperationError(
+                                    revision.status as ErrorStatus,
+                                    undefined,
+                                    revision.error,
+                                    revision.error
+                                );
+                            }
+                        }
                     }
                     listener.listenerStatus = 'SUCCESS';
-                    listenerUpdates.push({
-                        listenerId: listener.listener.listenerId,
-                        listenerRevisions
-                    });
                 } catch (e) {
                     // TODO: Handle error based on listener params (blocking, retry, etc)
                     onError?.(e as Error, driveId, listener);
