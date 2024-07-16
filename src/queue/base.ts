@@ -87,6 +87,10 @@ export class BaseQueueManager implements IQueueManager {
         this.queue = new MemoryQueue<Job, IOperationResult>('queue')
     }
 
+    setQueue(queue: IQueue<Job, IOperationResult>) {
+        this.queue = queue;
+    }
+
     async init(
         delegate: IServerDelegate,
         onError: (error: Error) => void
