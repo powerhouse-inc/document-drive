@@ -34,10 +34,6 @@ export interface IServerDelegate {
 
 export interface IQueueManager {
     addJob(job: Job): Promise<JobId>;
-    getQueue(driveId: string, document?: string): IQueue<Job, IOperationResult>;
-    removeQueue(driveId: string, documentId?: string): void;
-    getQueueByIndex(index: number): IQueue<Job, IOperationResult> | null;
-    getQueues(): string[];
     init(delegate: IServerDelegate, onError: (error: Error) => void): Promise<void>;
     on<K extends keyof QueueEvents>(
         this: this,
@@ -46,20 +42,16 @@ export interface IQueueManager {
     ): Unsubscribe;
 }
 
-export type IJob<T> = { jobId: JobId, score: number } & T;
+export type IJob<T> = { jobId: JobId, score: number, dependencies: Array<string> } & T;
 
 export interface IQueue<T, R> {
     addJob(data: IJob<T>): Promise<void>;
     getNextJob(): Promise<IJob<T> | undefined>;
     amountOfJobs(): Promise<number>;
     getId(): string;
-    setBlocked(blocked: boolean): Promise<void>;
-    isBlocked(): Promise<boolean>;
-    isDeleted(): Promise<boolean>;
-    setDeleted(deleted: boolean): Promise<void>;
     getJobs(): Promise<IJob<T>[]>;
-    addDependencies(job: IJob<Job>): Promise<void>;
-    removeDependencies(job: IJob<Job>): Promise<void>;
+    createOrUpdateJobs(jobs: IJob<T>[]): Promise<void>;
+    removeJobs(jobIds: string[]): Promise<void>;
 }
 
 export type IJobQueue = IQueue<Job, IOperationResult>;

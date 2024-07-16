@@ -16,6 +16,7 @@ import {
     QueueEvents,
     isOperationJob
 } from './types';
+import { IOperationResult } from '../server';
 
 export class MemoryQueue<T, R> implements IQueue<T, R> {
     private id: string;
@@ -48,6 +49,15 @@ export class MemoryQueue<T, R> implements IQueue<T, R> {
         return this.items.sort((a, b) => a.jobId > b.jobId ? 1 : -1).sort((a, b) => a.score - b.score);
     }
 
+    async createOrUpdateJobs(jobs: IJob<T>[]) {
+        const jobIds = jobs.map(j => j.jobId);
+        this.items = this.items.filter(e => !jobIds.includes(e.jobId)).concat(jobs);
+    }
+
+    async removeJobs(jobIds: string[]) {
+        this.items = this.items.filter(e => !jobIds.includes(e.jobId));
+    }
+
     async increaseJobScore(jobId: string, score: number) {
         const job = this.items.find(j => j.jobId === jobId);
         if (job) {
@@ -66,7 +76,7 @@ export class MemoryQueue<T, R> implements IQueue<T, R> {
 export class BaseQueueManager implements IQueueManager {
     protected emitter = createNanoEvents<QueueEvents>();
     protected ticker = 0;
-    protected queue: IJobQueue;
+    protected queue: IQueue<Job, IOperationResult>;
     protected workers: number;
     protected timeout: number;
     private delegate: IServerDelegate | undefined;
@@ -74,7 +84,7 @@ export class BaseQueueManager implements IQueueManager {
     constructor(workers = 3, timeout = 0) {
         this.workers = workers;
         this.timeout = timeout;
-        this.queue = new MemoryQueue('queue');
+        this.queue = new MemoryQueue<Job, IOperationResult>('queue')
     }
 
     async init(
@@ -101,6 +111,7 @@ export class BaseQueueManager implements IQueueManager {
 
         // calculate score
         let score = 0;
+        const dependencies: string[] = [];
 
         const newDocument =
             job.documentId &&
@@ -109,7 +120,7 @@ export class BaseQueueManager implements IQueueManager {
                 job.documentId
             ));
 
-        // if new document check for add file operations n the queue with same document Id and increase score of new job if jobs in queue found
+        // if job is a new document check for the add file operation in the queue and increase score of job if add file is found
         const jobs = await this.queue.getJobs();
         if (newDocument) {
             const addFileDriveJobs = jobs.filter(j => {
@@ -130,6 +141,9 @@ export class BaseQueueManager implements IQueueManager {
             })
 
             score += addFileDriveJobs.length;
+            addFileDriveJobs.forEach(j => {
+                dependencies.push(j.jobId);
+            });
         }
 
         // if new job has add file operation then increase score of existing operations
@@ -141,9 +155,19 @@ export class BaseQueueManager implements IQueueManager {
 
             const filteredJobs = jobs.filter(j => {
                 input.id === j.documentId;
+            }).map(j => {
+                if (j.dependencies && j.dependencies.includes(jobId)) {
+                    return j;
+                } else {
+                    return {
+                        ...j,
+                        score: j.score + 1,
+                        dependencies: [...j.dependencies ?? [], jobId]
+                    };
+                }
             });
 
-            // TODO updateJobScore + 1
+            await queue.createOrUpdateJobs(filteredJobs);
         }
 
         // if new job has delete_node operation then remove existing operations from queue
@@ -157,10 +181,11 @@ export class BaseQueueManager implements IQueueManager {
                 input.id === j.documentId;
             });
 
-            // TODO removeJob from queue
+            await queue.removeJobs(filteredJobs.map(j => j.jobId));
         }
 
-        await queue.addJob({ jobId, score, ...job });
+        // add job to queue
+        await queue.addJob({ jobId, score, dependencies, ...job });
         return jobId;
     }
 
@@ -180,23 +205,16 @@ export class BaseQueueManager implements IQueueManager {
             throw new Error('No server delegate defined');
         }
 
-
         const queue = this.queue;
         // if no jobs in the current queue then looks for the
         // next queue with jobs. If no jobs in any queue then
         // retries after a timeout
         const amountOfJobs = await queue.amountOfJobs();
         if (amountOfJobs === 0) {
-            // TODO: 
-        }
-
-        const isBlocked = await queue.isBlocked();
-        if (isBlocked) {
             this.retryNextJob();
             return;
         }
 
-        await queue.setBlocked(true);
         const nextJob = await queue.getNextJob();
         if (!nextJob) {
             this.retryNextJob();
@@ -213,11 +231,18 @@ export class BaseQueueManager implements IQueueManager {
             const addFileActions = actions.filter(op => op.type === 'ADD_FILE');
             if (addFileActions.length > 0) {
                 for (const addFile of addFileActions) {
-                    const documentQueue = this.getQueue(
-                        nextJob.driveId,
-                        (addFile.input as AddFileInput).id
-                    );
-                    await documentQueue.removeDependencies(nextJob);
+                    const jobs = await queue.getJobs();
+                    const filteredJobs = jobs.filter(j => {
+                        j.dependencies.includes(nextJob.jobId);
+                    }).map(j => {
+                        // remove dependency from job
+                        return {
+                            ...j,
+                            score: j.score - 1,
+                            dependencies: j.dependencies?.filter(d => d !== nextJob.jobId)
+                        };
+                    });
+                    await queue.createOrUpdateJobs(filteredJobs)
                 }
             }
             this.emit('jobCompleted', nextJob, result);
@@ -225,8 +250,7 @@ export class BaseQueueManager implements IQueueManager {
             console.error(`job failed`, e);
             this.emit('jobFailed', nextJob, e as Error);
         } finally {
-            await queue.setBlocked(false);
-            await this.processNextJob();
+            this.processNextJob();
         }
     }
 
