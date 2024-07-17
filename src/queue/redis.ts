@@ -14,7 +14,7 @@ export class RedisQueue<T, R> implements IQueue<T, R> {
     async addJob(job: IJob<T>) {
         this.client.zAdd(this.id + "-jobs", {
             score: job.score,
-            value: JSON.stringify(job)
+            value: Date.now() + "_" + JSON.stringify({ ...job })
         });
     }
 
@@ -26,12 +26,15 @@ export class RedisQueue<T, R> implements IQueue<T, R> {
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
-
-        return { ...JSON.parse(entry.value), score: entry.score } as IJob<T>;
+        const data = entry.value.match(/(?<=_)(.*)/);
+        if (!data[0]) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        return { ...JSON.parse(data[0]), score: entry.score } as IJob<T>;
     }
 
     async amountOfJobs() {
-        return this.client.zCount(this.id + "-jobs", 0, -1);
+        return (await this.getJobs()).length
     }
 
     getId() {
@@ -40,7 +43,16 @@ export class RedisQueue<T, R> implements IQueue<T, R> {
 
     async getJobs() {
         const entries = await this.client.zRangeWithScores(this.id + "-jobs", 0, -1)
-        return entries.map(e => ({ ...JSON.parse(e.value), score: e.score }) as IJob<T>);
+        return entries.map(e => {
+            // regex to remove everything before first _
+            const data = e.value.match(/(?<=_)(.*)/);
+            if (!data || data.length === 0) {
+                throw new Error("Couldn't match job task")
+            }
+
+            return { ...JSON.parse(data![0]!), score: e.score } as IJob<T>;
+
+        });
     }
 
     async createOrUpdateJobs(jobs: IJob<T>[]) {

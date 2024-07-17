@@ -110,7 +110,7 @@ export class BaseQueueManager implements IQueueManager {
             throw new Error('No server delegate defined');
         }
 
-        const jobId = Date.now() + "_" + generateUUID();
+        const jobId = generateUUID();
         const queue = this.queue;
 
         // calculate score
@@ -144,19 +144,18 @@ export class BaseQueueManager implements IQueueManager {
                 return false;
             })
 
-            score += addFileDriveJobs.length;
+            score += 1;
             addFileDriveJobs.forEach(j => {
                 dependencies.push(j.jobId);
+                // score += 1;
             });
         }
 
-        // if new job has add file operation then increase score of existing operations
+        // if new job has add file operation then increase score of existing operations if existing arent already dependent on new job
         const actions = isOperationJob(job) ? job.operations : job.actions;
         const filteredActions = actions.filter((j: Action) => j.type === 'ADD_FILE');
-
         for (const addFileOp of filteredActions) {
             const input = addFileOp.input as AddFileInput;
-
             const filteredJobs = jobs.filter(j => {
                 input.id === j.documentId;
             }).map(j => {
@@ -170,8 +169,9 @@ export class BaseQueueManager implements IQueueManager {
                     };
                 }
             });
-
-            await queue.createOrUpdateJobs(filteredJobs);
+            if (filteredJobs.length > 0) {
+                await queue.createOrUpdateJobs(filteredJobs);
+            }
         }
 
         // if new job has delete_node operation then remove existing operations from queue
@@ -208,6 +208,7 @@ export class BaseQueueManager implements IQueueManager {
         if (!this.delegate) {
             throw new Error('No server delegate defined');
         }
+
 
         const queue = this.queue;
         // if no jobs in the current queue then looks for the

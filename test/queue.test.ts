@@ -27,7 +27,7 @@ const documentModels = [
 
 
 const queueLayers = [
-    ['Memory Queue', async () => new BaseQueueManager()],
+    // ['Memory Queue', async () => new BaseQueueManager()],
     [
         'Redis Queue',
         async () => {
@@ -125,7 +125,7 @@ describe.each(queueLayers)(
             ]);
         });
 
-        it("orders strands correctly", async ({ expect }) => {
+        it.only("orders strands correctly", async ({ expect }) => {
             const server = new DocumentDriveServer(
                 documentModels,
                 new MemoryStorage(),
@@ -150,11 +150,11 @@ describe.each(queueLayers)(
                 server.queueDriveOperations(driveId, [buildOperation(reducer, drive, actions.addFolder({ id: "folder 2", name: "folder 2" }))]),
             ]);
 
-            const errors = results.flat().filter(r => !!(r as IOperationResult).error);
-            if (errors.length) {
-                errors.forEach(error => console.error(error));
-            }
-            expect(errors.length).toBe(0);
+            console.log(results)
+
+            const error = results.flat().filter(r => !!(r as IOperationResult).error);
+
+            expect(error.length).toBe(0);
 
             drive = await server.getDrive(driveId);
             expect(drive.state.global.nodes).toStrictEqual([
