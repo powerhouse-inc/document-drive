@@ -1,18 +1,15 @@
 import { RedisClientType } from "redis";
 import { IJob, IQueue, IQueueManager, IServerDelegate, OperationJob } from "./types";
-import { BaseQueueManager } from "./base";
 
 export class RedisQueue<T, R> implements IQueue<T, R> {
-    private id: string;
     private client: RedisClientType;
 
-    constructor(id: string, client: RedisClientType) {
+    constructor(client: RedisClientType) {
         this.client = client;
-        this.id = id;
     }
 
     async addJob(job: IJob<T>) {
-        this.client.zAdd(this.id + "-jobs", {
+        this.client.zAdd(this.getId() + "-jobs", {
             score: job.score,
             value: Date.now() + "_" + JSON.stringify({ ...job })
         });
@@ -21,7 +18,7 @@ export class RedisQueue<T, R> implements IQueue<T, R> {
     async getNextJob() {
         let entry: null | any = null;
         while (!entry) {
-            entry = await this.client.zPopMin(this.id + "-jobs");
+            entry = await this.client.zPopMin(this.getId() + "-jobs");
             if (!entry) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
@@ -38,11 +35,11 @@ export class RedisQueue<T, R> implements IQueue<T, R> {
     }
 
     getId() {
-        return this.id;
+        return 'document-drive-job-queue';
     }
 
     async getJobs() {
-        const entries = await this.client.zRangeWithScores(this.id + "-jobs", 0, -1)
+        const entries = await this.client.zRangeWithScores(this.getId() + "-jobs", 0, -1)
         return entries.map(e => {
             // regex to remove everything before first _
             const data = e.value.match(/(?<=_)(.*)/);
@@ -65,18 +62,7 @@ export class RedisQueue<T, R> implements IQueue<T, R> {
         const entries = await this.getJobs();
         const entriesToDelete = entries.filter(e => jobIds.includes(e.jobId))
         for (const entry of entriesToDelete) {
-            await this.client.zRem(this.id + "-jobs", JSON.stringify(entry));
+            await this.client.zRem(this.getId() + "-jobs", JSON.stringify(entry));
         }
-    }
-}
-
-export class RedisQueueManager extends BaseQueueManager implements IQueueManager {
-
-    private client: RedisClientType;
-
-    constructor(workers = 3, timeout = 0, client: RedisClientType) {
-        super(workers, timeout);
-        this.client = client;
-        this.setQueue(new RedisQueue<OperationJob, any>("queue", this.client));
     }
 }

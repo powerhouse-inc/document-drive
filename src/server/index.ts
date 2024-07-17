@@ -26,7 +26,7 @@ import { ClientError } from 'graphql-request';
 import { createNanoEvents, Unsubscribe } from 'nanoevents';
 import { ICache } from '../cache';
 import InMemoryCache from '../cache/memory';
-import { BaseQueueManager } from '../queue/base';
+import { QueueManager } from '../queue/manager';
 import {
     ActionJob,
     IQueueManager,
@@ -106,7 +106,7 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         documentModels: DocumentModel[],
         storage: IDriveStorage = new MemoryStorage(),
         cache: ICache = new InMemoryCache(),
-        queueManager: IQueueManager = new BaseQueueManager()
+        queueManager: IQueueManager = new QueueManager()
     ) {
         super();
         this.listenerStateManager = new ListenerManager(this);

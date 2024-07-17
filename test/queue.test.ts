@@ -14,10 +14,10 @@ import { describe, it } from 'vitest';
 import { DocumentDriveServer } from '../src/server';
 import { MemoryStorage } from '../src/storage/memory';
 import { generateUUID, IOperationResult } from '../src';
-import { BaseQueueManager } from '../src/queue/base';
+import { QueueManager } from '../src/queue/manager';
 import { buildOperation, buildOperations } from './utils';
 import InMemoryCache from '../src/cache/memory';
-import { RedisQueueManager } from '../src/queue/redis';
+import { RedisQueue } from '../src/queue/redis';
 import { createClient, RedisClientType } from "redis"
 import { IQueueManager } from '../src/queue/types';
 const documentModels = [
@@ -27,13 +27,13 @@ const documentModels = [
 
 
 const queueLayers = [
-    // ['Memory Queue', async () => new BaseQueueManager()],
+    ['Memory Queue', async () => new QueueManager()],
     [
         'Redis Queue',
         async () => {
             const client = await createClient().connect();
             await client.flushAll();
-            return new RedisQueueManager(3, 0, client as RedisClientType);
+            return new QueueManager(new RedisQueue(client as RedisClientType), 3, 0);
         }
     ]
 ] as unknown as [string, () => Promise<IQueueManager>][];
