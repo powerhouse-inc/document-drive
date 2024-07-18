@@ -62,7 +62,7 @@
         "@total-typescript/ts-reset": "^0.5.1",
         "@types/node": "^20.12.7",
         "@types/uuid": "^9.0.8",
-        "@typescript-eslint/eslint-plugin": "^6.21.0",
+        "@typescript-eslint/eslint-plugin": "^7.0.0",
         "@typescript-eslint/parser": "^6.21.0",
         "@vitest/coverage-v8": "^1.4.0",
         "document-model": "^1.7.0",
