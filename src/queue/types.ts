@@ -25,6 +25,7 @@ export interface QueueEvents {
     jobCompleted: (job: IJob<Job>, result: IOperationResult) => void;
     jobFailed: (job: IJob<Job>, error: Error) => void;
     queueRemoved: (queueId: string) => void;
+    jobAdded: (job: IJob<Job>) => void;
 }
 
 export interface IServerDelegate {

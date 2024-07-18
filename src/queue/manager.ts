@@ -24,13 +24,23 @@ export class QueueManager implements IQueueManager {
     protected ticker = 0;
     protected queue: IQueue<Job, IOperationResult>;
     protected workers: number;
+    protected activeWorkers: number;
     protected timeout: number;
     private delegate: IServerDelegate | undefined;
+    private jobAddedListener: Unsubscribe | undefined;
 
     constructor(queue: IQueue<Job, IOperationResult> = new MemoryQueue<Job, IOperationResult>(), workers = 3, timeout = 0) {
         this.workers = workers;
         this.timeout = timeout;
         this.queue = queue;
+        this.activeWorkers = 0;
+
+    }
+
+    async onJobAdded(job: IJob<Job>) {
+        if (this.workers > this.activeWorkers && job.score === 0) {
+            this.processNextJob();
+        }
     }
 
     setQueue(queue: IQueue<Job, IOperationResult>) {
@@ -42,12 +52,13 @@ export class QueueManager implements IQueueManager {
         onError: (error: Error) => void
     ): Promise<void> {
         this.delegate = delegate;
-        for (let i = 0; i < this.workers; i++) {
-            setTimeout(
-                () => this.processNextJob.bind(this)().catch(onError),
-                100 * i
-            );
-        }
+        // for (let i = 0; i < this.workers; i++) {
+        //     setTimeout(
+        //         () => this.processNextJob.bind(this)().catch(onError),
+        //         100 * i
+        //     );
+        // }
+        this.jobAddedListener = this.emitter.on('jobAdded', (job) => this.onJobAdded(job));
         return Promise.resolve();
     }
 
@@ -136,18 +147,11 @@ export class QueueManager implements IQueueManager {
 
         // add job to queue
         await queue.addJob({ jobId, score, dependencies, ...job });
+        this.emit('jobAdded', { jobId, score, dependencies, ...job });
         return jobId;
     }
 
 
-    private retryNextJob(timeout?: number) {
-        const _timeout = timeout !== undefined ? timeout : this.timeout;
-        const retry =
-            _timeout === 0 && typeof setImmediate !== 'undefined'
-                ? setImmediate
-                : (fn: () => void) => setTimeout(fn, _timeout);
-        return retry(() => this.processNextJob());
-    }
 
 
     private async processNextJob() {
@@ -157,22 +161,15 @@ export class QueueManager implements IQueueManager {
 
 
         const queue = this.queue;
-        // if no jobs in the current queue then looks for the
-        // next queue with jobs. If no jobs in any queue then
-        // retries after a timeout
-        const amountOfJobs = await queue.amountOfJobs();
-        if (amountOfJobs === 0) {
-            this.retryNextJob();
-            return;
-        }
-
         const nextJob = await queue.getNextJob();
         if (!nextJob) {
-            this.retryNextJob();
             return;
         }
 
+        console.log("next: ", nextJob)
+
         try {
+            this.activeWorkers += 1;
             const result = await this.delegate.processJob(nextJob);
 
             // unblock the document queues of each add_file operation
@@ -201,6 +198,7 @@ export class QueueManager implements IQueueManager {
             console.error(`job failed`, e);
             this.emit('jobFailed', nextJob, e as Error);
         } finally {
+            this.activeWorkers -= 1;
             this.processNextJob();
         }
     }

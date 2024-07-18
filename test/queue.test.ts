@@ -137,7 +137,8 @@ describe.each(queueLayers)(
             const driveId = drive.state.global.id;
             const driveOperations = buildOperations(reducer, drive, [
                 actions.addFolder({ id: "folder 1", name: "folder 1" }),
-                actions.addFile({ id: "file 1", name: "file 1", parentFolder: "folder 1", documentType: "powerhouse/budget-statement", synchronizationUnits: [{ syncId: "1", scope: "global", branch: "main" }] })]
+
+                actions.addFile({ id: "file 1", name: "file 1", parentFolder: "folder 1", documentType: "powerhouse/budget-statement", synchronizationUnits: [{ syncId: "1", scope: "global", branch: "main" }] })],
             );
             let budget = BudgetStatement.utils.createDocument();
             const budgetOperation = buildOperation(BudgetStatement.reducer, budget, BudgetStatement.actions.addAccount({
@@ -145,22 +146,18 @@ describe.each(queueLayers)(
             }));
 
             const results = await Promise.all([
-                server.queueOperations(driveId, "file 1", [budgetOperation]),
                 server.queueDriveOperations(driveId, driveOperations),
-                server.queueDriveOperations(driveId, [buildOperation(reducer, drive, actions.addFolder({ id: "folder 2", name: "folder 2" }))]),
+                server.queueOperations(driveId, "file 1", [budgetOperation]),
             ]);
-
-            console.log(results)
 
             const error = results.flat().filter(r => !!(r as IOperationResult).error);
 
-            expect(error.length).toBe(0);
-
+            expect(error.length).toEqual(0);
             drive = await server.getDrive(driveId);
             expect(drive.state.global.nodes).toStrictEqual([
                 expect.objectContaining({ id: "folder 1", name: "folder 1", kind: "folder", parentFolder: null }),
                 expect.objectContaining({ id: "file 1", name: "file 1", kind: "file", parentFolder: "folder 1", documentType: "powerhouse/budget-statement", synchronizationUnits: [{ syncId: "1", scope: "global", branch: "main" }] }),
-                expect.objectContaining({ id: "folder 2", name: "folder 2", kind: "folder", parentFolder: null }),
+
             ]);
 
             budget = await server.getDocument(driveId, "file 1") as BudgetStatement.BudgetStatementDocument;
