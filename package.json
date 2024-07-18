@@ -64,7 +64,7 @@
         "@types/uuid": "^9.0.8",
         "@typescript-eslint/eslint-plugin": "^6.21.0",
         "@typescript-eslint/parser": "^6.21.0",
-        "@vitest/coverage-v8": "^1.6.0",
+        "@vitest/coverage-v8": "^2.0.3",
         "document-model": "^1.7.0",
         "document-model-libs": "^1.70.0",
         "eslint": "^8.57.0",
@@ -79,7 +79,7 @@
         "sequelize": "^6.37.2",
         "sqlite3": "^5.1.7",
         "typescript": "^5.5.3",
-        "vitest": "^1.6.0"
+        "vitest": "^2.0.3"
     },
     "packageManager": "pnpm@9.1.4+sha256.30a1801ac4e723779efed13a21f4c39f9eb6c9fbb4ced101bce06b422593d7c9"
 }
