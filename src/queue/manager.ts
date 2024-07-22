@@ -43,10 +43,6 @@ export class QueueManager implements IQueueManager {
         }
     }
 
-    setQueue(queue: IQueue<Job, IOperationResult>) {
-        this.queue = queue;
-    }
-
     async init(
         delegate: IServerDelegate,
         onError: (error: Error) => void
