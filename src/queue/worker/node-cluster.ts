@@ -6,6 +6,7 @@ const cluster = require('node:cluster');
 const numCPUs = require('node:os').availableParallelism();
 const process = require('node:process');
 
+// TODO: Should be moved to drive index
 if (cluster.isPrimary) {
     console.log(`Primary ${process.pid} is running`);
 
