@@ -1,4 +1,4 @@
-import { IJob, IQueue } from "./types";
+import { IJob, IQueue } from "../types";
 
 export class MemoryQueue<T, R> implements IQueue<T, R> {
     private items: IJob<T>[] = [];

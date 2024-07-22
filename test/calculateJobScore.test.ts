@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MemoryQueue } from "../src/queue/memory";
+import { MemoryQueue } from "../src/queue/adapter/memory";
 import { IJob, IQueue, Job } from "../src/queue/types";
 import { actions, reducer, utils } from "document-model-libs/document-drive"
 import { Operation } from "document-model/document";

@@ -17,7 +17,7 @@ import {
     isOperationJob
 } from './types';
 import { IOperationResult } from '../server';
-import { MemoryQueue } from './memory';
+import { MemoryQueue } from './adapter/memory';
 import { calculateJobScore } from './utils';
 
 export class QueueManager implements IQueueManager {
@@ -49,12 +49,6 @@ export class QueueManager implements IQueueManager {
         onError: (error: Error) => void
     ): Promise<void> {
         this.delegate = delegate;
-        // for (let i = 0; i < this.workers; i++) {
-        //     setTimeout(
-        //         () => this.processNextJob.bind(this)().catch(onError),
-        //         100 * i
-        //     );
-        // }
         this.jobAddedListener = this.emitter.on('jobAdded', (job) => this.#onJobAdded(job));
         return Promise.resolve();
     }
@@ -81,14 +75,11 @@ export class QueueManager implements IQueueManager {
             throw new Error('No server delegate defined');
         }
 
-
         const queue = this.queue;
         const nextJob = await queue.getNextJob();
         if (!nextJob) {
             return;
         }
-
-        console.log("next: ", nextJob)
 
         try {
             this.activeWorkers += 1;
