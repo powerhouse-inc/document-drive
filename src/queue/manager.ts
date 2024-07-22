@@ -22,26 +22,14 @@ import { calculateJobScore } from './utils';
 
 export class QueueManager implements IQueueManager {
     protected emitter = createNanoEvents<QueueEvents>();
-    protected ticker = 0;
     protected queue: IQueue<Job, IOperationResult>;
-    protected workers: number;
-    protected activeWorkers: number;
     protected timeout: number;
     private delegate: IServerDelegate | undefined;
-    private jobAddedListener: Unsubscribe | undefined;
 
     constructor(queue: IQueue<Job, IOperationResult> = new MemoryQueue<Job, IOperationResult>(), workers = 3, timeout = 0) {
-        this.workers = workers;
         this.timeout = timeout;
         this.queue = queue;
-        this.activeWorkers = 0;
 
-    }
-
-    async #onJobAdded(job: IJob<Job>) {
-        if (this.workers > this.activeWorkers && job.score === 0) {
-            this.processNextJob();
-        }
     }
 
     async init(
@@ -49,7 +37,6 @@ export class QueueManager implements IQueueManager {
         onError: (error: Error) => void
     ): Promise<void> {
         this.delegate = delegate;
-        this.jobAddedListener = this.emitter.on('jobAdded', (job) => this.#onJobAdded(job));
         return Promise.resolve();
     }
 
@@ -70,7 +57,7 @@ export class QueueManager implements IQueueManager {
     }
 
 
-    private async processNextJob() {
+    async processNextJob() {
         if (!this.delegate) {
             throw new Error('No server delegate defined');
         }
@@ -82,7 +69,6 @@ export class QueueManager implements IQueueManager {
         }
 
         try {
-            this.activeWorkers += 1;
             const result = await this.delegate.processJob(nextJob);
 
             // unblock the document queues of each add_file operation
@@ -111,7 +97,6 @@ export class QueueManager implements IQueueManager {
             console.error(`job failed`, e);
             this.emit('jobFailed', nextJob, e as Error);
         } finally {
-            this.activeWorkers -= 1;
             this.processNextJob();
         }
     }

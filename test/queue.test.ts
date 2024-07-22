@@ -17,7 +17,7 @@ import { generateUUID, IOperationResult } from '../src';
 import { QueueManager } from '../src/queue/manager';
 import { buildOperation, buildOperations } from './utils';
 import InMemoryCache from '../src/cache/memory';
-import { RedisQueue } from '../src/queue/redis';
+import { RedisQueue } from '../src/queue/adapter/redis';
 import { createClient, RedisClientType } from "redis"
 import { IQueueManager } from '../src/queue/types';
 const documentModels = [

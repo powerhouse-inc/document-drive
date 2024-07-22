@@ -1,6 +1,9 @@
-import { DocumentDriveServer } from "../../server";
+import { createClient, RedisClientType } from "redis";
+import { DocumentDriveServer, IOperationResult } from "../../server";
+import { MemoryQueue } from "../adapter/memory";
+import { RedisQueue } from "../adapter/redis";
 import { QueueManager } from "../manager";
-import { IServerDelegate } from "../types";
+import { IQueue, IServerDelegate, Job } from "../types";
 
 const cluster = require('node:cluster');
 const numCPUs = require('node:os').availableParallelism();
@@ -9,16 +12,14 @@ const process = require('node:process');
 // TODO: Should be moved to drive index
 if (cluster.isPrimary) {
     console.log(`Primary ${process.pid} is running`);
-
-    // Fork workers.
+    // instantiate document drive server
+    const server = new DocumentDriveServer([]);
+    server.initialize();
+    // Fork workers
     for (let i = 0; i < numCPUs; i++) {
         cluster.fork();
     }
-
 } else {
-    // Workers can share any TCP connection
-    // In this case it is an HTTP server
-
     const delegate: IServerDelegate = {
         checkDocumentExists: async (driveId: string, documentId: string) => {
             return true;
@@ -32,8 +33,18 @@ if (cluster.isPrimary) {
         console.error(error);
     }
 
-    const qm = new QueueManager();
-    qm.init(delegate, onError);
+    // Initialize queue manager for worker with redis
+    createClient({
+        
+    })
+        .connect()
+        .then((client) => {
+            const queue: IQueue<Job, IOperationResult> = new RedisQueue(client as RedisClientType);
+            const qm = new QueueManager(queue);
+            return qm
+                .init(delegate, onError)
+                .then(qm.processNextJob)
+        });
 
 
     console.log(`Worker ${process.pid} started`);

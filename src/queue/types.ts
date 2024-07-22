@@ -36,6 +36,7 @@ export interface IServerDelegate {
 export interface IQueueManager {
     addJob(job: Job): Promise<JobId>;
     init(delegate: IServerDelegate, onError: (error: Error) => void): Promise<void>;
+    processNextJob(): Promise<void>;
     on<K extends keyof QueueEvents>(
         this: this,
         event: K,
