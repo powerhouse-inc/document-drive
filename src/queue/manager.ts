@@ -29,7 +29,6 @@ export class QueueManager implements IQueueManager {
     constructor(queue: IQueue<Job, IOperationResult> = new MemoryQueue<Job, IOperationResult>(), workers = 3, timeout = 0) {
         this.timeout = timeout;
         this.queue = queue;
-
     }
 
     async init(
@@ -44,13 +43,14 @@ export class QueueManager implements IQueueManager {
         if (!this.delegate) {
             throw new Error('No server delegate defined');
         }
-
+        // part 1: calculate job score and dependencies
         const iJob = await calculateJobScore({
             ...job,
             jobId: generateUUID(),
             score: 0,
             dependencies: []
         }, this.queue);
+        // TODO: part 2: updateDependentJobs helper in Queue (increase score)
         await this.queue.addJob(iJob);
         this.emit('jobAdded', iJob);
         return iJob.jobId;
@@ -65,6 +65,8 @@ export class QueueManager implements IQueueManager {
         const queue = this.queue;
         const nextJob = await queue.getNextJob();
         if (!nextJob) {
+            await new Promise(resolve => setTimeout(resolve, this.timeout));
+            this.processNextJob();
             return;
         }
 
@@ -72,6 +74,7 @@ export class QueueManager implements IQueueManager {
             const result = await this.delegate.processJob(nextJob);
 
             // unblock the document queues of each add_file operation
+            // TODO: Reduce score of dependent jobs
             const actions = isOperationJob(nextJob)
                 ? nextJob.operations
                 : nextJob.actions;
