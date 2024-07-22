@@ -18,6 +18,7 @@ import {
 } from './types';
 import { IOperationResult } from '../server';
 import { MemoryQueue } from './memory';
+import { calculateJobScore } from './utils';
 
 export class QueueManager implements IQueueManager {
     protected emitter = createNanoEvents<QueueEvents>();
@@ -63,91 +64,16 @@ export class QueueManager implements IQueueManager {
             throw new Error('No server delegate defined');
         }
 
-        const jobId = generateUUID();
-        const queue = this.queue;
-
-        // calculate score
-        let score = 0;
-        const dependencies: string[] = [];
-
-        const newDocument =
-            job.documentId &&
-            !(await this.delegate.checkDocumentExists(
-                job.driveId,
-                job.documentId
-            ));
-
-        // if job is a new document check for the add file operation in the queue and increase score of job if add file is found
-        const jobs = await this.queue.getJobs();
-        if (newDocument) {
-            const addFileDriveJobs = jobs.filter(j => {
-                const actions = isOperationJob(j)
-                    ? j.operations
-                    : j.actions;
-
-                const op = actions.find((j: Action) => {
-                    const input = j.input as AddFileInput;
-                    return j.type === 'ADD_FILE' && input.id === job.documentId;
-                });
-
-                if (op) {
-                    return true;
-                }
-
-                return false;
-            })
-
-            score += 1;
-            addFileDriveJobs.forEach(j => {
-                dependencies.push(j.jobId);
-                // score += 1;
-            });
-        }
-
-        // if new job has add file operation then increase score of existing operations if existing arent already dependent on new job
-        const actions = isOperationJob(job) ? job.operations : job.actions;
-        const filteredActions = actions.filter((j: Action) => j.type === 'ADD_FILE');
-        for (const addFileOp of filteredActions) {
-            const input = addFileOp.input as AddFileInput;
-            const filteredJobs = jobs.filter(j => {
-                input.id === j.documentId;
-            }).map(j => {
-                if (j.dependencies && j.dependencies.includes(jobId)) {
-                    return j;
-                } else {
-                    return {
-                        ...j,
-                        score: j.score + 1,
-                        dependencies: [...j.dependencies ?? [], jobId]
-                    };
-                }
-            });
-            if (filteredJobs.length > 0) {
-                await queue.createOrUpdateJobs(filteredJobs);
-            }
-        }
-
-        // if new job has delete_node operation then remove existing operations from queue
-        const removeFileOps = actions.filter(
-            (j: Action) => j.type === 'DELETE_NODE'
-        );
-        for (const removeFileOp of removeFileOps) {
-            const input = removeFileOp.input as DeleteNodeInput;
-
-            const filteredJobs = jobs.filter(j => {
-                input.id === j.documentId;
-            });
-
-            await queue.removeJobs(filteredJobs.map(j => j.jobId));
-        }
-
-        // add job to queue
-        await queue.addJob({ jobId, score, dependencies, ...job });
-        this.emit('jobAdded', { jobId, score, dependencies, ...job });
-        return jobId;
+        const iJob = await calculateJobScore({
+            ...job,
+            jobId: generateUUID(),
+            score: 0,
+            dependencies: []
+        }, this.queue);
+        await this.queue.addJob(iJob);
+        this.emit('jobAdded', iJob);
+        return iJob.jobId;
     }
-
-
 
 
     private async processNextJob() {
