@@ -37,7 +37,7 @@ export class QueueManager implements IQueueManager {
 
     }
 
-    async onJobAdded(job: IJob<Job>) {
+    async #onJobAdded(job: IJob<Job>) {
         if (this.workers > this.activeWorkers && job.score === 0) {
             this.processNextJob();
         }
@@ -58,7 +58,7 @@ export class QueueManager implements IQueueManager {
         //         100 * i
         //     );
         // }
-        this.jobAddedListener = this.emitter.on('jobAdded', (job) => this.onJobAdded(job));
+        this.jobAddedListener = this.emitter.on('jobAdded', (job) => this.#onJobAdded(job));
         return Promise.resolve();
     }
 
