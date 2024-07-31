@@ -353,7 +353,7 @@ describe('Synchronization Units', () => {
                 }
             ]);
             expect(storageSpy).toHaveBeenCalledTimes(1);
-            expect(cacheSpy).toHaveBeenCalledTimes(2);
+            expect(cacheSpy).toHaveBeenCalledTimes(1);
         });
 
         it('should db query for each document', async () => {
@@ -469,7 +469,7 @@ describe('Synchronization Units', () => {
                 }
             ]);
             expect(storageSpy).toHaveBeenCalledTimes(100);
-            expect(cacheSpy).toHaveBeenCalledTimes(2);
+            expect(cacheSpy).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -731,7 +731,7 @@ describe('Synchronization Units', () => {
                 )
             );
 
-            await server.addDriveOperation(
+            const result2 = await server.addDriveOperation(
                 '1',
                 buildOperation(
                     DocumentDrive.reducer,
@@ -807,7 +807,7 @@ describe('Synchronization Units', () => {
                 }
             ]);
             expect(storageSpy).toHaveBeenCalledTimes(0);
-            expect(cacheSpy).toHaveBeenCalledTimes(2);
+            expect(cacheSpy).toHaveBeenCalledTimes(1);
         });
 
         it('should make single db query for all documents', async () => {
@@ -923,7 +923,7 @@ describe('Synchronization Units', () => {
                 }
             ]);
             expect(storageSpy).toHaveBeenCalledTimes(0);
-            expect(cacheSpy).toHaveBeenCalledTimes(2);
+            expect(cacheSpy).toHaveBeenCalledTimes(1);
         });
     });
 });

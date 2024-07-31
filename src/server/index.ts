@@ -787,7 +787,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             logger.error('Error getting drive from cache', e);
         }
         const driveStorage = await this.storage.getDrive(drive);
-        const document = this._buildDocument(driveStorage, options);
+        const driveStorageWithState = await this._addDocumentResultingStage(
+            driveStorage,
+            'drives',
+            drive,
+            options
+        );
+        const document = this._buildDocument(driveStorageWithState, options);
         if (!isDocumentDrive(document)) {
             throw new Error(
                 `Document with id ${drive} is not a Document Drive`
@@ -811,7 +817,10 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
         }
 
         const driveStorage = await this.storage.getDriveBySlug(slug);
-        const document = this._buildDocument(driveStorage, options);
+        const document = await this.getDrive(
+            driveStorage.state.global.id,
+            options
+        );
         if (!isDocumentDrive(document)) {
             throw new Error(
                 `Document with slug ${slug} is not a Document Drive`
@@ -834,7 +843,13 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             logger.error('Error getting document from cache', e);
         }
         const documentStorage = await this.storage.getDocument(drive, id);
-        const document = this._buildDocument(documentStorage, options);
+        const documentStorageWithState = await this._addDocumentResultingStage(
+            documentStorage,
+            drive,
+            id,
+            options
+        );
+        const document = this._buildDocument(documentStorageWithState, options);
 
         this.cache.setDocument(drive, id, document).catch(logger.error);
         return document;
@@ -877,7 +892,12 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
             clipboard: [],
             state: state ?? document.state
         };
-        await this.storage.createDocument(driveId, input.id, documentStorage);
+        await this.storage.createDocument(
+            driveId,
+            input.id,
+            documentStorage,
+            input.synchronizationUnits
+        );
 
         // if the document contains operations then
         // stores the operations in the storage
