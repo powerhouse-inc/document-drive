@@ -35,42 +35,13 @@ describe('Document operations', () => {
             })
         );
         expect(result.error).toBeUndefined();
-        const driveStorage = await storage.getDrive('test');
-        expect(
-            JSON.parse(
-                driveStorage.operations.global.at(-1)?.resultingState as string
-            )
-        ).toStrictEqual({
-            icon: null,
-            id: 'test',
-            name: '',
-            nodes: [
-                {
-                    id: 'folder1',
-                    kind: 'folder',
-                    name: 'folder1',
-                    parentFolder: null
-                }
-            ],
-            slug: null
-        });
-    });
-
-    it('should retrieve only the last resultingState', async ({ expect }) => {
-        await server.addDriveAction(
+        const resultingState = await storage.getDriveOperationResultingState(
             'test',
-            actions.addFolder({
-                id: 'folder2',
-                name: 'folder2'
-            })
+            0,
+            'global',
+            'main'
         );
-
-        const driveStorage = await storage.getDrive('test');
-        expect(
-            JSON.parse(
-                driveStorage.operations.global.at(-1)?.resultingState as string
-            )
-        ).toStrictEqual({
+        expect(JSON.parse(resultingState as string)).toStrictEqual({
             icon: null,
             id: 'test',
             name: '',
@@ -79,40 +50,6 @@ describe('Document operations', () => {
                     id: 'folder1',
                     kind: 'folder',
                     name: 'folder1',
-                    parentFolder: null
-                },
-                {
-                    id: 'folder2',
-                    kind: 'folder',
-                    name: 'folder2',
-                    parentFolder: null
-                }
-            ],
-            slug: null
-        });
-
-        expect(
-            driveStorage.operations.global.at(0)?.resultingState
-        ).toBeUndefined();
-    });
-
-    it('should retrieve only the last resultingState', async ({ expect }) => {
-        const drive = await server.getDrive('test');
-        expect(drive.state.global).toStrictEqual({
-            icon: null,
-            id: 'test',
-            name: '',
-            nodes: [
-                {
-                    id: 'folder1',
-                    kind: 'folder',
-                    name: 'folder1',
-                    parentFolder: null
-                },
-                {
-                    id: 'folder2',
-                    kind: 'folder',
-                    name: 'folder2',
                     parentFolder: null
                 }
             ],
@@ -123,8 +60,8 @@ describe('Document operations', () => {
     it('should retrieve operation attachment', async ({ expect }) => {
         const result = await server.addDriveAction('test', {
             ...actions.addFolder({
-                id: 'folder3',
-                name: 'folder3'
+                id: 'folder2',
+                name: 'folder2'
             }),
             attachments: [{ data: 'test', mimeType: 'text', hash: '123' }]
         });
@@ -136,9 +73,7 @@ describe('Document operations', () => {
             {
                 data: 'test',
                 mimeType: 'text',
-                hash: '123',
-                extension: null,
-                filename: null
+                hash: '123'
             }
         ]);
     });
@@ -147,40 +82,8 @@ describe('Document operations', () => {
         expect
     }) => {
         const driveStorage = await storage.getDrive('test');
-        expect(driveStorage.operations.global.length).toBe(3);
-        expect(
-            JSON.parse(
-                driveStorage.operations.global.at(2)?.resultingState as string
-            )
-        ).toStrictEqual({
-            icon: null,
-            id: 'test',
-            name: '',
-            nodes: [
-                {
-                    id: 'folder1',
-                    kind: 'folder',
-                    name: 'folder1',
-                    parentFolder: null
-                },
-                {
-                    id: 'folder2',
-                    kind: 'folder',
-                    name: 'folder2',
-                    parentFolder: null
-                },
-                {
-                    id: 'folder3',
-                    kind: 'folder',
-                    name: 'folder3',
-                    parentFolder: null
-                }
-            ],
-            slug: null
-        });
-        expect(
-            driveStorage.operations.global.at(1)?.resultingState
-        ).toBeUndefined();
+        expect(driveStorage.operations.global.length).toBe(2);
+
         const result = await server.addDriveOperation(
             'test',
             // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
@@ -214,15 +117,21 @@ describe('Document operations', () => {
             slug: null
         };
         expect(result.document?.state.global).toStrictEqual(resultingState);
-        expect(driveStorage.operations.global.length).toBe(3);
-        expect(
-            result.document?.operations.global.at(2)?.resultingState
-        ).toStrictEqual(resultingState);
-        expect(
-            JSON.parse(
-                result.document?.operations.global.at(1)
-                    ?.resultingState as string
-            )
-        ).toStrictEqual(resultingState);
+        expect(driveStorage.operations.global.length).toBe(2);
+
+        const resultingState1 = await storage.getDriveOperationResultingState(
+            'test',
+            1,
+            'global',
+            'main'
+        );
+        const resultingState2 = await storage.getDriveOperationResultingState(
+            'test',
+            3,
+            'global',
+            'main'
+        );
+        expect(resultingState1).toStrictEqual(resultingState2);
+        expect(resultingState1).toStrictEqual(JSON.stringify(resultingState));
     });
 });

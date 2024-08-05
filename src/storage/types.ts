@@ -8,7 +8,8 @@ import type {
     Document,
     DocumentHeader,
     DocumentOperations,
-    Operation
+    Operation,
+    SynchronizationUnit
 } from 'document-model/document';
 import type { SynchronizationUnitQuery } from '../server/types';
 
@@ -33,7 +34,8 @@ export interface IStorage {
     createDocument(
         drive: string,
         id: string,
-        document: DocumentStorage
+        document: DocumentStorage,
+        synchronizationUnits: SynchronizationUnit[]
     ): Promise<void>;
     addDocumentOperations(
         drive: string,
