@@ -252,24 +252,41 @@ export class DocumentDriveServer extends BaseDocumentDriveServer {
                             this.updateSyncStatus(driveId, 'SUCCESS');
                         }
 
-                        for (const syncUnit of syncUnits) {
-                            const fileErrorRevision = errorRevision.find(
-                                r => r.documentId === syncUnit.documentId
-                            );
+                        this.getDrive(driveId)
+                            .then(_drive =>
+                                this.getSynchronizationUnitsIds(
+                                    driveId,
+                                    undefined,
+                                    undefined,
+                                    undefined,
+                                    undefined,
+                                    _drive
+                                )
+                            )
+                            .then(_syncUnits => {
+                                for (const syncUnit of _syncUnits) {
+                                    const fileErrorRevision =
+                                        errorRevision.find(
+                                            r =>
+                                                r.documentId ===
+                                                syncUnit.documentId
+                                        );
 
-                            if (fileErrorRevision) {
-                                this.updateSyncStatus(
-                                    syncUnit.syncId,
-                                    fileErrorRevision.status,
-                                    fileErrorRevision.error
-                                );
-                            } else {
-                                this.updateSyncStatus(
-                                    syncUnit.syncId,
-                                    'SUCCESS'
-                                );
-                            }
-                        }
+                                    if (fileErrorRevision) {
+                                        this.updateSyncStatus(
+                                            syncUnit.syncId,
+                                            fileErrorRevision.status,
+                                            fileErrorRevision.error
+                                        );
+                                    } else {
+                                        this.updateSyncStatus(
+                                            syncUnit.syncId,
+                                            'SUCCESS'
+                                        );
+                                    }
+                                }
+                            })
+                            .catch(logger.error);
 
                         // if it is the first pull and returns empty
                         // then updates corresponding push transmitter
