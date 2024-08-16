@@ -74,7 +74,7 @@
         "localforage": "^1.10.0",
         "msw": "^2.3.1",
         "prettier": "^3.3.3",
-        "prettier-plugin-organize-imports": "^3.2.4",
+        "prettier-plugin-organize-imports": "^4.0.0",
         "prisma": "^5.18.0",
         "semantic-release": "^23.1.1",
         "sequelize": "^6.37.2",
