@@ -148,6 +148,8 @@ export type PushSyncStatus = SyncStatus;
 export type SyncUnitStatusObject = {
     push?: PushSyncStatus;
     pull?: PullSyncStatus;
+    driveId: string;
+    documentId?: string;
 };
 
 export type AddRemoteDriveStatus =
