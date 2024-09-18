@@ -4,9 +4,9 @@ import { RenownVerificationService } from "../src/server/verification/renown-ver
 import { definition } from "../src/ceramic/definition";
 
 
-describe("KYC Service", () => {
+describe("Renown Verification Service", () => {
 
-  let service: KYCService;
+  let service: RenownVerificationService;
 
   beforeAll(async () => {
     service = new RenownVerificationService({
