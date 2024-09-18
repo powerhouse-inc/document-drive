@@ -101,9 +101,10 @@ import {
     type SynchronizationUnit
 } from './types';
 import { filterOperationsByRevision } from './utils';
-import { RenownCredentialService } from './verification/renown.service';
+import { RenownVerificationService } from './verification/renown-verification.service';
 import { definition } from '../ceramic/definition';
 import { RuntimeCompositeDefinition } from '@composedb/types';
+import { SignatureVerificationService } from './verification/signature-verification.service';
 
 export * from './listener';
 export type * from './types';
@@ -133,7 +134,8 @@ export class BaseDocumentDriveServer
 
     protected options: Required<DocumentDriveServerOptions>;
 
-    protected renownCredentialService: RenownCredentialService;
+    protected renownVerificationService: RenownVerificationService;
+    protected signatureVerificationService: SignatureVerificationService;
 
     constructor(
         documentModels: DocumentModel[],
@@ -145,6 +147,7 @@ export class BaseDocumentDriveServer
         super();
         this.options = {
             ...options,
+            ceramicUrl: options?.ceramicUrl ?? 'http://localhost:7007',
             defaultDrives: {
                 ...options?.defaultDrives
             },
@@ -185,10 +188,12 @@ export class BaseDocumentDriveServer
             }
         });
 
-        this.renownCredentialService = new RenownCredentialService({
+        this.renownVerificationService = new RenownVerificationService({
             definition: definition as RuntimeCompositeDefinition,
             ceramicUrl: options?.ceramicUrl ?? 'http://localhost:7007',
         });
+
+        this.signatureVerificationService = new SignatureVerificationService(this.renownVerificationService);
 
         this.initializePromise = this._initialize();
     }
@@ -655,7 +660,7 @@ export class BaseDocumentDriveServer
             });
         }
 
-        await this.renownCredentialService.init();
+        await this.renownVerificationService.init();
 
         return errors.length === 0 ? null : errors;
     }

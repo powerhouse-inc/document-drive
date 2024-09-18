@@ -6,13 +6,13 @@ import { CeramicPowerhouseVerifiableCredential } from "../../ceramic/types";
 import { definition } from "../../ceramic/definition";
 import { ILogger, logger } from "../../utils/logger";
 
-export interface RenownCredentialServiceOptions {
+export interface RenownVerificationServiceOptions {
   ceramicUrl?: string;
   logger?: ILogger;
   definition: RuntimeCompositeDefinition
 }
 
-export class RenownCredentialService {
+export class RenownVerificationService {
 
   protected client: ComposeClient;
 
@@ -22,7 +22,7 @@ export class RenownCredentialService {
 
   protected logger: ILogger;
 
-  constructor(options: RenownCredentialServiceOptions) {
+  constructor(options: RenownVerificationServiceOptions) {
     const ceramic = options.ceramicUrl || "http://localhost:7007";
     this.client = new ComposeClient({
       ceramic,

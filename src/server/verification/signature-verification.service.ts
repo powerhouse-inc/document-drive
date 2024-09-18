@@ -1,16 +1,16 @@
 import { Operation, utils } from "document-model/document";
 import * as KeyDidResolver from 'key-did-resolver'
 import { Resolver } from 'did-resolver'
-import { RenownCredentialService } from "./renown.service";
+import { RenownVerificationService } from "./renown-verification.service";
 import { getAddressDID } from "../../ceramic/types";
 import { logger } from "../../utils/logger";
 
 export class SignatureVerificationService {
 
     protected didResolver = new Resolver(KeyDidResolver.getResolver());
-    protected renownService: RenownCredentialService;
+    protected renownService: RenownVerificationService;
 
-    constructor(renownService: RenownCredentialService) {
+    constructor(renownService: RenownVerificationService) {
         this.renownService = renownService;
     }
 
