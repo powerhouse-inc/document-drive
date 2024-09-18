@@ -266,6 +266,7 @@ export type DocumentDriveServerOptions = {
      */
     taskQueueMethod?: RunAsap.RunAsap<unknown> | null;
     listenerManager?: ListenerManagerOptions;
+    ceramicUrl?: string | null;
 };
 
 export type GetStrandsOptions = {
