@@ -3,7 +3,6 @@ import { ComposeClient } from "@composedb/client";
 import { EventSource } from "cross-eventsource";
 import { fetchEntry } from "../../ceramic/queries";
 import { CeramicPowerhouseVerifiableCredential } from "../../ceramic/types";
-import { definition } from "../../ceramic/definition";
 import { ILogger, logger } from "../../utils/logger";
 
 export interface RenownVerificationServiceOptions {
@@ -26,7 +25,7 @@ export class RenownVerificationService {
     const ceramic = options.ceramicUrl || "http://localhost:7007";
     this.client = new ComposeClient({
       ceramic,
-      definition: options.definition as RuntimeCompositeDefinition,
+      definition: options.definition,
     });
     this.eventSource = new EventSource(`${ceramic}/api/v0/feed/aggregation/documents`)
     this.logger = options.logger || logger;
@@ -100,7 +99,7 @@ export class RenownVerificationService {
       return null;
     }
 
-    return data.verifiableCredentialEIP712Index.edges[0]!.node;
+    return data.verifiableCredentialEIP712Index.edges[0]?.node;
   }
 
   #replaceCredential = (credential: CeramicPowerhouseVerifiableCredential) => {
@@ -109,7 +108,7 @@ export class RenownVerificationService {
     );
     if (index !== -1) {
       if (credential.revocationDate && credential.revocationDate < new Date().toISOString()) {
-        delete this.credentials[index];
+        this.credentials.splice(index, 1);
       } else {
         this.credentials[index] = credential;
       }
@@ -122,7 +121,7 @@ export class RenownVerificationService {
     const entry = await this.#fetchCredential(issuerId, subjectId);
     const index = this.credentials.findIndex((e) => e.issuer.id === issuerId && e.credentialSubject.id === subjectId);
     if (!entry) {
-      delete this.credentials[index];
+      this.credentials.splice(index, 1);
       return null;
     }
 
@@ -136,7 +135,7 @@ export class RenownVerificationService {
     }
 
     this.eventSource.addEventListener('message', (event) => {
-      const { content } = JSON.parse(event.data);
+      const { content } = JSON.parse(event.data as string) as { content: string };
       const parsedCredential = JSON.parse(content) as CeramicPowerhouseVerifiableCredential;
       this.#replaceCredential(parsedCredential);
     })
@@ -161,7 +160,7 @@ export class RenownVerificationService {
     return this.#updateCredential(issuerId, subjectId);
   }
 
-  async checkCredential(credential: CeramicPowerhouseVerifiableCredential, remote: boolean = true) {
+  async checkCredential(credential: CeramicPowerhouseVerifiableCredential, remote = true) {
     if (
       credential.revocationDate
       || credential.issuanceDate > new Date().toISOString()

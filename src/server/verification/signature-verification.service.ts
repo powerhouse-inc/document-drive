@@ -1,18 +1,11 @@
-import { Operation, utils } from "document-model/document";
+import { ActionSigner, Operation, Signature, utils } from "document-model/document";
 import * as KeyDidResolver from 'key-did-resolver'
 import { Resolver } from 'did-resolver'
-import { RenownVerificationService } from "./renown-verification.service";
-import { getAddressDID } from "../../ceramic/types";
 import { logger } from "../../utils/logger";
 
 export class SignatureVerificationService {
 
     protected didResolver = new Resolver(KeyDidResolver.getResolver());
-    protected renownService: RenownVerificationService;
-
-    constructor(renownService: RenownVerificationService) {
-        this.renownService = renownService;
-    }
 
     async verifyOperationsAndSignature(
         id: string,
@@ -33,7 +26,6 @@ export class SignatureVerificationService {
             }
 
             // check data fields
-
             let previousStateHash = "";
             if (operation.index > 0 && index === 0 && existingOperations.length > 0) {
                 previousStateHash = existingOperations[existingOperations.length - 1]?.hash ?? "";
@@ -47,15 +39,15 @@ export class SignatureVerificationService {
                 previousStateHash,
                 signer
             })
-            const sigData = signer.signatures[0]?.toString().split(",")
+            const sigData = signer.signatures[0]
             if (!sigData) {
                 return false;
             }
 
             const validData = genData.map((d: string, i: number) => {
                 // if()
-                if (d !== sigData[i]) {
-                    logger.error(`Data mismatch: ${d} !== ${sigData![i]}`)
+                if (d !== sigData[i] && i !== 2) {
+                    logger.error(`Data mismatch: ${d} !== ${sigData[i]}`)
                     return false
                 }
 
@@ -67,52 +59,54 @@ export class SignatureVerificationService {
             }
 
             // check signature
-            const algorithm = {
-                name: 'ECDSA',
-                namedCurve: 'P-256',
-                hash: 'SHA-256',
-            };
-
-            const verified = await utils.verifyOperationSignature(
-                signer.signatures.at(0)!,
-                signer,
-                async (publicKey, signature, data) => {
-                    let pubkey: any = publicKey;
-                    if (publicKey.startsWith("did:key:")) {
-                        const doc = await this.didResolver.resolve(publicKey)
-                        const auth = doc.didDocument?.verificationMethod;
-                        if (auth && auth[0]) {
-                            pubkey = auth[0].publicKeyJwk;
-                        }
-                    }
-
-                    const importedKey = await crypto.subtle.importKey(
-                        'jwk',
-                        pubkey,
-                        algorithm,
-                        true,
-                        ['verify'],
-                    );
-                    return crypto.subtle.verify(
-                        algorithm,
-                        importedKey,
-                        signature,
-                        data,
-                    );
-
-
-                },
-            );
-            const issuerId = getAddressDID(signer.user.address, signer.user.chainId);
-            const credential = await this.renownService.getCredential(issuerId, signer.app.key)
-
-            if (!credential) {
-                throw new Error('Credential not found');
-            }
-
+            const verified = await this.#verifySignature(signer);
             return verified
         }));
 
         return results.filter(e => !e).length === 0
+    }
+
+    #verifySignature = async (signer: Omit<ActionSigner, 'signatures'> & {
+        signatures?: Signature[];
+    }) => {
+        // check signature
+        const algorithm = {
+            name: 'ECDSA',
+            namedCurve: 'P-256',
+            hash: 'SHA-256',
+        };
+
+        const verified = await utils.verifyOperationSignature(
+            signer.signatures!.at(0)!,
+            signer,
+            async (publicKey, signature, data) => {
+                let pubkey: JsonWebKey = publicKey as JsonWebKey;
+                if (publicKey.startsWith("did:key:")) {
+                    const doc = await this.didResolver.resolve(publicKey)
+                    const auth = doc.didDocument?.verificationMethod;
+                    if (auth?.[0]?.publicKeyJwk) {
+                        pubkey = auth[0].publicKeyJwk;
+                    }
+                }
+
+                const importedKey = await crypto.subtle.importKey(
+                    'jwk',
+                    pubkey,
+                    algorithm,
+                    true,
+                    ['verify'],
+                );
+                return crypto.subtle.verify(
+                    algorithm,
+                    importedKey,
+                    signature,
+                    data,
+                );
+
+
+            },
+        );
+
+        return verified
     }
 }
