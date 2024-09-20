@@ -41,7 +41,7 @@
     "optionalDependencies": {
         "@prisma/client": "^5.18.0",
         "localforage": "^1.10.0",
-        "redis": "^4.6.15",
+        "redis": "^4.7.0",
         "sequelize": "^6.37.3",
         "sqlite3": "^5.1.7"
     },
