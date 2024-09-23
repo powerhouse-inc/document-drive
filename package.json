@@ -46,14 +46,21 @@
         "sqlite3": "^5.1.7"
     },
     "dependencies": {
+        "@ceramicnetwork/codecs": "^5.4.0",
+        "@composedb/client": "^0.7.1",
+        "@composedb/types": "^0.7.1",
         "change-case": "^5.4.4",
+        "cross-eventsource": "^1.0.0",
+        "did-resolver": "^4.1.0",
         "exponential-backoff": "^3.1.1",
         "graphql": "^16.9.0",
         "graphql-request": "^6.1.0",
         "json-stringify-deterministic": "^1.0.12",
+        "key-did-resolver": "^4.0.0",
         "nanoevents": "^9.0.0",
         "sanitize-filename": "^1.6.3",
-        "uuid": "^9.0.1"
+        "uuid": "^9.0.1",
+        "wagmi": "^2.12.12"
     },
     "devDependencies": {
         "@commitlint/cli": "^18.6.1",
@@ -83,8 +90,8 @@
         "sqlite3": "^5.1.7",
         "typescript": "^5.5.3",
         "vitest": "^2.0.5",
-        "webdriverio": "^9.0.9",
-        "vitest-fetch-mock": "^0.3.0"
+        "vitest-fetch-mock": "^0.3.0",
+        "webdriverio": "^9.0.9"
     },
     "packageManager": "pnpm@9.1.4+sha256.30a1801ac4e723779efed13a21f4c39f9eb6c9fbb4ced101bce06b422593d7c9"
 }

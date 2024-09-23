@@ -101,6 +101,10 @@ import {
     type SynchronizationUnit
 } from './types';
 import { filterOperationsByRevision } from './utils';
+import { RenownVerificationService } from './verification/renown-verification.service';
+import { definition } from '../ceramic/definition';
+import { RuntimeCompositeDefinition } from '@composedb/types';
+import { SignatureVerificationService } from './verification/signature-verification.service';
 
 export * from './listener';
 export type * from './types';
@@ -111,8 +115,7 @@ export const PULL_DRIVE_INTERVAL = 5000;
 
 export class BaseDocumentDriveServer
     extends AbstractDocumentDriveServer
-    implements IBaseDocumentDriveServer
-{
+    implements IBaseDocumentDriveServer {
     private emitter = createNanoEvents<DriveEvents>();
     private cache: ICache;
     private documentModels: DocumentModel[];
@@ -131,6 +134,9 @@ export class BaseDocumentDriveServer
 
     protected options: Required<DocumentDriveServerOptions>;
 
+    protected renownVerificationService: RenownVerificationService;
+    protected signatureVerificationService: SignatureVerificationService;
+
     constructor(
         documentModels: DocumentModel[],
         storage: IDriveStorage = new MemoryStorage(),
@@ -141,6 +147,7 @@ export class BaseDocumentDriveServer
         super();
         this.options = {
             ...options,
+            ceramicUrl: options?.ceramicUrl ?? 'http://localhost:7007',
             defaultDrives: {
                 ...options?.defaultDrives
             },
@@ -180,6 +187,13 @@ export class BaseDocumentDriveServer
                 }
             }
         });
+
+        this.renownVerificationService = new RenownVerificationService({
+            definition: definition as RuntimeCompositeDefinition,
+            ceramicUrl: options?.ceramicUrl ?? 'http://localhost:7007',
+        });
+
+        this.signatureVerificationService = new SignatureVerificationService(this.renownVerificationService);
 
         this.initializePromise = this._initialize();
     }
@@ -332,28 +346,28 @@ export class BaseDocumentDriveServer
 
         const result = await (!strand.documentId
             ? this.queueDriveOperations(
-                  strand.driveId,
-                  operations as Operation<DocumentDriveAction | BaseAction>[],
-                  { source }
-              )
+                strand.driveId,
+                operations as Operation<DocumentDriveAction | BaseAction>[],
+                { source }
+            )
             : this.queueOperations(
-                  strand.driveId,
-                  strand.documentId,
-                  operations,
-                  { source }
-              ));
+                strand.driveId,
+                strand.documentId,
+                operations,
+                { source }
+            ));
 
         if (result.status === 'ERROR') {
             const syncUnits =
                 strand.documentId !== ''
                     ? (
-                          await this.getSynchronizationUnitsIds(
-                              strand.driveId,
-                              [strand.documentId],
-                              [strand.scope],
-                              [strand.branch]
-                          )
-                      ).map(s => s.syncId)
+                        await this.getSynchronizationUnitsIds(
+                            strand.driveId,
+                            [strand.documentId],
+                            [strand.scope],
+                            [strand.branch]
+                        )
+                    ).map(s => s.syncId)
                     : [strand.driveId];
 
             const operationSource = this.getOperationSource(source);
@@ -568,12 +582,12 @@ export class BaseDocumentDriveServer
             return documentId
                 ? this.addOperations(driveId, documentId, operations, options)
                 : this.addDriveOperations(
-                      driveId,
-                      operations as Operation<
-                          DocumentDriveAction | BaseAction
-                      >[],
-                      options
-                  );
+                    driveId,
+                    operations as Operation<
+                        DocumentDriveAction | BaseAction
+                    >[],
+                    options
+                );
         },
         processActionJob: async ({
             driveId,
@@ -584,10 +598,10 @@ export class BaseDocumentDriveServer
             return documentId
                 ? this.addActions(driveId, documentId, actions, options)
                 : this.addDriveActions(
-                      driveId,
-                      actions as Operation<DocumentDriveAction | BaseAction>[],
-                      options
-                  );
+                    driveId,
+                    actions as Operation<DocumentDriveAction | BaseAction>[],
+                    options
+                );
         },
         processJob: async (job: Job) => {
             if (isOperationJob(job)) {
@@ -645,6 +659,8 @@ export class BaseDocumentDriveServer
                     });
             });
         }
+
+        await this.renownVerificationService.init();
 
         return errors.length === 0 ? null : errors;
     }
@@ -768,14 +784,14 @@ export class BaseDocumentDriveServer
             const nodeUnits =
                 scope?.length || branch?.length
                     ? node.synchronizationUnits.filter(
-                          unit =>
-                              (!scope?.length ||
-                                  scope.includes(unit.scope) ||
-                                  scope.includes('*')) &&
-                              (!branch?.length ||
-                                  branch.includes(unit.branch) ||
-                                  branch.includes('*'))
-                      )
+                        unit =>
+                            (!scope?.length ||
+                                scope.includes(unit.scope) ||
+                                scope.includes('*')) &&
+                            (!branch?.length ||
+                                branch.includes(unit.branch) ||
+                                branch.includes('*'))
+                    )
                     : node.synchronizationUnits;
             if (!nodeUnits.length) {
                 continue;
@@ -872,10 +888,10 @@ export class BaseDocumentDriveServer
             syncId === '0'
                 ? { documentId: '', scope: 'global' }
                 : await this.getSynchronizationUnitIdInfo(
-                      driveId,
-                      syncId,
-                      loadedDrive
-                  );
+                    driveId,
+                    syncId,
+                    loadedDrive
+                );
 
         if (!syncUnit) {
             throw new Error(`Invalid Sync Id ${syncId} in drive ${driveId}`);
@@ -1264,11 +1280,11 @@ export class BaseDocumentDriveServer
                         e instanceof OperationError
                             ? e
                             : new OperationError(
-                                  'ERROR',
-                                  nextOperation,
-                                  (e as Error).message,
-                                  (e as Error).cause
-                              );
+                                'ERROR',
+                                nextOperation,
+                                (e as Error).message,
+                                (e as Error).cause
+                            );
 
                     // TODO: don't break on errors...
                     break;
@@ -1294,9 +1310,9 @@ export class BaseDocumentDriveServer
         const operations =
             options?.revisions !== undefined
                 ? filterOperationsByRevision(
-                      document.operations,
-                      options.revisions
-                  )
+                    document.operations,
+                    options.revisions
+                )
                 : document.operations;
         const documentOperations =
             DocumentUtils.documentHelpers.garbageCollectDocumentOperations(
@@ -1314,18 +1330,18 @@ export class BaseDocumentDriveServer
             ) {
                 lastRemainingOperation.resultingState = await (documentId
                     ? this.storage.getOperationResultingState?.(
-                          drive,
-                          documentId,
-                          lastRemainingOperation.index,
-                          lastRemainingOperation.scope,
-                          'main'
-                      )
+                        drive,
+                        documentId,
+                        lastRemainingOperation.index,
+                        lastRemainingOperation.scope,
+                        'main'
+                    )
                     : this.storage.getDriveOperationResultingState?.(
-                          drive,
-                          lastRemainingOperation.index,
-                          lastRemainingOperation.scope,
-                          'main'
-                      ));
+                        drive,
+                        lastRemainingOperation.index,
+                        lastRemainingOperation.scope,
+                        'main'
+                    ));
             }
         }
 
@@ -1353,9 +1369,9 @@ export class BaseDocumentDriveServer
         const revisionOperations =
             options?.revisions !== undefined
                 ? filterOperationsByRevision(
-                      documentStorage.operations,
-                      options.revisions
-                  )
+                    documentStorage.operations,
+                    options.revisions
+                )
                 : documentStorage.operations;
         const operations =
             baseUtils.documentHelpers.garbageCollectDocumentOperations(
@@ -1405,18 +1421,18 @@ export class BaseDocumentDriveServer
         if (lastRemainingOperation && !lastRemainingOperation.resultingState) {
             lastRemainingOperation.resultingState = await (id
                 ? this.storage.getOperationResultingState?.(
-                      drive,
-                      id,
-                      lastRemainingOperation.index,
-                      lastRemainingOperation.scope,
-                      'main'
-                  )
+                    drive,
+                    id,
+                    lastRemainingOperation.index,
+                    lastRemainingOperation.scope,
+                    'main'
+                )
                 : this.storage.getDriveOperationResultingState?.(
-                      drive,
-                      lastRemainingOperation.index,
-                      lastRemainingOperation.scope,
-                      'main'
-                  ));
+                    drive,
+                    lastRemainingOperation.index,
+                    lastRemainingOperation.scope,
+                    'main'
+                ));
         }
 
         const operationSignals: (() => Promise<SignalResult>)[] = [];
@@ -1895,11 +1911,11 @@ export class BaseDocumentDriveServer
                 error instanceof OperationError
                     ? error
                     : new OperationError(
-                          'ERROR',
-                          undefined,
-                          (error as Error).message,
-                          (error as Error).cause
-                      );
+                        'ERROR',
+                        undefined,
+                        (error as Error).message,
+                        (error as Error).cause
+                    );
 
             return {
                 status: operationError.status,
@@ -2199,11 +2215,11 @@ export class BaseDocumentDriveServer
                 error instanceof OperationError
                     ? error
                     : new OperationError(
-                          'ERROR',
-                          undefined,
-                          (error as Error).message,
-                          (error as Error).cause
-                      );
+                        'ERROR',
+                        undefined,
+                        (error as Error).message,
+                        (error as Error).cause
+                    );
 
             return {
                 status: operationError.status,
