@@ -192,7 +192,7 @@ export class ListenerManager extends BaseListenerManager {
 
         if (outdatedListeners.length) {
             willUpdate?.(outdatedListeners);
-            return this.triggerUpdate(forceSync, source, onError);
+            return this.triggerUpdate(forceSync, source, onError) as Promise<ListenerUpdate[]>;
         }
         return [];
     }
