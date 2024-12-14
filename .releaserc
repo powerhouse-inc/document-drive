@@ -1,13 +1,9 @@
 {
     "branches": [
-        "production",
+        "main",
         {
-            "name": "main",
+            "name": "next",
             "prerelease": "alpha"
-        },
-        {
-            "name": "experimental",
-            "prerelease": "experimental"
         }
     ],
     "plugins": [
